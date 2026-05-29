@@ -2,6 +2,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import type { PdfOcrOptions, PdfOcrResult, TextElement } from '@/types/pdf';
 import { coordinateSorter } from './CoordinateSorter';
+import { documentBuilder } from './DocumentBuilder';
 
 const loadImageToCanvas = (file: File): Promise<HTMLCanvasElement> => {
     return new Promise((resolve, reject) => {
@@ -169,7 +170,15 @@ export class PdfOcrService {
             }
 
             // Group elements using CoordinateSorter to ensure alignment/sorting logic runs
-            coordinateSorter.groupElementsByY(allElements);
+            const lines = coordinateSorter.groupElementsByY(allElements);
+
+            // Build the appropriate document based on format
+            let data: ArrayBuffer;
+            if (options.targetFormat === 'docx') {
+                data = await documentBuilder.buildWordDocument(lines);
+            } else {
+                data = await documentBuilder.buildExcelDocument(lines);
+            }
 
             // Target metadata
             const filename = file.name.replace(/\.[^/.]+$/, '') + `.${options.targetFormat}`;
@@ -181,7 +190,7 @@ export class PdfOcrService {
                 success: true,
                 filename,
                 mimeType,
-                data: new ArrayBuffer(0) // Placeholders for builders implemented in Wave 3
+                data
             };
 
         } catch (error) {
