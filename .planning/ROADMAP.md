@@ -40,7 +40,7 @@ Plans:
 
 Plans:
 - [x] 02-01: Write `PdfOcrService.ts` and implementation for digital PDF text coordinate grouping.
-- [ ] 02-02: Implement Tesseract.js worker with English and Vietnamese models for scanned files.
+- [x] 02-02: Implement Tesseract.js worker with English and Vietnamese models for scanned files.
 - [ ] 02-03: Create output spreadsheet (`exceljs`) and document (`docx`) builders.
 
 ### Phase 3: Document Conversion Pipelines
@@ -78,6 +78,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Setup | 2/2 | Complete   | 2026-05-29 |
-| 2. Parsing & OCR | 1/3 | In Progress|  |
+| 2. Parsing & OCR | 2/3 | In Progress|  |
 | 3. Pipelines | 0/2 | Not started | - |
 | 4. UI Dashboard | 0/2 | Not started | - |
