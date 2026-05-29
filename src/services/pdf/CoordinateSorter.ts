@@ -1,4 +1,4 @@
-﻿import type { TextElement, LineGroup } from '@/types/pdf';
+import type { TextElement, LineGroup } from '@/types/pdf';
 
 export class CoordinateSorter {
     /**
@@ -93,7 +93,7 @@ export class CoordinateSorter {
                 let closestIdx = 0;
                 let minDiff = Infinity;
                 for (let i = 0; i < columnHeaders.length; i++) {
-                    const diff = Math.abs(el.x - columnHeaders[i]);
+                    const diff = Math.abs(el.x - columnHeaders[i]!);
                     if (diff < minDiff) {
                         minDiff = diff;
                         closestIdx = i;
