@@ -88,12 +88,42 @@ export class DocumentBuilder {
 
         const buffer = await workbook.xlsx.writeBuffer();
         
-        // exceljs in Node returns Buffer, in browser returns ArrayBuffer.
-        // Convert Buffer to ArrayBuffer safely:
         if (typeof Buffer !== 'undefined' && Buffer.isBuffer(buffer)) {
             return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
         }
         return buffer as ArrayBuffer;
+    }
+
+    /**
+     * Build word document (.docx) from Y-coordinate groups
+     */
+    async buildWordDocument(lines: LineGroup[]): Promise<ArrayBuffer> {
+        const children: Paragraph[] = [];
+
+        for (const line of lines) {
+            const lineText = line.elements.map(e => e.text).join(' ');
+            const isHeading = line.averageFontSize > 18;
+
+            children.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: lineText,
+                            size: isHeading ? 32 : 24, // 16pt vs 12pt
+                            bold: isHeading
+                        })
+                    ],
+                    spacing: { after: 120 }
+                })
+            );
+        }
+
+        const doc = new Document({
+            sections: [{ properties: {}, children }]
+        });
+
+        const blob = await Packer.toBlob(doc);
+        return await blob.arrayBuffer();
     }
 }
 
