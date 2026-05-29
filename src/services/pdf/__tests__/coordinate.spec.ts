@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { coordinateSorter } from '../CoordinateSorter';
 import type { TextElement } from '@/types/pdf';
 
@@ -11,8 +11,8 @@ describe('CoordinateSorter Y-Grouping', () => {
         ];
         const lines = coordinateSorter.groupElementsByY(elements);
         expect(lines).toHaveLength(1);
-        expect(lines[0].elements).toHaveLength(1);
-        expect(lines[0].elements[0].text).toBe('Hello');
+        expect(lines[0]!.elements).toHaveLength(1);
+        expect(lines[0]!.elements[0]!.text).toBe('Hello');
     });
 
     it('should group elements in the same line when Y difference is below threshold', () => {
@@ -24,10 +24,10 @@ describe('CoordinateSorter Y-Grouping', () => {
         ];
         const lines = coordinateSorter.groupElementsByY(elements);
         expect(lines).toHaveLength(1);
-        expect(lines[0].elements).toHaveLength(2);
+        expect(lines[0]!.elements).toHaveLength(2);
         // And they should be sorted by X ascending: 'Hello' (x=20) then 'World' (x=80)
-        expect(lines[0].elements[0].text).toBe('Hello');
-        expect(lines[0].elements[1].text).toBe('World');
+        expect(lines[0]!.elements[0]!.text).toBe('Hello');
+        expect(lines[0]!.elements[1]!.text).toBe('World');
     });
 
     it('should separate elements into different lines when Y difference exceeds threshold', () => {
@@ -40,8 +40,8 @@ describe('CoordinateSorter Y-Grouping', () => {
         const lines = coordinateSorter.groupElementsByY(elements);
         expect(lines).toHaveLength(2);
         // Lines should be sorted by Y descending: Line 1 (y=100) first, Line 2 (y=90) second.
-        expect(lines[0].elements[0].text).toBe('Line 1');
-        expect(lines[1].elements[0].text).toBe('Line 2');
+        expect(lines[0]!.elements[0]!.text).toBe('Line 1');
+        expect(lines[1]!.elements[0]!.text).toBe('Line 2');
     });
 
     it('should sort elements horizontally from left-to-right (X ascending)', () => {
@@ -52,9 +52,9 @@ describe('CoordinateSorter Y-Grouping', () => {
         ];
         const lines = coordinateSorter.groupElementsByY(elements);
         expect(lines).toHaveLength(1);
-        expect(lines[0].elements[0].text).toBe('A');
-        expect(lines[0].elements[1].text).toBe('B');
-        expect(lines[0].elements[2].text).toBe('C');
+        expect(lines[0]!.elements[0]!.text).toBe('A');
+        expect(lines[0]!.elements[1]!.text).toBe('B');
+        expect(lines[0]!.elements[2]!.text).toBe('C');
     });
 });
 
@@ -76,10 +76,10 @@ describe('CoordinateSorter Excel Grid Mapping', () => {
         const grid = coordinateSorter.mapToExcelGrid(lines, 12);
         expect(grid).toHaveLength(2);
         // Expect 2 columns: Col 1 is at ~11, Col 2 is at ~106
-        expect(grid[0]).toHaveLength(2);
-        expect(grid[0][0]).toBe('Col 1 Row 1');
-        expect(grid[0][1]).toBe('Col 2 Row 1');
-        expect(grid[1][0]).toBe('Col 1 Row 2');
-        expect(grid[1][1]).toBe('Col 2 Row 2');
+        expect(grid[0]!.length).toBe(2);
+        expect(grid[0]![0]).toBe('Col 1 Row 1');
+        expect(grid[0]![1]).toBe('Col 2 Row 1');
+        expect(grid[1]![0]).toBe('Col 1 Row 2');
+        expect(grid[1]![1]).toBe('Col 2 Row 2');
     });
 });
