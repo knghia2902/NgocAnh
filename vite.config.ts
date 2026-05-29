@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
@@ -17,5 +17,9 @@ export default defineConfig({
     esbuildOptions: {
       target: 'es2022',
     },
+  },
+  test: {
+    environment: 'happy-dom',
+    setupFiles: ['./src/services/infrastructure/__tests__/setup.ts'],
   },
 })
