@@ -6,7 +6,7 @@ Implement serverless, client-side PDF document parsing, Optical Character Recogn
 
 ## Phases
 
-- [ ] **Phase 1: Dependency Setup & Worker Infrastructure** - Install packages and configure Vite.
+- [x] **Phase 1: Dependency Setup & Worker Infrastructure** - Install packages and configure Vite. (completed 2026-05-29)
 - [ ] **Phase 2: PDF Parsing & OCR Implementation** - Build coordinate line parsers and Tesseract.js workers.
 - [ ] **Phase 3: Document Conversion Pipelines** - Implement DOCX/XLSX to PDF conversion paths.
 - [ ] **Phase 4: UI Integration & Formats Dashboard** - Design tabs, dropzones, and progress indicators.
@@ -25,7 +25,7 @@ Implement serverless, client-side PDF document parsing, Optical Character Recogn
 
 Plans:
 - [x] 01-01: Install npm dependencies and adjust TSConfig/Vite settings.
-- [ ] 01-02: Create worker configuration wrappers and test loading states.
+- [x] 01-02: Create worker configuration wrappers and test loading states.
 
 ### Phase 2: PDF Parsing & OCR Implementation
 **Goal**: Build core parsing algorithms, Y-coordinate text grouping, and Tesseract.js web workers.
@@ -77,7 +77,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Setup | 1/2 | In Progress|  |
+| 1. Setup | 2/2 | Complete   | 2026-05-29 |
 | 2. Parsing & OCR | 0/3 | Not started | - |
 | 3. Pipelines | 0/2 | Not started | - |
 | 4. UI Dashboard | 0/2 | Not started | - |
