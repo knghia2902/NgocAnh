@@ -10,8 +10,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Conversion Core (CONV)
 
 - [ ] **CONV-01**: User can parse text elements and coordinate layouts from uploaded digital PDFs client-side using `pdfjs-dist`.
-- [ ] **CONV-02**: User can convert parsed digital PDF table coordinates into an Excel (`.xlsx`) sheet with appropriate row/column cell boundaries.
-- [ ] **CONV-03**: User can convert parsed digital PDF text segments into a Word (`.docx`) document, preserving basic paragraph flows and headings.
+- [x] **CONV-02**: User can convert parsed digital PDF table coordinates into an Excel (`.xlsx`) sheet with appropriate row/column cell boundaries.
+- [x] **CONV-03**: User can convert parsed digital PDF text segments into a Word (`.docx`) document, preserving basic paragraph flows and headings.
 - [ ] **CONV-04**: User can upload a Word (`.docx`) file, render a preview in the browser DOM, and convert it to a downloadable PDF file client-side.
 - [ ] **CONV-05**: User can upload an Excel (`.xlsx`) sheet, render a preview as an HTML table, and convert it to a downloadable PDF file client-side.
 
@@ -20,7 +20,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **OCR-01**: User can run OCR on scanned PDFs and images (PNG, JPG) in the browser to extract text lines using a `tesseract.js` worker.
 - [ ] **OCR-02**: User can select OCR languages, supporting English and Vietnamese models (`eng+vie`).
 - [ ] **OCR-03**: User receives real-time progress callbacks (status, percentage complete) during OCR execution.
-- [ ] **OCR-04**: User can export OCR text results directly to the Excel (.xlsx) and Word (.docx) generators.
+- [x] **OCR-04**: User can export OCR text results directly to the Excel (.xlsx) and Word (.docx) generators.
 
 ### User Interface (UI)
 
@@ -54,14 +54,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CONV-01 | Phase 2 | Pending |
-| CONV-02 | Phase 2 | Pending |
-| CONV-03 | Phase 2 | Pending |
+| CONV-02 | Phase 2 | Completed |
+| CONV-03 | Phase 2 | Completed |
 | CONV-04 | Phase 3 | Pending |
 | CONV-05 | Phase 3 | Pending |
 | OCR-01 | Phase 2 | Pending |
 | OCR-02 | Phase 2 | Pending |
 | OCR-03 | Phase 2 | Pending |
-| OCR-04 | Phase 2 | Pending |
+| OCR-04 | Phase 2 | Completed |
 | UI-01 | Phase 4 | Pending |
 | UI-02 | Phase 4 | Pending |
 | UI-03 | Phase 4 | Pending |
