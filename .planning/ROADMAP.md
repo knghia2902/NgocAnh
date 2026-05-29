@@ -24,7 +24,7 @@ Implement serverless, client-side PDF document parsing, Optical Character Recogn
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: Install npm dependencies and adjust TSConfig/Vite settings.
+- [x] 01-01: Install npm dependencies and adjust TSConfig/Vite settings.
 - [ ] 01-02: Create worker configuration wrappers and test loading states.
 
 ### Phase 2: PDF Parsing & OCR Implementation
@@ -77,7 +77,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Setup | 0/2 | Not started | - |
+| 1. Setup | 1/2 | In Progress|  |
 | 2. Parsing & OCR | 0/3 | Not started | - |
 | 3. Pipelines | 0/2 | Not started | - |
 | 4. UI Dashboard | 0/2 | Not started | - |
