@@ -1,6 +1,6 @@
 ﻿import { ExcelService } from '@/services/excel/ExcelService';
 import { renderAsync } from 'docx-preview';
-import { ConversionOptions, ConversionResult } from '@/types/conversion';
+import type { ConversionOptions, ConversionResult } from '@/types/conversion';
 
 class DocumentConversionService {
     private excelService: ExcelService;
@@ -48,7 +48,7 @@ class DocumentConversionService {
             const opt = { 
                 margin: 10, 
                 filename: filename, 
-                image: { type: 'jpeg', quality: 0.98 }, 
+                image: { type: 'jpeg' as const, quality: 0.98 }, 
                 html2canvas: { scale: 2 }, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
             };
