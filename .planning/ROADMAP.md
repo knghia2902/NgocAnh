@@ -55,7 +55,7 @@ Plans:
 
 Plans:
 - [x] 03-01: Build DOCX -> PDF pipeline using `docx-preview` and `html2pdf.js`.
-- [ ] 03-02: Build XLSX -> PDF pipeline using Excel parsing and `html2pdf.js`.
+- [x] 03-02: Build XLSX -> PDF pipeline using Excel parsing and `html2pdf.js`.
 
 ### Phase 4: UI Integration & Formats Dashboard
 **Goal**: Create responsive UI views, drag-and-drop dropzones, and link them to `/tools`.
