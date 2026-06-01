@@ -4,6 +4,7 @@ import { contentStore } from './stores/content';
 import { ContentService } from './services/ContentService';
 import { onMounted } from 'vue';
 import { VisitorTracker } from './services/VisitorTracker';
+import ToastNotification from './components/ui/ToastNotification.vue';
 
 onMounted(async () => {
     // Load all content from Supabase
@@ -48,5 +49,8 @@ onMounted(async () => {
             </p>
         </div>
     </footer>
+    <ToastNotification />
   </div>
 </template>
+
+
