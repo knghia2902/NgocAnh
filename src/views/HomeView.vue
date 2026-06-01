@@ -5,16 +5,16 @@ import { contentStore } from '../stores/content';
 <template>
   <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
     <!-- Sparkles visibility check could be added here if needed -->
-    <div v-if="contentStore.visibility.sparkles" class="absolute top-[15%] left-[10%] text-strawberry-cream floating-1 opacity-40">
+    <div v-if="contentStore.visibility.sparkles" class="absolute top-[15%] left-[10%] text-strawberry-cream floating-1 twinkle opacity-40">
       <span class="material-symbols-outlined text-4xl">colors_spark</span>
     </div>
-    <div class="absolute bottom-[20%] right-[15%] text-strawberry-cream floating-2 opacity-40">
+    <div v-if="contentStore.visibility.sparkles" class="absolute bottom-[20%] right-[15%] text-strawberry-cream floating-2 twinkle opacity-40">
       <span class="material-symbols-outlined text-5xl">favorite</span>
     </div>
-    <div class="absolute top-[60%] left-[5%] text-strawberry-cream floating-1 opacity-20" style="animation-delay: 2s">
+    <div v-if="contentStore.visibility.sparkles" class="absolute top-[60%] left-[5%] text-strawberry-cream floating-1 twinkle opacity-20" style="animation-delay: 2s">
       <span class="material-symbols-outlined text-6xl">flare</span>
     </div>
-    <div class="absolute top-[40%] right-[10%] text-strawberry-cream floating-2 opacity-30" style="animation-delay: 1s">
+    <div v-if="contentStore.visibility.sparkles" class="absolute top-[40%] right-[10%] text-strawberry-cream floating-2 twinkle opacity-30" style="animation-delay: 1s">
       <span class="material-symbols-outlined text-3xl">magic_button</span>
     </div>
   </div>

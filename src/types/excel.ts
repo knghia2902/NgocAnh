@@ -54,3 +54,32 @@ export interface ConversionProgress {
     percentage: number;
     message: string;
 }
+
+/**
+ * Options for Smart Merge
+ */
+export interface MergeOptions {
+    masterFile: File;
+    otherFiles: File[];
+    matchKey: string;
+    headerRow: number;
+    skipEmpty?: boolean;
+    mergeType?: 'exact' | 'fuzzy';
+    fuzzyThreshold?: number;
+}
+
+/**
+ * Result of a merge operation
+ */
+export interface MergeResult {
+    success: boolean;
+    buffer?: ArrayBuffer;
+    filename: string;
+    mimeType: string;
+    successCount: number;
+    errors: string[];
+    matchedRows: number;
+    newRowsAdded: number;
+    fuzzyMatches: number;
+    error?: string;
+}

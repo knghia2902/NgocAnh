@@ -34,7 +34,12 @@ onMounted(async () => {
         <router-link to="/contact" class="text-sm font-bold text-[#4a2c32]/80 hover:text-primary transition-colors border-b-2 border-transparent hover:border-primary" active-class="text-primary border-primary">About</router-link>
       </nav>
       <div class="flex items-center gap-4">
-        <router-link to="/admin" class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 border-2 border-pastel-pink cursor-pointer hover:border-primary transition-colors" :style="{ backgroundImage: `url(${contentStore.hero.image})` }"></router-link>
+        <router-link to="/admin" 
+          class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 border-2 border-pastel-pink cursor-pointer hover:border-primary transition-colors flex items-center justify-center overflow-hidden" 
+          :style="{ backgroundImage: `url(${contentStore.hero.avatar || 'https://ngocanhcute.vercel.app/avatar.jpg'})` }"
+        >
+          <img v-if="contentStore.hero.avatar" :src="contentStore.hero.avatar" class="hidden" @error="(e: any) => e.target.parentElement.style.backgroundImage = 'url(https://ngocanhcute.vercel.app/avatar.jpg)'" />
+        </router-link>
       </div>
     </header>
 

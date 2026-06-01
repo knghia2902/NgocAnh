@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --soft-rose: #fdf2f4;
+    --primary-pink: #ff6b81;
+    --text-main: #4a2c32;
+}
+
+body {
+    background-color: var(--soft-rose);
+    color: var(--text-main);
+    @apply font-display;
+}
+
 @layer components {
     .glow-primary {
         box-shadow: 0 0 20px rgba(240, 66, 110, 0.4);
@@ -36,6 +48,24 @@
 
         50% {
             transform: translateY(-20px) rotate(5deg);
+        }
+    }
+
+    .twinkle {
+        animation: twinkle 4s ease-in-out infinite;
+    }
+
+    @keyframes twinkle {
+
+        0%,
+        100% {
+            opacity: 0.3;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.8;
+            transform: scale(1.2);
         }
     }
 
