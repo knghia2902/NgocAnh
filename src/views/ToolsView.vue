@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import FormatConverter from '../components/tools/FormatConverter.vue';
+import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 </script>
 
 <template>
@@ -50,6 +51,10 @@ import FormatConverter from '../components/tools/FormatConverter.vue';
         <button disabled class="puffy-button py-4 w-full opacity-50">Biến hoá ngay ✨</button>
       </div>
 
+    </div>
+
+    <div class="mt-8">
+      <PdfOcrTools />
     </div>
 
     <!-- Features Info Footer -->
