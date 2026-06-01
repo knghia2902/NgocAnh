@@ -69,7 +69,7 @@ Plans:
 
 Plans:
 - [ ] 04-01: Design the `PdfOcrTools.vue` tabs, drag-and-drop panel, and progress indicators.
-- [ ] 04-02: Integrate views with PdfOcrService and style using Tailwind CSS.
+- [x] 04-02: Integrate views with PdfOcrService and style using Tailwind CSS.
 
 ## Progress
 
