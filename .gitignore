@@ -27,6 +27,10 @@ dist-ssr
 test-extract.ts
 test-ocr.ts
 test-ocr-words.ts
+test-ocr-layout.ts
+test-ocr-merge.ts
+test-ocr-reconstruct.ts
 scratch/
+
 
 
