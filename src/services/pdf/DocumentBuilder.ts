@@ -102,11 +102,6 @@ export class DocumentBuilder {
         }
 
         const buffer = await workbook.xlsx.writeBuffer();
-        
-        if (typeof Buffer !== 'undefined' && Buffer.isBuffer(buffer)) {
-            const buf = buffer as any;
-            return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-        }
         return buffer as ArrayBuffer;
     }
 
