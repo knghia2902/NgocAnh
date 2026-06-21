@@ -42,7 +42,7 @@ export class PdfOcrService {
     async process(file: File, options: PdfOcrOptions): Promise<PdfOcrResult> {
         try {
             // Configure PDF.js worker CDN route
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PdfOcrService.PDF_WORKER_VERSION}/pdf.worker.min.mjs`;
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PdfOcrService.PDF_WORKER_VERSION}/build/pdf.worker.min.mjs`;
 
             const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
             const allElements: TextElement[] = [];
@@ -128,9 +128,15 @@ export class PdfOcrService {
                         if (!item) continue;
                         const { canvas, scale } = item;
                         const { data } = await worker.recognize(canvas);
-                        const words: any[] = [];
-                        if (data.blocks) {
-                            for (const block of data.blocks) {
+                        const pageData = data as any;
+                        console.log(`[PDF/OCR Service] Page ${i + 1} recognized raw text:`, pageData.text);
+                        console.log(`[PDF/OCR Service] Page ${i + 1} words count:`, pageData.words?.length || 0);
+
+                        let words: any[] = [];
+                        if (pageData.words && pageData.words.length > 0) {
+                            words = pageData.words;
+                        } else if (pageData.blocks) {
+                            for (const block of pageData.blocks) {
                                 for (const paragraph of block.paragraphs) {
                                     for (const line of paragraph.lines) {
                                         for (const word of line.words) {
@@ -169,14 +175,19 @@ export class PdfOcrService {
                 }
             }
 
+            console.log(`[PDF/OCR Service] Total elements extracted: ${allElements.length}`);
+
             // Group elements using CoordinateSorter to ensure alignment/sorting logic runs
             const lines = coordinateSorter.groupElementsByY(allElements);
+            console.log(`[PDF/OCR Service] Total grouped lines: ${lines.length}`);
 
             // Build the appropriate document based on format
             let data: ArrayBuffer;
             if (options.targetFormat === 'docx') {
+                console.log(`[PDF/OCR Service] Building Word document with ${lines.length} lines`);
                 data = await documentBuilder.buildWordDocument(lines);
             } else {
+                console.log(`[PDF/OCR Service] Building Excel document with ${lines.length} lines`);
                 data = await documentBuilder.buildExcelDocument(lines);
             }
 

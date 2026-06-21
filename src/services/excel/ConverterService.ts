@@ -160,16 +160,20 @@ export class ConverterService {
             });
 
             // Auto-fit columns
-            worksheet.columns.forEach(column => {
-                if (column && column.eachCell) {
-                    let maxLength = 0;
-                    column.eachCell({ includeEmpty: false }, cell => {
-                        const cellValue = cell.value ? String(cell.value) : '';
-                        maxLength = Math.max(maxLength, cellValue.length);
-                    });
-                    column.width = Math.min(maxLength + 2, 50);
-                }
-            });
+            const colCount = worksheet.columnCount;
+            if (colCount > 0) {
+                worksheet.columns = Array.from({ length: colCount }, () => ({}));
+                worksheet.columns.forEach(column => {
+                    if (column && column.eachCell) {
+                        let maxLength = 0;
+                        column.eachCell({ includeEmpty: false }, cell => {
+                            const cellValue = cell.value ? String(cell.value) : '';
+                            maxLength = Math.max(maxLength, cellValue.length);
+                        });
+                        column.width = Math.min(maxLength + 2, 50);
+                    }
+                });
+            }
 
             const buffer = await this.excelService.writeExcel(workbook);
             const filename = file.name.replace(/\.[^/.]+$/, '') + '.xlsx';
@@ -286,16 +290,20 @@ export class ConverterService {
             };
 
             // Auto-fit columns
-            worksheet.columns.forEach(column => {
-                if (column && column.eachCell) {
-                    let maxLength = 0;
-                    column.eachCell({ includeEmpty: false }, cell => {
-                        const cellValue = cell.value ? String(cell.value) : '';
-                        maxLength = Math.max(maxLength, cellValue.length);
-                    });
-                    column.width = Math.min(maxLength + 2, 50);
-                }
-            });
+            const colCount = worksheet.columnCount;
+            if (colCount > 0) {
+                worksheet.columns = Array.from({ length: colCount }, () => ({}));
+                worksheet.columns.forEach(column => {
+                    if (column && column.eachCell) {
+                        let maxLength = 0;
+                        column.eachCell({ includeEmpty: false }, cell => {
+                            const cellValue = cell.value ? String(cell.value) : '';
+                            maxLength = Math.max(maxLength, cellValue.length);
+                        });
+                        column.width = Math.min(maxLength + 2, 50);
+                    }
+                });
+            }
 
             const buffer = await this.excelService.writeExcel(workbook);
             const filename = file.name.replace(/\.[^/.]+$/, '') + '.xlsx';

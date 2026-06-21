@@ -8,7 +8,7 @@ export class DiagnosticService {
      */
     static async checkPdfWorker(): Promise<boolean> {
         try {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${this.PDF_WORKER_VERSION}/pdf.worker.min.mjs`;
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${this.PDF_WORKER_VERSION}/build/pdf.worker.min.mjs`;
             
             // Mock minimal PDF header chunk (PDF-1.4) to trigger worker loading request
             const dummyPdf = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10]);
