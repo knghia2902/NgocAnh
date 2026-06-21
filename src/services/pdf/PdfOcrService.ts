@@ -127,7 +127,7 @@ export class PdfOcrService {
                         const item = canvases[i];
                         if (!item) continue;
                         const { canvas, scale } = item;
-                        const { data } = await worker.recognize(canvas);
+                        const { data } = await worker.recognize(canvas, {}, { blocks: true });
                         const pageData = data as any;
                         console.log(`[PDF/OCR Service] Page ${i + 1} recognized raw text:`, pageData.text);
                         console.log(`[PDF/OCR Service] Page ${i + 1} words count:`, pageData.words?.length || 0);

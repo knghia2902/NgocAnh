@@ -26,5 +26,7 @@ dist-ssr
 # Local test scripts
 test-extract.ts
 test-ocr.ts
+test-ocr-words.ts
 scratch/
+
 
