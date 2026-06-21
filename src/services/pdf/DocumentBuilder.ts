@@ -89,10 +89,10 @@ export class DocumentBuilder {
         const maxCols = grid.length > 0 && grid[0] ? grid[0].length : 0;
         if (maxCols > 0) {
             worksheet.columns = Array.from({ length: maxCols }, () => ({}));
-            worksheet.columns.forEach(column => {
+            worksheet.columns.forEach((column: any) => {
                 if (column && column.eachCell) {
                     let maxLength = 0;
-                    column.eachCell({ includeEmpty: false }, cell => {
+                    column.eachCell({ includeEmpty: false }, (cell: any) => {
                         const cellValue = cell.value ? String(cell.value) : '';
                         maxLength = Math.max(maxLength, cellValue.length);
                     });
