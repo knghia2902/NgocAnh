@@ -15,12 +15,57 @@ const cleanHeaderCell = (text: string): string => {
     const normalized = removeAccents(text.toLowerCase())
         .replace(/[^a-z0-9]/g, '');
     
-    if (normalized.includes('stt') || normalized.includes('st') || normalized === 'no') return 'STT';
-    if (normalized.includes('ten') || normalized.includes('vattu') || normalized.includes('hang') || normalized.includes('description') || normalized.includes('name')) return 'Tên vật tư, hàng hóa';
-    if (normalized.includes('dvt') || normalized === 'ow' || normalized.includes('tow') || normalized.includes('unit')) return 'ĐVT';
-    if (normalized.includes('sltong') || normalized.includes('tongsl') || normalized === 'sl' || normalized.includes('qty') || normalized.includes('quantity')) return 'SL tổng';
-    if (normalized.includes('vitri') || normalized.includes('location') || normalized.includes('kho')) return 'Vị trí';
-    if (normalized.includes('ghichu') || normalized.includes('note') || normalized.includes('remark')) return 'Ghi chú';
+    if (
+        normalized.includes('stt') || 
+        normalized.includes('st') || 
+        normalized === 'no' || 
+        normalized === 'sit' || 
+        normalized === 'si' ||
+        (normalized.includes('s') && normalized.includes('t'))
+    ) return 'STT';
+    
+    if (
+        normalized.includes('ten') || 
+        normalized.includes('vattu') || 
+        normalized.includes('hang') || 
+        normalized.includes('description') || 
+        normalized.includes('name')
+    ) return 'Tên vật tư, hàng hóa';
+    
+    if (
+        normalized.includes('dvt') || 
+        normalized === 'ow' || 
+        normalized.includes('tow') || 
+        normalized.includes('unit') || 
+        normalized.includes('pw') || 
+        normalized.includes('pvt') ||
+        normalized === 'vt'
+    ) return 'ĐVT';
+    
+    if (
+        normalized.includes('sltong') || 
+        normalized.includes('tongsl') || 
+        normalized === 'sl' || 
+        normalized.includes('qty') || 
+        normalized.includes('quantity') ||
+        normalized.includes('sftong') ||
+        normalized.includes('slwtong') ||
+        normalized.includes('tong')
+    ) return 'SL tổng';
+    
+    if (
+        normalized.includes('vitri') || 
+        (normalized.includes('vi') && normalized.includes('tri')) || 
+        normalized.includes('location') || 
+        normalized.includes('kho')
+    ) return 'Vị trí';
+    
+    if (
+        normalized.includes('ghichu') || 
+        normalized.includes('ghi') || 
+        normalized.includes('note') || 
+        normalized.includes('remark')
+    ) return 'Ghi chú';
     
     return text;
 };
