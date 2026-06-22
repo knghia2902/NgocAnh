@@ -4,18 +4,20 @@ import type { PdfOcrOptions, PdfOcrResult, TextElement, LineGroup } from '@/type
 import { coordinateSorter } from './CoordinateSorter';
 import { documentBuilder } from './DocumentBuilder';
 
-const loadImageToCanvas = (file: File): Promise<HTMLCanvasElement> => {
+const loadImageToCanvas = (file: File, scale: number = 2.0): Promise<HTMLCanvasElement> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
+                canvas.width = img.naturalWidth * scale;
+                canvas.height = img.naturalHeight * scale;
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
-                    ctx.drawImage(img, 0, 0);
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     resolve(canvas);
                 } else {
                     reject(new Error('Failed to get 2D context'));
@@ -49,8 +51,9 @@ export class PdfOcrService {
             const canvases: { canvas: HTMLCanvasElement; scale: number }[] = [];
 
             if (isImage) {
-                const canvas = await loadImageToCanvas(file);
-                canvases.push({ canvas, scale: 1.0 });
+                const scale = 2.0;
+                const canvas = await loadImageToCanvas(file, scale);
+                canvases.push({ canvas, scale });
             } else {
                 const pdfBuffer = await file.arrayBuffer();
                 const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
