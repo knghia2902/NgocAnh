@@ -31,6 +31,112 @@ const loadImageToCanvas = (file: File, scale: number = 2.0): Promise<HTMLCanvasE
     });
 };
 
+const preprocessCanvasForOcr = (canvas: HTMLCanvasElement): void => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx || typeof ctx.getImageData !== 'function') return;
+    const width = canvas.width;
+    const height = canvas.height;
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    
+    const pixels = new Uint8Array(width * height);
+    const threshold = 190;
+    
+    // 1. Grayscale and Binarize
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            const r = data[idx]!;
+            const g = data[idx + 1]!;
+            const b = data[idx + 2]!;
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            const isBlack = gray <= threshold;
+            pixels[y * width + x] = isBlack ? 1 : 0;
+        }
+    }
+    
+    // 2. Line detection and erasure
+    const toRemove = new Uint8Array(width * height);
+    const H_LINE_LEN = 100;
+    const V_LINE_LEN = 100;
+    
+    // Horizontal lines
+    for (let y = 0; y < height; y++) {
+        let runStart = -1;
+        for (let x = 0; x < width; x++) {
+            if (pixels[y * width + x] === 1) {
+                if (runStart === -1) runStart = x;
+            } else {
+                if (runStart !== -1) {
+                    const runLen = x - runStart;
+                    if (runLen >= H_LINE_LEN) {
+                        for (let rx = runStart; rx < x; rx++) {
+                            toRemove[y * width + rx] = 1;
+                        }
+                    }
+                    runStart = -1;
+                }
+            }
+        }
+        if (runStart !== -1) {
+            const runLen = width - runStart;
+            if (runLen >= H_LINE_LEN) {
+                for (let rx = runStart; rx < width; rx++) {
+                    toRemove[y * width + rx] = 1;
+                }
+            }
+        }
+    }
+    
+    // Vertical lines
+    for (let x = 0; x < width; x++) {
+        let runStart = -1;
+        for (let y = 0; y < height; y++) {
+            if (pixels[y * width + x] === 1) {
+                if (runStart === -1) runStart = y;
+            } else {
+                if (runStart !== -1) {
+                    const runLen = y - runStart;
+                    if (runLen >= V_LINE_LEN) {
+                        for (let ry = runStart; ry < y; ry++) {
+                            toRemove[ry * width + x] = 1;
+                        }
+                    }
+                    runStart = -1;
+                }
+            }
+        }
+        if (runStart !== -1) {
+            const runLen = height - runStart;
+            if (runLen >= V_LINE_LEN) {
+                for (let ry = runStart; ry < height; ry++) {
+                    toRemove[ry * width + x] = 1;
+                }
+            }
+        }
+    }
+    
+    // 3. Write back to imageData
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            if (toRemove[y * width + x] === 1) {
+                data[idx] = 255;
+                data[idx + 1] = 255;
+                data[idx + 2] = 255;
+            } else {
+                const val = pixels[y * width + x] === 1 ? 0 : 255;
+                data[idx] = val;
+                data[idx + 1] = val;
+                data[idx + 2] = val;
+            }
+            data[idx + 3] = 255; // Keep fully opaque
+        }
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
+};
+
 export class PdfOcrService {
     private static PDF_WORKER_VERSION = '5.7.284';
 
@@ -51,8 +157,9 @@ export class PdfOcrService {
             const canvases: { canvas: HTMLCanvasElement; scale: number }[] = [];
 
             if (isImage) {
-                const scale = 2.0;
+                const scale = 4.0;
                 const canvas = await loadImageToCanvas(file, scale);
+                preprocessCanvasForOcr(canvas);
                 canvases.push({ canvas, scale });
             } else {
                 const pdfBuffer = await file.arrayBuffer();
@@ -104,6 +211,7 @@ export class PdfOcrService {
                             throw new Error('Failed to get 2d context for canvas');
                         }
                         await page.render({ canvasContext: context, canvas, viewport }).promise;
+                        preprocessCanvasForOcr(canvas);
                         canvases.push({ canvas, scale: 2.0 });
                     }
                 }
@@ -127,6 +235,12 @@ export class PdfOcrService {
                         }
                     }
                 });
+
+                if (typeof worker.setParameters === 'function') {
+                    await worker.setParameters({
+                        tessedit_pageseg_mode: '3' as any,
+                    });
+                }
 
                 try {
                     for (let i = 0; i < totalPages; i++) {
