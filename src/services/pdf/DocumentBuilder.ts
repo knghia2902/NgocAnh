@@ -11,7 +11,7 @@ export class DocumentBuilder {
     /**
      * Merges elements on the same line that are close to each other
      */
-    mergeCloseElements(lines: LineGroup[]): LineGroup[] {
+    mergeCloseElements(lines: LineGroup[], maxThreshold: number = 12.0): LineGroup[] {
         const mergedLines: LineGroup[] = [];
         
         for (const line of lines) {
@@ -28,11 +28,12 @@ export class DocumentBuilder {
             for (let i = 1; i < sorted.length; i++) {
                 const next = sorted[i]!;
                 const gap = next.x - (current.x + current.width);
-                const threshold = 1.0 * Math.max(current.fontSize, next.fontSize);
+                const baseMin = maxThreshold > 12.0 ? maxThreshold - 2.0 : 8.0;
+                const threshold = Math.max(baseMin, Math.min(maxThreshold, 0.6 * Math.max(current.fontSize, next.fontSize)));
                 
                 if (gap < threshold) {
                     current.text = (current.text + ' ' + next.text).trim();
-                    current.width = (next.x + next.width) - current.x;
+                    current.width = Math.max(current.x + current.width, next.x + next.width) - current.x;
                     current.height = Math.max(current.height, next.height);
                     current.fontSize = Math.max(current.fontSize, next.fontSize);
                 } else {
@@ -56,12 +57,11 @@ export class DocumentBuilder {
      * Detects column boundaries using header-anchored gap-voting from RAW elements.
      */
     detectColumnBoundaries(lines: LineGroup[]): number[] {
-        // Run standard close-element merging first to group adjacent words (crucial for OCR where elements are individual words)
         const mergedLines = this.mergeCloseElements(lines);
-        const intervals = this.detectColumnIntervals(mergedLines);
+        const intervals = this.detectColumnIntervals(mergedLines, false);
         if (intervals.length < 2) return [];
 
-        // Find header block indices for gap-voting to exclude header rows from gap collection
+        // Find header block indices for gap-voting to exclude header rows from gap collection (on mergedLines)
         let mainHeaderIdx = -1;
         let maxElements = 0;
         const searchLimit = Math.min(10, mergedLines.length);
@@ -72,34 +72,7 @@ export class DocumentBuilder {
             }
         }
 
-        let minHeaderIdx = mainHeaderIdx;
-        let maxHeaderIdx = mainHeaderIdx;
-        if (mainHeaderIdx !== -1 && maxElements > 2) {
-            // Grow header block upward
-            for (let i = mainHeaderIdx - 1; i >= 0; i--) {
-                const line = mergedLines[i]!;
-                if (line.elements.length === 0 || this.checkPhysicalOverlap(line, mergedLines[mainHeaderIdx]!)) {
-                    break;
-                }
-                minHeaderIdx = i;
-            }
-            // Grow header block downward
-            for (let i = mainHeaderIdx + 1; i < mergedLines.length; i++) {
-                const line = mergedLines[i]!;
-                if (line.elements.length === 0) break;
-                const isSmallCount = line.elements.length <= Math.max(2, Math.floor(maxElements * 0.4));
-                if (!isSmallCount) break;
-                let overlapsWithHeader = false;
-                for (let h = minHeaderIdx; h <= maxHeaderIdx; h++) {
-                    if (this.checkPhysicalOverlap(line, mergedLines[h]!)) {
-                        overlapsWithHeader = true;
-                        break;
-                    }
-                }
-                if (!overlapsWithHeader) break;
-                maxHeaderIdx = i;
-            }
-        }
+        const maxHeaderIdx = mainHeaderIdx;
 
         // Define gap regions between adjacent header columns
         const gapRegions: { left: number; right: number; fallback: number }[] = [];
@@ -111,12 +84,11 @@ export class DocumentBuilder {
             });
         }
 
-        // Collect data row gaps and match to gap regions
+        // Collect data row gaps and match to gap regions (only below the header block on raw lines)
         const matchedGaps: { leftRight: number; rightLeft: number }[][] = gapRegions.map(() => []);
-        const TOLERANCE = 5;
+        const TOLERANCE = 15;
 
-        for (let lineIdx = 0; lineIdx < mergedLines.length; lineIdx++) {
-            if (lineIdx >= minHeaderIdx && lineIdx <= maxHeaderIdx) continue;
+        for (let lineIdx = maxHeaderIdx + 1; lineIdx < mergedLines.length; lineIdx++) {
             const line = mergedLines[lineIdx]!;
             if (line.elements.length < 2) continue;
 
@@ -147,8 +119,22 @@ export class DocumentBuilder {
         for (let g = 0; g < gapRegions.length; g++) {
             const edges = matchedGaps[g]!;
             if (edges.length > 0) {
-                const maxLeftRight = Math.max(...edges.map(e => e.leftRight));
-                const minRightLeft = Math.min(...edges.map(e => e.rightLeft));
+                let filteredEdges = edges;
+                if (edges.length > 2) {
+                    const centers = edges.map(e => (e.leftRight + e.rightLeft) / 2);
+                    let bestCenter = centers[0]!;
+                    let maxVotes = 0;
+                    for (const c of centers) {
+                        const votes = centers.filter(other => Math.abs(other - c) <= 8.0).length;
+                        if (votes > maxVotes) {
+                            maxVotes = votes;
+                            bestCenter = c;
+                        }
+                    }
+                    filteredEdges = edges.filter(e => Math.abs((e.leftRight + e.rightLeft) / 2 - bestCenter) <= 8.0);
+                }
+                const maxLeftRight = Math.max(...filteredEdges.map(e => e.leftRight));
+                const minRightLeft = Math.min(...filteredEdges.map(e => e.rightLeft));
                 boundaries.push((maxLeftRight + minRightLeft) / 2);
             } else {
                 boundaries.push(gapRegions[g]!.fallback);
@@ -161,7 +147,7 @@ export class DocumentBuilder {
     /**
      * Column-aware merge: prevent merging elements across column boundaries
      */
-    mergeWithBoundaries(lines: LineGroup[], boundaries: number[]): LineGroup[] {
+    mergeWithBoundaries(lines: LineGroup[], boundaries: number[], maxThreshold: number = 12.0): LineGroup[] {
         const mergedLines: LineGroup[] = [];
         for (const line of lines) {
             if (line.elements.length <= 1) {
@@ -174,7 +160,7 @@ export class DocumentBuilder {
             for (let i = 1; i < sorted.length; i++) {
                 const next = sorted[i]!;
                 const gap = next.x - (current.x + current.width);
-                const threshold = 1.0 * Math.max(current.fontSize, next.fontSize);
+                const threshold = Math.max(8.0, Math.min(maxThreshold, 0.6 * Math.max(current.fontSize, next.fontSize)));
                 
                 // Check if a boundary falls between elements
                 const curRight = current.x + current.width;
@@ -189,7 +175,7 @@ export class DocumentBuilder {
                 
                 if (gap < threshold && !crossesBoundary) {
                     current.text = (current.text + ' ' + next.text).trim();
-                    current.width = (next.x + next.width) - current.x;
+                    current.width = Math.max(current.x + current.width, next.x + next.width) - current.x;
                     current.height = Math.max(current.height, next.height);
                     current.fontSize = Math.max(current.fontSize, next.fontSize);
                 } else {
@@ -239,7 +225,7 @@ export class DocumentBuilder {
     /**
      * Detects column intervals based on overlapping text spans on multi-element rows, excluding titles.
      */
-    private detectColumnIntervals(lines: LineGroup[]): ColInterval[] {
+    private detectColumnIntervals(lines: LineGroup[], expandWithData: boolean = true): ColInterval[] {
         // Exclude title lines from contributing to column headers if possible
         let mainHeaderIdx = -1;
         let maxElements = 0;
@@ -269,52 +255,95 @@ export class DocumentBuilder {
                 }
                 minHeaderIdx = i;
             }
-            // Grow header block downward
-            for (let i = mainHeaderIdx + 1; i < lines.length; i++) {
-                const line = lines[i]!;
-                if (line.elements.length === 0) {
-                    break;
-                }
-                const isSmallCount = line.elements.length <= Math.max(2, Math.floor(maxElements * 0.4));
-                if (!isSmallCount) {
-                    break;
-                }
-                let overlapsWithHeader = false;
-                for (let h = minHeaderIdx; h <= maxHeaderIdx; h++) {
-                    if (this.checkPhysicalOverlap(line, lines[h]!)) {
-                        overlapsWithHeader = true;
-                        break;
+        }
+
+        const ALPHANUMERIC_REGEX = /[\p{L}\p{N}]/u;
+
+        if (minHeaderIdx !== -1 && maxHeaderIdx !== -1) {
+            const headerLines = lines.slice(minHeaderIdx, maxHeaderIdx + 1);
+            const mergedHeaderLines = this.mergeCloseElements(headerLines, 16.0);
+            let headerElements: TextElement[] = [];
+            for (const line of mergedHeaderLines) {
+                headerElements.push(...line.elements);
+            }
+            
+            // Filter out noisy punctuation elements
+            headerElements = headerElements.filter(el => ALPHANUMERIC_REGEX.test(el.text));
+            
+            // Build initial disjoint header intervals
+            const rawRanges = headerElements.map(el => ({
+                minX: el.x,
+                maxX: el.x + el.width
+            })).sort((a, b) => a.minX - b.minX);
+            
+            let intervals: ColInterval[] = [];
+            if (rawRanges.length > 0) {
+                let current = { ...rawRanges[0]! };
+                for (let i = 1; i < rawRanges.length; i++) {
+                    const next = rawRanges[i]!;
+                    const overlap = Math.max(0, Math.min(current.maxX, next.maxX) - Math.max(current.minX, next.minX));
+                    const isDuplicate = (next.maxX - next.minX) - overlap < 2 || (current.maxX - current.minX) - overlap < 2;
+                    
+                    if (next.minX < current.maxX && (overlap > 5 || isDuplicate)) {
+                        current.maxX = Math.max(current.maxX, next.maxX);
+                    } else {
+                        intervals.push(current);
+                        current = { ...next };
                     }
                 }
-                if (!overlapsWithHeader) {
-                    break;
-                }
-                maxHeaderIdx = i;
+                intervals.push(current);
             }
+            
+            intervals.sort((a, b) => a.minX - b.minX);
+
+            if (expandWithData) {
+                // Expand header intervals using data rows (below maxHeaderIdx)
+                for (let i = maxHeaderIdx + 1; i < lines.length; i++) {
+                    const line = lines[i]!;
+                    if (line.elements.length === 0) continue;
+                    const mergedLine = this.mergeCloseElements([line])[0]!;
+                    
+                    const validElements = mergedLine.elements.filter(el => ALPHANUMERIC_REGEX.test(el.text));
+                    if (validElements.length === 0) continue;
+                    
+                    const path = this.findOptimalAssignment(validElements, intervals);
+                    for (let idx = 0; idx < validElements.length; idx++) {
+                        const el = validElements[idx]!;
+                        const colIdx = path[idx]!;
+                        if (colIdx === undefined) continue;
+                        
+                        const leftLimit = colIdx === 0 ? 0 : intervals[colIdx - 1]!.maxX;
+                        const rightLimit = colIdx === intervals.length - 1 ? Infinity : intervals[colIdx + 1]!.minX;
+                        
+                        const newMinX = Math.max(el.x, leftLimit);
+                        const newMaxX = Math.min(el.x + el.width, rightLimit);
+                        
+                        intervals[colIdx]!.minX = Math.min(intervals[colIdx]!.minX, newMinX);
+                        intervals[colIdx]!.maxX = Math.max(intervals[colIdx]!.maxX, newMaxX);
+                    }
+                }
+            }
+            
+            return intervals;
         }
 
+        // Fallback for non-header case (e.g. key-value documents)
         let colElements: TextElement[] = [];
-        if (minHeaderIdx !== -1 && maxHeaderIdx !== -1) {
-            for (let i = minHeaderIdx; i <= maxHeaderIdx; i++) {
-                const line = lines[i]!;
+        const mergedLines = this.mergeCloseElements(lines);
+        for (const line of mergedLines) {
+            if (line.elements.length > 1) {
                 colElements.push(...line.elements);
-            }
-        } else {
-            for (const line of lines) {
-                if (line.elements.length > 1) {
-                    colElements.push(...line.elements);
-                }
             }
         }
 
-        // Fallback if no elements collected
         if (colElements.length === 0) {
-            for (const line of lines) {
+            for (const line of mergedLines) {
                 colElements.push(...line.elements);
             }
         }
 
-        // Build disjoint intervals by merging overlapping element ranges with padding = 0 (using a sorted interval merge)
+        colElements = colElements.filter(el => ALPHANUMERIC_REGEX.test(el.text));
+
         const rawRanges = colElements.map(el => ({
             minX: el.x,
             maxX: el.x + el.width
@@ -340,6 +369,93 @@ export class DocumentBuilder {
 
         intervals.sort((a, b) => a.minX - b.minX);
         return intervals;
+    }
+
+    /**
+     * Finds the geometrically optimal assignment of elements to column intervals,
+     * maintaining strictly increasing column indices (left-to-right order) for elements
+     * on the same line, and avoiding invalid cross-column assignments.
+     */
+    private findOptimalAssignment(elements: TextElement[], intervals: ColInterval[]): number[] {
+        const n = elements.length;
+        const M = intervals.length;
+        if (n === 0) return [];
+        
+        const memo = new Map<string, { cost: number; path: number[] }>();
+        
+        const solve = (idx: number, lastCol: number): { cost: number; path: number[] } => {
+            if (idx === n) {
+                return { cost: 0, path: [] };
+            }
+            const key = `${idx},${lastCol}`;
+            if (memo.has(key)) return memo.get(key)!;
+            
+            let bestCost = Infinity;
+            let bestPath: number[] = [];
+            
+            const startCol = lastCol + 1;
+            const endCol = M - (n - idx);
+            
+            for (let col = startCol; col <= endCol; col++) {
+                const el = elements[idx]!;
+                const inv = intervals[col]!;
+                const startX = el.x;
+                const endX = el.x + el.width;
+                
+                // Geometric constraint: cannot be completely to the right of the column
+                // Allow a small tolerance of 5 pixels
+                if (startX + 5 >= inv.maxX) {
+                    continue;
+                }
+                
+                // Geometric constraint: cannot be completely to the left of the column
+                // Allow a small tolerance of 5 pixels
+                if (endX - 5 <= inv.minX) {
+                    continue;
+                }
+                
+                // Cost calculation: distance to interval
+                const overlap = Math.max(0, Math.min(endX, inv.maxX) - Math.max(startX, inv.minX));
+                let cost = 0;
+                if (overlap === 0) {
+                    cost = Math.max(0, inv.minX - endX, startX - inv.maxX);
+                }
+                
+                const res = solve(idx + 1, col);
+                const totalCost = cost + res.cost;
+                if (totalCost < bestCost) {
+                    bestCost = totalCost;
+                    bestPath = [col, ...res.path];
+                }
+            }
+            
+            const result = { cost: bestCost, path: bestPath };
+            memo.set(key, result);
+            return result;
+        };
+        
+        const path = solve(0, -1).path;
+        if (path.length === 0) {
+            // Fallback: greedy mapping if no valid path exists
+            const fallbackPath: number[] = [];
+            let last = -1;
+            for (const el of elements) {
+                let bestIdx = Math.min(last + 1, M - 1);
+                let bestDist = Infinity;
+                for (let k = bestIdx; k < M; k++) {
+                    const inv = intervals[k]!;
+                    const dist = Math.max(0, inv.minX - (el.x + el.width), el.x - inv.maxX);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestIdx = k;
+                    }
+                }
+                fallbackPath.push(bestIdx);
+                last = bestIdx;
+            }
+            return fallbackPath;
+        }
+        return path;
     }
 
     /**
