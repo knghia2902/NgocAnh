@@ -62,16 +62,7 @@ export class DocumentBuilder {
         if (intervals.length < 2) return [];
 
         // Find header block indices for gap-voting to exclude header rows from gap collection (on mergedLines)
-        let mainHeaderIdx = -1;
-        let maxElements = 0;
-        const searchLimit = Math.min(10, mergedLines.length);
-        for (let i = 0; i < searchLimit; i++) {
-            if (mergedLines[i]!.elements.length > maxElements) {
-                maxElements = mergedLines[i]!.elements.length;
-                mainHeaderIdx = i;
-            }
-        }
-
+        const mainHeaderIdx = this.findHeaderRowIndex(mergedLines);
         const maxHeaderIdx = mainHeaderIdx;
 
         // Define gap regions between adjacent header columns
@@ -227,21 +218,11 @@ export class DocumentBuilder {
      */
     private detectColumnIntervals(lines: LineGroup[], expandWithData: boolean = true): ColInterval[] {
         // Exclude title lines from contributing to column headers if possible
-        let mainHeaderIdx = -1;
-        let maxElements = 0;
-        const searchLimit = Math.min(10, lines.length);
-
-        for (let i = 0; i < searchLimit; i++) {
-            const line = lines[i]!;
-            if (line.elements.length > maxElements) {
-                maxElements = line.elements.length;
-                mainHeaderIdx = i;
-            }
-        }
+        const mainHeaderIdx = this.findHeaderRowIndex(lines);
 
         let minHeaderIdx = -1;
         let maxHeaderIdx = -1;
-        if (mainHeaderIdx !== -1 && maxElements > 2) {
+        if (mainHeaderIdx !== -1) {
             minHeaderIdx = mainHeaderIdx;
             maxHeaderIdx = mainHeaderIdx;
             // Grow header block upward
@@ -582,24 +563,15 @@ export class DocumentBuilder {
             const gridEndRowIdx = worksheet.rowCount;
 
             // 2. Local Header & Title Detection for this page using lines array (restricted to first 10 rows to avoid data rows with high element counts)
-            let mainHeaderIdx = -1;
-            let maxElements = 0;
-            const searchLimit = Math.min(10, lines.length);
-
-            for (let i = 0; i < searchLimit; i++) {
-                const line = lines[i]!;
-                if (line.elements.length > maxElements) {
-                    maxElements = line.elements.length;
-                    mainHeaderIdx = i;
-                }
-            }
+            const mainHeaderIdx = this.findHeaderRowIndex(lines);
 
             let minHeaderIdx = -1;
             let maxHeaderIdx = -1;
 
-            if (mainHeaderIdx !== -1 && maxElements > 2) {
+            if (mainHeaderIdx !== -1) {
                 minHeaderIdx = mainHeaderIdx;
                 maxHeaderIdx = mainHeaderIdx;
+                const maxElements = lines[mainHeaderIdx]!.elements.length;
 
                 // Grow header block upward
                 for (let i = mainHeaderIdx - 1; i >= 0; i--) {
@@ -935,6 +907,48 @@ export class DocumentBuilder {
 
         const blob = await Packer.toBlob(doc);
         return await blob.arrayBuffer();
+    }
+
+    private findHeaderRowIndex(lines: LineGroup[]): number {
+        let mainHeaderIdx = -1;
+        let maxScore = 0;
+        const searchLimit = Math.min(10, lines.length);
+
+        for (let i = 0; i < searchLimit; i++) {
+            const line = lines[i]!;
+            const lineText = line.elements.map(el => el.text).join(' ');
+            const score = this.getHeaderScore(lineText);
+            if (score > maxScore) {
+                maxScore = score;
+                mainHeaderIdx = i;
+            }
+        }
+
+        if (mainHeaderIdx === -1 || maxScore < 3) {
+            let maxElements = 0;
+            for (let i = 0; i < searchLimit; i++) {
+                const line = lines[i]!;
+                if (line.elements.length > maxElements) {
+                    maxElements = line.elements.length;
+                    mainHeaderIdx = i;
+                }
+            }
+        }
+        return mainHeaderIdx;
+    }
+
+    private getHeaderScore(text: string): number {
+        const lower = text.toLowerCase();
+        let score = 0;
+        
+        if (/\b(stt|st|no|số tt|so tt)\b/.test(lower)) score += 2;
+        if (/\b(tên|ten|vật tư|vat tu|hàng|hang|nhãn|nhan|hiệu|hieu|quy cách|quy cach|description|name|tent)\b/.test(lower)) score += 2;
+        if (/\b(đvt|dvt|đơn vị|don vi|unit|tow)\b/.test(lower)) score += 2;
+        if (/\b(sl|số lượng|so luong|qty|quantity|lê sl)\b/.test(lower)) score += 2;
+        if (/\b(vị trí|vi tri|location|kho|vir mm|vir|vec)\b/.test(lower)) score += 2;
+        if (/\b(ghi chú|ghi chu|note|notes|remark|remarks|ewe)\b/.test(lower)) score += 2;
+        
+        return score;
     }
 }
 
