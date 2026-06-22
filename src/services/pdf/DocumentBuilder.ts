@@ -12,62 +12,22 @@ const removeAccents = (str: string): string => {
 };
 
 const cleanHeaderCell = (text: string): string => {
-    const normalized = removeAccents(text.toLowerCase())
-        .replace(/[^a-z0-9]/g, '');
+    // Strip leading/trailing vertical bars and brackets
+    let clean = text
+        .replace(/^[|[\]\s_-]+/, '')
+        .replace(/[|[\]\s_-]+$/, '')
+        .trim();
+        
+    const normalized = removeAccents(clean.toLowerCase()).replace(/\s+/g, '');
     
-    if (
-        normalized.includes('stt') || 
-        normalized.includes('st') || 
-        normalized === 'no' || 
-        normalized === 'sit' || 
-        normalized === 'si' ||
-        (normalized.includes('s') && normalized.includes('t'))
-    ) return 'STT';
+    // Generic layout header spacing and typo corrections
+    if (normalized === 'stt' || normalized === 'st' || normalized === 'sit' || normalized === 'sitt') return 'STT';
+    if (normalized === 'vitri') return 'Vị trí';
+    if (normalized === 'ghichu') return 'Ghi chú';
+    if (normalized === 'sltong') return 'SL tổng';
+    if (normalized === 'tenvattu') return 'Tên vật tư';
     
-    if (
-        normalized.includes('ten') || 
-        normalized.includes('vattu') || 
-        normalized.includes('hang') || 
-        normalized.includes('description') || 
-        normalized.includes('name')
-    ) return 'Tên vật tư, hàng hóa';
-    
-    if (
-        normalized.includes('dvt') || 
-        normalized === 'ow' || 
-        normalized.includes('tow') || 
-        normalized.includes('unit') || 
-        normalized.includes('pw') || 
-        normalized.includes('pvt') ||
-        normalized === 'vt'
-    ) return 'ĐVT';
-    
-    if (
-        normalized.includes('sltong') || 
-        normalized.includes('tongsl') || 
-        normalized === 'sl' || 
-        normalized.includes('qty') || 
-        normalized.includes('quantity') ||
-        normalized.includes('sftong') ||
-        normalized.includes('slwtong') ||
-        normalized.includes('tong')
-    ) return 'SL tổng';
-    
-    if (
-        normalized.includes('vitri') || 
-        (normalized.includes('vi') && normalized.includes('tri')) || 
-        normalized.includes('location') || 
-        normalized.includes('kho')
-    ) return 'Vị trí';
-    
-    if (
-        normalized.includes('ghichu') || 
-        normalized.includes('ghi') || 
-        normalized.includes('note') || 
-        normalized.includes('remark')
-    ) return 'Ghi chú';
-    
-    return text;
+    return clean;
 };
 
 export class DocumentBuilder {

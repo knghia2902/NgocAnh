@@ -221,7 +221,14 @@ export class PdfOcrService {
                 const totalPages = canvases.length;
                 let currentPageIdx = 0;
 
+                // Load traineddata from local server instead of CDN to prevent network loading failures
+                const langPath = typeof window !== 'undefined'
+                    ? `${window.location.origin}/tessdata`
+                    : undefined;
+
                 const worker = await createWorker('eng+vie', 1, {
+                    langPath,
+                    gzip: false,
                     logger: (m) => {
                         if (m.status === 'recognizing text' && options.onProgress) {
                             const pageProgress = m.progress || 0;
