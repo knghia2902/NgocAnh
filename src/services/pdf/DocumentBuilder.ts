@@ -7,6 +7,24 @@ interface ColInterval {
     maxX: number;
 }
 
+const removeAccents = (str: string): string => {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+};
+
+const cleanHeaderCell = (text: string): string => {
+    const normalized = removeAccents(text.toLowerCase())
+        .replace(/[^a-z0-9]/g, '');
+    
+    if (normalized.includes('stt') || normalized.includes('st') || normalized === 'no') return 'STT';
+    if (normalized.includes('ten') || normalized.includes('vattu') || normalized.includes('hang') || normalized.includes('description') || normalized.includes('name')) return 'Tên vật tư, hàng hóa';
+    if (normalized.includes('dvt') || normalized === 'ow' || normalized.includes('tow') || normalized.includes('unit')) return 'ĐVT';
+    if (normalized.includes('sltong') || normalized.includes('tongsl') || normalized === 'sl' || normalized.includes('qty') || normalized.includes('quantity')) return 'SL tổng';
+    if (normalized.includes('vitri') || normalized.includes('location') || normalized.includes('kho')) return 'Vị trí';
+    if (normalized.includes('ghichu') || normalized.includes('note') || normalized.includes('remark')) return 'Ghi chú';
+    
+    return text;
+};
+
 export class DocumentBuilder {
     /**
      * Merges elements on the same line that are close to each other
@@ -190,7 +208,10 @@ export class DocumentBuilder {
     mapWithBoundaries(lines: LineGroup[], boundaries: number[]): string[][] {
         const numCols = boundaries.length + 1;
         const grid: string[][] = [];
-        for (const line of lines) {
+        const headerIdx = this.findHeaderRowIndex(lines);
+
+        for (let idx = 0; idx < lines.length; idx++) {
+            const line = lines[idx]!;
             const row = Array(numCols).fill('');
             for (const el of line.elements) {
                 const startX = el.x;
@@ -208,6 +229,22 @@ export class DocumentBuilder {
                 }
                 row[bestIdx] = row[bestIdx] ? (row[bestIdx] + ' ' + el.text).trim() : el.text;
             }
+
+            // Clean cell values
+            const isHeader = idx === headerIdx;
+            for (let i = 0; i < numCols; i++) {
+                if (row[i]) {
+                    let clean = row[i]
+                        .replace(/^[|[\]\s_-]+/, '')
+                        .replace(/[|[\]\s_-]+$/, '')
+                        .trim();
+                    if (isHeader) {
+                        clean = cleanHeaderCell(clean);
+                    }
+                    row[i] = clean;
+                }
+            }
+
             grid.push(row);
         }
         return grid;
@@ -242,7 +279,7 @@ export class DocumentBuilder {
 
         if (minHeaderIdx !== -1 && maxHeaderIdx !== -1) {
             const headerLines = lines.slice(minHeaderIdx, maxHeaderIdx + 1);
-            const mergedHeaderLines = this.mergeCloseElements(headerLines, 16.0);
+            const mergedHeaderLines = this.mergeCloseElements(headerLines, 10.0);
             let headerElements: TextElement[] = [];
             for (const line of mergedHeaderLines) {
                 headerElements.push(...line.elements);
@@ -459,7 +496,10 @@ export class DocumentBuilder {
             }
 
             const grid: string[][] = [];
-            for (const line of lines) {
+            const headerIdx = this.findHeaderRowIndex(lines);
+
+            for (let idx = 0; idx < lines.length; idx++) {
+                const line = lines[idx]!;
                 const row = Array(intervals.length).fill('');
                 for (const el of line.elements) {
                     const startX = el.x;
@@ -483,6 +523,22 @@ export class DocumentBuilder {
                         ? (row[closestIdx] + ' ' + el.text).trim()
                         : el.text;
                 }
+
+                // Clean cell values
+                const isHeader = idx === headerIdx;
+                for (let i = 0; i < intervals.length; i++) {
+                    if (row[i]) {
+                        let clean = row[i]
+                            .replace(/^[|[\]\s_-]+/, '')
+                            .replace(/[|[\]\s_-]+$/, '')
+                            .trim();
+                        if (isHeader) {
+                            clean = cleanHeaderCell(clean);
+                        }
+                        row[i] = clean;
+                    }
+                }
+
                 grid.push(row);
             }
 
@@ -666,7 +722,13 @@ export class DocumentBuilder {
                         }
 
                         if (values.length > 0) {
-                            const joinedValue = values.join('\n');
+                            const uniqueValues: string[] = [];
+                            for (const val of values) {
+                                if (!uniqueValues.some(v => v.toLowerCase() === val.toLowerCase())) {
+                                    uniqueValues.push(val);
+                                }
+                            }
+                            const joinedValue = uniqueValues.join('\n');
                             const topCell = worksheet.getRow(wsMinHeaderIdx).getCell(c);
                             topCell.value = joinedValue;
 

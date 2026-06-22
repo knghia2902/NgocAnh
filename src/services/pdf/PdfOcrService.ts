@@ -57,8 +57,8 @@ const preprocessCanvasForOcr = (canvas: HTMLCanvasElement): void => {
     
     // 2. Line detection and erasure
     const toRemove = new Uint8Array(width * height);
-    const H_LINE_LEN = 100;
-    const V_LINE_LEN = 100;
+    const H_LINE_LEN = 60;
+    const V_LINE_LEN = 60;
     
     // Horizontal lines
     for (let y = 0; y < height; y++) {
@@ -238,7 +238,7 @@ export class PdfOcrService {
 
                 if (typeof worker.setParameters === 'function') {
                     await worker.setParameters({
-                        tessedit_pageseg_mode: '3' as any,
+                        tessedit_pageseg_mode: '6' as any,
                     });
                 }
 
