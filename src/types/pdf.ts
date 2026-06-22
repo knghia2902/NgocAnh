@@ -1,4 +1,4 @@
-﻿// PDF and OCR type definitions
+// PDF and OCR type definitions
 
 export interface TextElement {
     text: string;
@@ -34,4 +34,5 @@ export interface PdfOcrResult {
     filename: string;
     mimeType: string;
     error?: string;
+    pagesGrids?: string[][][];
 }

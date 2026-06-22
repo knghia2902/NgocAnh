@@ -18,7 +18,7 @@ export class CoordinateSorter {
             // threshold = 0.5 * Math.max(el.fontSize, line.averageFontSize)
             const matchingLine = lines.find(line => {
                 const distance = Math.abs(el.y - line.y);
-                const threshold = 0.5 * Math.max(el.fontSize, line.averageFontSize);
+                const threshold = 0.8 * Math.max(el.fontSize, line.averageFontSize);
                 return distance < threshold;
             });
 

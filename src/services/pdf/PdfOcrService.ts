@@ -1,6 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
-import type { PdfOcrOptions, PdfOcrResult, TextElement } from '@/types/pdf';
+import type { PdfOcrOptions, PdfOcrResult, TextElement, LineGroup } from '@/types/pdf';
 import { coordinateSorter } from './CoordinateSorter';
 import { documentBuilder } from './DocumentBuilder';
 
@@ -45,7 +45,7 @@ export class PdfOcrService {
             pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PdfOcrService.PDF_WORKER_VERSION}/build/pdf.worker.min.mjs`;
 
             const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
-            const allElements: TextElement[] = [];
+            const pagesElements: TextElement[][] = [];
             const canvases: { canvas: HTMLCanvasElement; scale: number }[] = [];
 
             if (isImage) {
@@ -63,11 +63,12 @@ export class PdfOcrService {
                     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                         const page = await pdf.getPage(pageNum);
                         const textContent = await page.getTextContent();
+                        const pageElements: TextElement[] = [];
 
                         for (const item of textContent.items) {
                             if ('str' in item) {
                                 const transform = item.transform;
-                                allElements.push({
+                                pageElements.push({
                                     text: item.str,
                                     x: transform[4],
                                     y: transform[5],
@@ -77,15 +78,18 @@ export class PdfOcrService {
                                 });
                             }
                         }
+                        pagesElements.push(pageElements);
                     }
 
                     // Fallback to OCR if no text elements found
-                    if (allElements.length === 0) {
+                    const totalElementsCount = pagesElements.reduce((sum, list) => sum + list.length, 0);
+                    if (totalElementsCount === 0) {
                         runOcr = true;
                     }
                 }
 
                 if (runOcr) {
+                    pagesElements.length = 0; // Clear empty digital pages if falling back to OCR
                     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                         const page = await pdf.getPage(pageNum);
                         const viewport = page.getViewport({ scale: 2.0 });
@@ -148,8 +152,9 @@ export class PdfOcrService {
                         }
                         const pageHeight = canvas.height;
 
+                        const pageElements: TextElement[] = [];
                         for (const word of words) {
-                            allElements.push({
+                            pageElements.push({
                                 text: word.text,
                                 x: word.bbox.x0 / scale,
                                 y: (pageHeight - word.bbox.y1) / scale,
@@ -158,6 +163,7 @@ export class PdfOcrService {
                                 fontSize: (word.bbox.y1 - word.bbox.y0) / scale
                             });
                         }
+                        pagesElements.push(pageElements);
 
                         if (options.onProgress) {
                             options.onProgress(
@@ -175,21 +181,38 @@ export class PdfOcrService {
                 }
             }
 
-            console.log(`[PDF/OCR Service] Total elements extracted: ${allElements.length}`);
+            const totalElements = pagesElements.reduce((sum, list) => sum + list.length, 0);
+            console.log(`[PDF/OCR Service] Total elements extracted: ${totalElements}`);
 
-            // Group elements using CoordinateSorter to ensure alignment/sorting logic runs
-            const lines = coordinateSorter.groupElementsByY(allElements);
-            console.log(`[PDF/OCR Service] Total grouped lines: ${lines.length}`);
+            // Group elements using CoordinateSorter page-by-page
+            const pagesLines: LineGroup[][] = pagesElements.map(pageEls =>
+                coordinateSorter.groupElementsByY(pageEls)
+            );
+            const totalLinesCount = pagesLines.reduce((sum, list) => sum + list.length, 0);
+            console.log(`[PDF/OCR Service] Total grouped lines across pages: ${totalLinesCount}`);
 
             // Build the appropriate document based on format
             let data: ArrayBuffer;
             if (options.targetFormat === 'docx') {
-                console.log(`[PDF/OCR Service] Building Word document with ${lines.length} lines`);
-                data = await documentBuilder.buildWordDocument(lines);
+                console.log(`[PDF/OCR Service] Building Word document with ${pagesLines.length} pages`);
+                data = await documentBuilder.buildWordDocument(pagesLines);
             } else {
-                console.log(`[PDF/OCR Service] Building Excel document with ${lines.length} lines`);
-                data = await documentBuilder.buildExcelDocument(lines);
+                console.log(`[PDF/OCR Service] Building Excel document with ${pagesLines.length} pages`);
+                data = await documentBuilder.buildExcelDocument(pagesLines);
             }
+
+            // Generate 2D string grid for UI preview before downloading
+            const pagesGrids: string[][][] = pagesLines.map(pageLines => {
+                const boundaries = documentBuilder.detectColumnBoundaries(pageLines);
+                let lines: LineGroup[];
+                if (boundaries.length > 0) {
+                    lines = documentBuilder.mergeWithBoundaries(pageLines, boundaries);
+                    return documentBuilder.mapWithBoundaries(lines, boundaries);
+                } else {
+                    lines = documentBuilder.mergeCloseElements(pageLines);
+                    return documentBuilder.mapToExcelGrid(lines, 15);
+                }
+            });
 
             // Target metadata
             const filename = file.name.replace(/\.[^/.]+$/, '') + `.${options.targetFormat}`;
@@ -201,7 +224,8 @@ export class PdfOcrService {
                 success: true,
                 filename,
                 mimeType,
-                data
+                data,
+                pagesGrids
             };
 
         } catch (error) {
