@@ -56,16 +56,18 @@ export class DocumentBuilder {
      * Detects column boundaries using header-anchored gap-voting from RAW elements.
      */
     detectColumnBoundaries(lines: LineGroup[]): number[] {
-        const intervals = this.detectColumnIntervals(lines);
+        // Run standard close-element merging first to group adjacent words (crucial for OCR where elements are individual words)
+        const mergedLines = this.mergeCloseElements(lines);
+        const intervals = this.detectColumnIntervals(mergedLines);
         if (intervals.length < 2) return [];
 
         // Find header block indices for gap-voting to exclude header rows from gap collection
         let mainHeaderIdx = -1;
         let maxElements = 0;
-        const searchLimit = Math.min(10, lines.length);
+        const searchLimit = Math.min(10, mergedLines.length);
         for (let i = 0; i < searchLimit; i++) {
-            if (lines[i]!.elements.length > maxElements) {
-                maxElements = lines[i]!.elements.length;
+            if (mergedLines[i]!.elements.length > maxElements) {
+                maxElements = mergedLines[i]!.elements.length;
                 mainHeaderIdx = i;
             }
         }
@@ -75,21 +77,21 @@ export class DocumentBuilder {
         if (mainHeaderIdx !== -1 && maxElements > 2) {
             // Grow header block upward
             for (let i = mainHeaderIdx - 1; i >= 0; i--) {
-                const line = lines[i]!;
-                if (line.elements.length === 0 || this.checkPhysicalOverlap(line, lines[mainHeaderIdx]!)) {
+                const line = mergedLines[i]!;
+                if (line.elements.length === 0 || this.checkPhysicalOverlap(line, mergedLines[mainHeaderIdx]!)) {
                     break;
                 }
                 minHeaderIdx = i;
             }
             // Grow header block downward
-            for (let i = mainHeaderIdx + 1; i < lines.length; i++) {
-                const line = lines[i]!;
+            for (let i = mainHeaderIdx + 1; i < mergedLines.length; i++) {
+                const line = mergedLines[i]!;
                 if (line.elements.length === 0) break;
                 const isSmallCount = line.elements.length <= Math.max(2, Math.floor(maxElements * 0.4));
                 if (!isSmallCount) break;
                 let overlapsWithHeader = false;
                 for (let h = minHeaderIdx; h <= maxHeaderIdx; h++) {
-                    if (this.checkPhysicalOverlap(line, lines[h]!)) {
+                    if (this.checkPhysicalOverlap(line, mergedLines[h]!)) {
                         overlapsWithHeader = true;
                         break;
                     }
@@ -113,9 +115,9 @@ export class DocumentBuilder {
         const matchedGaps: { leftRight: number; rightLeft: number }[][] = gapRegions.map(() => []);
         const TOLERANCE = 5;
 
-        for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        for (let lineIdx = 0; lineIdx < mergedLines.length; lineIdx++) {
             if (lineIdx >= minHeaderIdx && lineIdx <= maxHeaderIdx) continue;
-            const line = lines[lineIdx]!;
+            const line = mergedLines[lineIdx]!;
             if (line.elements.length < 2) continue;
 
             const sorted = [...line.elements].sort((a, b) => a.x - b.x);
