@@ -26,7 +26,9 @@ export class DBContext {
     }
 
     async set(key: string, val: any) {
-        return (await this.dbPromise).put(STORE_NAME, val, key);
+        // Deep clone to strip reactive proxies, symbols, and non-serializable fields
+        const cleanVal = val !== undefined ? JSON.parse(JSON.stringify(val)) : val;
+        return (await this.dbPromise).put(STORE_NAME, cleanVal, key);
     }
 
     async delete(key: string) {
