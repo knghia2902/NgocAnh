@@ -17,6 +17,7 @@ export interface CustomFieldConfig {
 }
 
 export interface BargeConfig {
+    [key: string]: any;
     goods: string;
     goodsCode: string;
     owner: string;
@@ -29,6 +30,11 @@ export interface BargeConfig {
     ketluan: string;
     locked?: boolean;
     printFields?: CustomFieldConfig[];
+    companyName?: string;
+    companyAddress?: string;
+    companyPhone?: string;
+    ticketTitle?: string;
+    signatures?: string[];
 }
 
 export interface Barge {

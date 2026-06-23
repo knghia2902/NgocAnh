@@ -124,7 +124,12 @@ const cfgForm = reactive<BargeConfig>({
     phupham: 0,
     ketluan: 'Chính phẩm đạt tiêu chuẩn',
     locked: false,
-    printFields: getDefaultPrintFields()
+    printFields: getDefaultPrintFields(),
+    companyName: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC',
+    companyAddress: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam',
+    companyPhone: 'ĐT: 0964 258 671 / Fax:',
+    ticketTitle: 'PHIẾU CÂN XE',
+    signatures: ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ']
 });
 
 const dialogTruck = reactive({
@@ -508,6 +513,11 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.ketluan = cfg.ketluan || 'Chính phẩm đạt tiêu chuẩn';
         cfgForm.locked = cfg.locked || false;
         cfgForm.printFields = cfg.printFields || getDefaultPrintFields();
+        cfgForm.companyName = cfg.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
+        cfgForm.companyAddress = cfg.companyAddress || 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam';
+        cfgForm.companyPhone = cfg.companyPhone || 'ĐT: 0964 258 671 / Fax:';
+        cfgForm.ticketTitle = cfg.ticketTitle || 'PHIẾU CÂN XE';
+        cfgForm.signatures = cfg.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'];
 
         // Fetch trucks
         loading.value = true;
@@ -1971,9 +1981,9 @@ onMounted(() => {
                                             <th class="p-3 w-12 text-center bg-gray-50">STT</th>
                                             <th class="p-3 bg-gray-50">Tên sà lan</th>
                                             <th class="p-3 bg-gray-50">Thuộc Tàu</th>
-                                            <th class="p-3 bg-gray-50">Trạng thái</th>
                                             <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
                                             <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
+                                            <th class="p-3 bg-gray-50 text-center">Trạng thái</th>
                                             <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
                                         </tr>
                                     </thead>
@@ -1986,7 +1996,9 @@ onMounted(() => {
                                                     {{ b.vesselName }}
                                                 </span>
                                             </td>
-                                            <td class="p-3">
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateStart ? formatDateTimeStr(b.dateStart) : '-' }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateEnd ? formatDateTimeStr(b.dateEnd) : '-' }}</td>
+                                            <td class="p-3 flex justify-center">
                                                 <span v-if="b.locked" class="px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
                                                     <span class="material-symbols-outlined text-[11px]">lock</span> Khóa
                                                 </span>
@@ -1994,8 +2006,6 @@ onMounted(() => {
                                                     <span class="material-symbols-outlined text-[11px]">lock_open</span> Mở
                                                 </span>
                                             </td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateStart ? formatDateTimeStr(b.dateStart) : '-' }}</td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateEnd ? formatDateTimeStr(b.dateEnd) : '-' }}</td>
                                             <td class="p-3 text-center">
                                                 <button 
                                                     @click="selectBarge(b.vesselId, b.id)" 
@@ -2130,11 +2140,11 @@ onMounted(() => {
                                         <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
                                             <th class="p-3 w-12 text-center bg-gray-50">STT</th>
                                             <th class="p-3 bg-gray-50">Tên sà lan</th>
-                                            <th class="p-3 bg-gray-50 text-center">Trạng thái</th>
                                             <th class="p-3 text-right bg-gray-50">Số chuyến xe chạy</th>
                                             <th class="p-3 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
                                             <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
                                             <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
+                                            <th class="p-3 bg-gray-50 text-center">Trạng thái</th>
                                             <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
                                         </tr>
                                     </thead>
@@ -2142,6 +2152,10 @@ onMounted(() => {
                                         <tr v-for="(b, idx) in filteredVesselBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
                                             <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
                                             <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="p-3 text-right font-medium">{{ formatNumber(b.truckCount) }}</td>
+                                            <td class="p-3 text-right font-bold text-teal-600">{{ formatNumber(b.totalWeight) }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateStart) || '-' }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateEnd) || '-' }}</td>
                                             <td class="p-3 flex justify-center">
                                                 <span v-if="b.locked" class="px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
                                                     <span class="material-symbols-outlined text-[11px]">lock</span> Khóa
@@ -2150,10 +2164,6 @@ onMounted(() => {
                                                     <span class="material-symbols-outlined text-[11px]">lock_open</span> Mở
                                                 </span>
                                             </td>
-                                            <td class="p-3 text-right font-medium">{{ formatNumber(b.truckCount) }}</td>
-                                            <td class="p-3 text-right font-bold text-teal-600">{{ formatNumber(b.totalWeight) }}</td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateStart) || '-' }}</td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateEnd) || '-' }}</td>
                                             <td class="p-3 text-center">
                                                 <button 
                                                     @click="selectBarge(activeVesselId!, b.id)" 
@@ -2563,7 +2573,7 @@ onMounted(() => {
                                                         Cột {{ f.column === 'left' ? 'Trái' : 'Phải' }}
                                                     </button>
                                                     
-                                                    <!-- Order Buttons -->
+                                                        <!-- Order Buttons -->
                                                     <div class="flex items-center gap-0.5 select-none">
                                                         <button 
                                                             @click="moveField(f.id, 'up')" 
@@ -2592,17 +2602,41 @@ onMounted(() => {
                                         <div class="text-[9px] uppercase font-black text-gray-400 mb-3 select-none">Xem trước biểu mẫu in</div>
                                         
                                         <!-- Real Mockup Container -->
-                                        <div class="bg-white border border-gray-200 rounded-xl p-4 select-none w-full max-w-[480px] shadow-sm font-serif text-[10px] text-black">
+                                        <div class="bg-white border border-gray-200 rounded-xl p-4 w-full max-w-[480px] shadow-sm font-serif text-[10px] text-black">
                                             <!-- Mockup Header -->
-                                            <div class="flex justify-between items-start text-[8px] mb-2 font-bold line-clamp-1 border-b border-gray-100 pb-1.5">
-                                                <div>CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC</div>
-                                                <div class="text-right">Phiếu số: PC-001</div>
+                                            <div class="flex justify-between items-start text-[8px] mb-2 font-bold border-b border-gray-100 pb-1.5 w-full gap-2">
+                                                <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+                                                    <input 
+                                                        v-model="cfgForm.companyName" 
+                                                        :disabled="cfgForm.locked" 
+                                                        class="bg-transparent border-none text-[8px] font-black text-gray-850 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 -ml-1 w-full focus:ring-1 focus:ring-primary py-0 font-serif"
+                                                        placeholder="Tên công ty"
+                                                    />
+                                                    <input 
+                                                        v-model="cfgForm.companyAddress" 
+                                                        :disabled="cfgForm.locked" 
+                                                        class="bg-transparent border-none text-[6.5px] font-normal text-gray-500 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 -ml-1 w-full focus:ring-1 focus:ring-primary py-0 font-serif"
+                                                        placeholder="Địa chỉ công ty"
+                                                    />
+                                                    <input 
+                                                        v-model="cfgForm.companyPhone" 
+                                                        :disabled="cfgForm.locked" 
+                                                        class="bg-transparent border-none text-[6.5px] font-normal text-gray-500 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 -ml-1 w-full focus:ring-1 focus:ring-primary py-0 font-serif"
+                                                        placeholder="Số điện thoại"
+                                                    />
+                                                </div>
+                                                <div class="text-right whitespace-nowrap pt-0.5 text-gray-700">Phiếu số: PC-001</div>
                                             </div>
                                             
                                             <!-- Title -->
-                                            <div class="text-center mb-3">
-                                                <div class="text-xs font-black">PHIẾU CÂN XE</div>
-                                                <div class="text-[7px] italic text-gray-400">Ngày giờ vào/ra: 2026-06-20...</div>
+                                            <div class="text-center mb-2 px-4">
+                                                <input 
+                                                    v-model="cfgForm.ticketTitle" 
+                                                    :disabled="cfgForm.locked"
+                                                    class="bg-transparent border-none text-xs font-black text-center text-gray-900 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 w-full focus:ring-1 focus:ring-primary py-0.5 font-serif"
+                                                    placeholder="TIÊU ĐỀ PHIẾU"
+                                                />
+                                                <div class="text-[7px] italic text-gray-400 mt-0.5">Ngày giờ vào/ra: 2026-06-20...</div>
                                             </div>
                                             
                                             <!-- Columns mockup -->
@@ -2610,9 +2644,35 @@ onMounted(() => {
                                                 <!-- Left -->
                                                 <div class="space-y-1.5">
                                                     <div v-for="f in printFieldsLeft.filter(f => f.visible)" :key="f.id" class="flex items-baseline">
-                                                        <span class="w-20 shrink-0 text-gray-500 font-semibold">{{ f.label }}</span>
+                                                        <input 
+                                                            v-model="f.label" 
+                                                            :disabled="cfgForm.locked"
+                                                            class="w-20 shrink-0 bg-transparent border-none text-gray-500 font-semibold focus:outline-none hover:bg-gray-100 focus:bg-white focus:ring-1 focus:ring-primary rounded px-0.5 -ml-0.5 text-[8.5px] truncate font-serif"
+                                                        />
                                                         <span class="w-2 shrink-0 text-center font-semibold">:</span>
-                                                        <span class="grow font-bold text-gray-800 truncate" :class="(f.id === 'plateNumber' || f.id === 'weightNet') ? 'text-[11px]' : ''">
+                                                        
+                                                        <!-- Config Values / Dynamic Values -->
+                                                        <input 
+                                                            v-if="['goods', 'owner', 'goodsCode', 'operator'].includes(f.id)"
+                                                            v-model="cfgForm[f.id]"
+                                                            :disabled="cfgForm.locked"
+                                                            class="grow bg-transparent border-none font-bold text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 -ml-0.5 text-[8.5px] focus:ring-1 focus:ring-primary w-full py-0 font-serif"
+                                                            :placeholder="'Nhập ' + f.label"
+                                                        />
+                                                        <select 
+                                                            v-else-if="f.id === 'xn'"
+                                                            v-model="cfgForm.xn"
+                                                            :disabled="cfgForm.locked"
+                                                            class="grow bg-transparent border-none font-bold text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 -ml-0.5 text-[8.5px] focus:ring-1 focus:ring-primary w-full py-0 h-4 font-serif"
+                                                        >
+                                                            <option value="XUẤT">XUẤT</option>
+                                                            <option value="NHẬP">NHẬP</option>
+                                                        </select>
+                                                        <span 
+                                                            v-else 
+                                                            class="grow font-bold text-gray-850 truncate" 
+                                                            :class="(f.id === 'plateNumber' || f.id === 'weightNet') ? 'text-[11px]' : ''"
+                                                        >
                                                             {{ getFieldValue(f.id) }}
                                                         </span>
                                                     </div>
@@ -2625,29 +2685,49 @@ onMounted(() => {
                                                             ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA
                                                         </div>
                                                         <div class="flex items-baseline">
-                                                            <span class="w-20 shrink-0 text-gray-500 font-semibold" :class="f.id === 'chinhpham' || f.id === 'phupham' ? 'font-normal' : ''">
-                                                                {{ f.label }}
-                                                            </span>
+                                                            <input 
+                                                                v-model="f.label" 
+                                                                :disabled="cfgForm.locked"
+                                                                class="w-20 shrink-0 bg-transparent border-none text-gray-500 font-semibold focus:outline-none hover:bg-gray-100 focus:bg-white focus:ring-1 focus:ring-primary rounded px-0.5 -ml-0.5 text-[8.5px] truncate font-serif"
+                                                                :class="f.id === 'chinhpham' || f.id === 'phupham' ? 'font-normal' : ''"
+                                                            />
                                                             <span class="w-2 shrink-0 text-center font-semibold">{{ f.id === 'chinhpham' || f.id === 'phupham' ? ':' : ' ' }}</span>
+                                                            
                                                             <div v-if="f.id === 'chinhpham' || f.id === 'phupham'" class="grow flex items-baseline">
-                                                                <span class="border-b border-black w-14 text-center font-bold pb-0.5">
-                                                                    {{ f.id === 'chinhpham' ? cfgForm.chinhpham : cfgForm.phupham }}
-                                                                </span>
+                                                                <input 
+                                                                    v-model.number="cfgForm[f.id]" 
+                                                                    :disabled="cfgForm.locked"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    class="border-b border-black bg-transparent w-14 text-center font-bold pb-0.5 focus:outline-none text-[8.5px] p-0 h-4 border-t-0 border-x-0 focus:ring-0 font-serif"
+                                                                />
                                                                 <span class="ml-1 text-[8px] font-normal">%</span>
                                                             </div>
-                                                            <span v-else class="grow font-bold text-gray-850 truncate">{{ getFieldValue(f.id) }}</span>
+                                                            
+                                                            <input 
+                                                                v-else-if="['goods', 'owner', 'goodsCode', 'operator', 'ketluan'].includes(f.id)"
+                                                                v-model="cfgForm[f.id]"
+                                                                :disabled="cfgForm.locked"
+                                                                class="grow bg-transparent border-none font-bold text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 -ml-0.5 text-[8.5px] focus:ring-1 focus:ring-primary w-full py-0 font-serif"
+                                                                :placeholder="'Nhập ' + f.label"
+                                                            />
+                                                            <span v-else class="grow font-bold text-gray-850 truncate font-serif">{{ getFieldValue(f.id) }}</span>
                                                         </div>
                                                     </template>
                                                 </div>
                                             </div>
                                             
                                             <!-- Signatures -->
-                                            <div class="flex justify-between text-[7px] font-black text-gray-800 mt-4 text-center">
-                                                <div>NV TRẠM CÂN</div>
-                                                <div>BẢO VỆ</div>
-                                                <div>CHỦ HÀNG</div>
-                                                <div>THỦ KHO</div>
-                                                <div>TÀI XẾ</div>
+                                            <div class="flex justify-between text-[7px] font-black text-gray-800 mt-4 text-center gap-1">
+                                                <div v-for="(_, sIdx) in (cfgForm.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'])" :key="sIdx" class="flex-1 min-w-0">
+                                                    <input 
+                                                        v-model="cfgForm.signatures![sIdx]" 
+                                                        :disabled="cfgForm.locked"
+                                                        class="bg-transparent border-none text-[6.5px] font-black text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 w-full text-center focus:ring-1 focus:ring-primary py-0 font-serif"
+                                                        placeholder="Ký tên..."
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -2789,9 +2869,9 @@ onMounted(() => {
                 <!-- Header -->
                 <div class="ticket-header">
                     <div class="ticket-logo-info">
-                        <div class="ticket-company">CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC</div>
-                        <div class="ticket-address">Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam</div>
-                        <div class="ticket-phone">ĐT: 0964 258 671 / Fax:</div>
+                        <div class="ticket-company">{{ cfgForm.companyName }}</div>
+                        <div class="ticket-address">{{ cfgForm.companyAddress }}</div>
+                        <div class="ticket-phone">{{ cfgForm.companyPhone }}</div>
                     </div>
                     <div class="ticket-number-box">
                         <span class="ticket-number-label">Phiếu số: </span>
@@ -2801,7 +2881,7 @@ onMounted(() => {
 
                 <!-- Title -->
                 <div class="ticket-title-container">
-                    <div class="ticket-title">PHIẾU CÂN XE</div>
+                    <div class="ticket-title">{{ cfgForm.ticketTitle || 'PHIẾU CÂN XE' }}</div>
                     <div class="ticket-dates">
                         <div>Ngày, giờ vào: {{ formatDateTimeStr(truck.dateIn) }}</div>
                         <div>Ngày, giờ ra: {{ formatDateTimeStr(truck.dateOut) }}</div>
@@ -2867,11 +2947,9 @@ onMounted(() => {
 
                 <!-- Signatures -->
                 <div class="ticket-footer-signatures">
-                    <div class="sig-col">NV TRẠM CÂN</div>
-                    <div class="sig-col">BẢO VỆ</div>
-                    <div class="sig-col">CHỦ HÀNG</div>
-                    <div class="sig-col">THỦ KHO</div>
-                    <div class="sig-col">TÀI XẾ</div>
+                    <div v-for="(sig, sIdx) in (cfgForm.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'])" :key="sIdx" class="sig-col">
+                        {{ sig }}
+                    </div>
                 </div>
             </div>
         </div>
