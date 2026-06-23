@@ -30,6 +30,9 @@ const vesselFilterMonth = ref<string>('');
 const bargeSearchQuery = ref<string>('');
 const searchQuery = ref<string>('');
 const globalBargeSearchQuery = ref<string>('');
+const globalFilterMonth = ref<string>('');
+const globalBargesSummary = ref<BargeSummary[]>([]);
+const loadingGlobalSummary = ref(false);
 const sortKey = ref<string>('');
 const sortOrder = ref<'asc' | 'desc'>('asc');
 
@@ -158,8 +161,59 @@ const allBarges = computed(() => {
     });
 });
 
+const availableGlobalMonths = computed(() => {
+    if (!globalBargesSummary.value) return [];
+    
+    const months = new Set<string>();
+    globalBargesSummary.value.forEach(b => {
+        const dates = [b.dateStart, b.dateEnd].filter(Boolean);
+        dates.forEach(dStr => {
+            const date = new Date(dStr!);
+            if (!isNaN(date.getTime())) {
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const yyyy = date.getFullYear();
+                months.add(`${mm}/${yyyy}`);
+            }
+        });
+    });
+    
+    return Array.from(months).sort((a, b) => {
+        const partsA = a.split('/');
+        const partsB = b.split('/');
+        const mA = Number(partsA[0]) || 0;
+        const yA = Number(partsA[1]) || 0;
+        const mB = Number(partsB[0]) || 0;
+        const yB = Number(partsB[1]) || 0;
+        if (yA !== yB) return yB - yA;
+        return mB - mA;
+    });
+});
+
 const filteredAllBarges = computed(() => {
-    let list = allBarges.value;
+    let list = allBarges.value.map(b => {
+        const summary = globalBargesSummary.value.find(s => s.id === b.id);
+        return {
+            ...b,
+            dateStart: summary ? summary.dateStart : '',
+            dateEnd: summary ? summary.dateEnd : '',
+            truckCount: summary ? summary.truckCount : 0,
+            totalWeight: summary ? summary.totalWeight : 0
+        };
+    });
+
+    if (globalFilterMonth.value) {
+        list = list.filter(b => {
+            const dates = [b.dateStart, b.dateEnd].filter(Boolean);
+            return dates.some(dStr => {
+                const d = new Date(dStr!);
+                if (isNaN(d.getTime())) return false;
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                return `${mm}/${yyyy}` === globalFilterMonth.value;
+            });
+        });
+    }
+
     if (globalBargeSearchQuery.value.trim()) {
         const query = removeAccents(globalBargeSearchQuery.value.trim().toLowerCase());
         list = list.filter(b => 
@@ -338,6 +392,46 @@ const refreshVesselSummary = async () => {
     }
 };
 
+const refreshGlobalBargesSummary = async () => {
+    loadingGlobalSummary.value = true;
+    try {
+        const allBargePromises = vessels.value.flatMap(v => {
+            return (v.barges || []).map(async (b) => {
+                const trks = await WeighbridgeService.getTrucks(b.id);
+                let totalWeight = 0;
+                let minDate = '';
+                let maxDate = '';
+                
+                trks.forEach(t => {
+                    totalWeight += (t.weightNet || 0);
+                    if (t.dateIn) {
+                        if (!minDate || t.dateIn < minDate) minDate = t.dateIn;
+                    }
+                    if (t.dateOut) {
+                        if (!maxDate || t.dateOut > maxDate) maxDate = t.dateOut;
+                    }
+                });
+                
+                return {
+                    id: b.id,
+                    name: b.name,
+                    truckCount: trks.length,
+                    totalWeight,
+                    dateStart: minDate,
+                    dateEnd: maxDate
+                };
+            });
+        });
+        
+        const results = await Promise.all(allBargePromises);
+        globalBargesSummary.value = results;
+    } catch (e) {
+        console.error('Error loading global summary:', e);
+    } finally {
+        loadingGlobalSummary.value = false;
+    }
+};
+
 const loadVessels = async () => {
     loading.value = true;
     try {
@@ -353,6 +447,8 @@ const loadVessels = async () => {
 
         if (activeVesselId.value) {
             await refreshVesselSummary();
+        } else {
+            await refreshGlobalBargesSummary();
         }
     } catch (e) {
         showToast('Không thể tải danh sách tàu từ Supabase!', 'error');
@@ -609,13 +705,18 @@ watch(activeVesselId, async (newVesselId) => {
         await refreshVesselSummary();
     } else {
         vesselBargesSummary.value = [];
+        await refreshGlobalBargesSummary();
     }
 });
 
 // Watch activeBargeId: if we return to the vessel summary view (activeBargeId becomes null)
 watch(activeBargeId, async (newBargeId) => {
-    if (newBargeId === null && activeVesselId.value !== null) {
-        await refreshVesselSummary();
+    if (newBargeId === null) {
+        if (activeVesselId.value !== null) {
+            await refreshVesselSummary();
+        } else {
+            await refreshGlobalBargesSummary();
+        }
     }
 });
 
@@ -1586,29 +1687,51 @@ onMounted(() => {
                                 </h3>
                             </div>
                             
-                            <!-- Search box for all barges -->
-                            <div v-if="allBarges.length > 0" class="relative flex items-center mb-4 p-3 bg-gray-50 rounded-[16px] border border-primary/5">
-                                <span class="material-symbols-outlined absolute left-6 text-gray-400 text-sm">search</span>
-                                <input 
-                                    v-model="globalBargeSearchQuery"
-                                    type="text"
-                                    placeholder="Tìm kiếm nhanh tên sà lan hoặc tên tàu..."
-                                    class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
-                                />
-                                <button 
-                                    v-if="globalBargeSearchQuery" 
-                                    @click="globalBargeSearchQuery = ''" 
-                                    class="absolute right-6 text-gray-400 hover:text-primary flex items-center"
-                                >
-                                    <span class="material-symbols-outlined text-xs">close</span>
-                                </button>
+                            <!-- Filters Row for all barges -->
+                            <div v-if="allBarges.length > 0" class="flex flex-col md:flex-row gap-3 mb-4 p-3 bg-gray-50 rounded-[16px] border border-primary/5">
+                                <!-- Search input -->
+                                <div class="relative flex-1 flex items-center">
+                                    <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                                    <input 
+                                        v-model="globalBargeSearchQuery"
+                                        type="text"
+                                        placeholder="Tìm kiếm nhanh tên sà lan hoặc tên tàu..."
+                                        class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                                    />
+                                    <button 
+                                        v-if="globalBargeSearchQuery" 
+                                        @click="globalBargeSearchQuery = ''" 
+                                        class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                                    >
+                                        <span class="material-symbols-outlined text-xs">close</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Month Filter dropdown -->
+                                <div v-if="availableGlobalMonths.length > 0" class="relative min-w-[200px] flex items-center">
+                                    <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">calendar_month</span>
+                                    <select 
+                                        v-model="globalFilterMonth" 
+                                        class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary cursor-pointer appearance-none"
+                                    >
+                                        <option value="">Tất cả các tháng (Thời gian)</option>
+                                        <option v-for="month in availableGlobalMonths" :key="month" :value="month">
+                                            Tháng {{ month }}
+                                        </option>
+                                    </select>
+                                    <span class="material-symbols-outlined absolute right-3 text-gray-400 text-sm pointer-events-none">expand_more</span>
+                                </div>
                             </div>
 
-                            <div v-if="allBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                            <div v-if="loadingGlobalSummary" class="text-center py-10 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
+                                <span class="material-symbols-outlined text-2xl animate-spin text-primary">sync</span>
+                                Đang tính toán và tải dữ liệu sà lan...
+                            </div>
+                            <div v-else-if="allBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
                                 Chưa có tàu hoặc sà lan nào được tạo. Vui lòng thêm ở cột bên trái.
                             </div>
                             <div v-else-if="filteredAllBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
-                                Không tìm thấy sà lan phù hợp với từ khóa tìm kiếm.
+                                Không tìm thấy sà lan phù hợp với từ khóa tìm kiếm hoặc bộ lọc.
                             </div>
                             <div v-else class="overflow-x-auto rounded-[16px] border border-gray-100">
                                 <table class="w-full text-left border-collapse text-xs font-semibold">
@@ -1617,7 +1740,8 @@ onMounted(() => {
                                             <th class="p-3 w-12 text-center bg-gray-50">STT</th>
                                             <th class="p-3 bg-gray-50">Tên sà lan</th>
                                             <th class="p-3 bg-gray-50">Thuộc Tàu</th>
-                                            <th class="p-3 bg-gray-50">Ngày tạo</th>
+                                            <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
+                                            <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
                                             <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
                                         </tr>
                                     </thead>
@@ -1630,7 +1754,8 @@ onMounted(() => {
                                                     {{ b.vesselName }}
                                                 </span>
                                             </td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.created_at ? formatDateTimeStr(b.created_at) : '-' }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateStart ? formatDateTimeStr(b.dateStart) : '-' }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateEnd ? formatDateTimeStr(b.dateEnd) : '-' }}</td>
                                             <td class="p-3 text-center">
                                                 <button 
                                                     @click="selectBarge(b.vesselId, b.id)" 
@@ -2044,8 +2169,8 @@ onMounted(() => {
                         <!-- TAB 2: CONFIGURATION -->
                         <div v-if="activeTab === 'config'" class="flex flex-col gap-4 animate-fade-in">
                             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                                <!-- Left: Print Configuration (7 cols) -->
-                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-7 flex flex-col justify-between">
+                                <!-- Print Configuration (12 cols) -->
+                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-12 flex flex-col justify-between">
                                     <div>
                                         <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5">
                                             <span class="material-symbols-outlined text-base">settings_applications</span>
@@ -2084,31 +2209,6 @@ onMounted(() => {
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Số phiếu bắt đầu</label>
                                                 <input v-model="cfgForm.ticketSeed" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: 1 hoặc 001" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-    
-                                <!-- Right: Quality Evaluation (5 cols) -->
-                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-5 flex flex-col justify-between">
-                                    <div>
-                                        <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5">
-                                            <span class="material-symbols-outlined text-base">verified</span>
-                                            Đánh giá chất lượng hàng hóa
-                                        </h3>
-                                        
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div class="flex flex-col gap-1">
-                                                <label class="text-[10px] font-bold text-gray-500">Chính phẩm (%)</label>
-                                                <input v-model.number="cfgForm.chinhpham" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
-                                            </div>
-                                            <div class="flex flex-col gap-1">
-                                                <label class="text-[10px] font-bold text-gray-500">Phụ phẩm (%)</label>
-                                                <input v-model.number="cfgForm.phupham" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
-                                            </div>
-                                            <div class="flex flex-col gap-1 md:col-span-2">
-                                                <label class="text-[10px] font-bold text-gray-500">Kết luận chất lượng</label>
-                                                <input v-model="cfgForm.ketluan" type="text" placeholder="Chính phẩm đạt chuẩn..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                         </div>
                                     </div>
@@ -2263,8 +2363,8 @@ onMounted(() => {
                 <div class="ticket-title-container">
                     <div class="ticket-title">PHIẾU CÂN XE</div>
                     <div class="ticket-dates">
-                        <span>Ngày, giờ vào: {{ formatDateTimeStr(truck.dateIn) }}</span>
-                        <span>Ngày, giờ ra: {{ formatDateTimeStr(truck.dateOut) }}</span>
+                        <div>Ngày, giờ vào: {{ formatDateTimeStr(truck.dateIn) }}</div>
+                        <div>Ngày, giờ ra: {{ formatDateTimeStr(truck.dateOut) }}</div>
                     </div>
                 </div>
 
@@ -2335,29 +2435,6 @@ onMounted(() => {
                             <span class="ticket-row-label">X/N</span>
                             <span class="ticket-row-separator">:</span>
                             <span class="ticket-row-val normal-weight">{{ cfgForm.xn }}</span>
-                        </div>
-
-                        <!-- Quality evaluation box -->
-                        <div class="quality-box">
-                            <div class="quality-title">ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA</div>
-                            <div class="quality-row">
-                                <span class="quality-label">*Chính phẩm</span>
-                                <span class="flex items-baseline">
-                                    <span class="quality-val">{{ cfgForm.chinhpham }}</span>
-                                    <span class="text-[9pt] ml-0.5">%</span>
-                                </span>
-                            </div>
-                            <div class="quality-row">
-                                <span class="quality-label">*Phụ phẩm</span>
-                                <span class="flex items-baseline">
-                                    <span class="quality-val">{{ cfgForm.phupham }}</span>
-                                    <span class="text-[9pt] ml-0.5">%</span>
-                                </span>
-                            </div>
-                            <div class="quality-conclusion-row">
-                                <span class="quality-conclusion-label">Kết luận</span>
-                                <span class="quality-conclusion-val">{{ cfgForm.ketluan }}</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -2512,11 +2589,12 @@ onMounted(() => {
 
     .ticket-dates {
         display: flex;
-        justify-content: center;
-        gap: 8mm;
+        flex-direction: column;
+        align-items: center;
         font-size: 10pt;
         font-style: italic;
         margin-top: 1mm;
+        line-height: 1.3;
     }
 
     .ticket-body {
@@ -2579,61 +2657,7 @@ onMounted(() => {
         font-style: italic;
     }
 
-    .quality-box {
-        border: 1px dashed black;
-        padding: 2mm 3mm;
-        margin-top: 1mm;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5mm;
-        border-radius: 2px;
-    }
 
-    .quality-title {
-        font-weight: bold;
-        font-size: 10pt;
-        text-align: center;
-        text-transform: uppercase;
-        margin-bottom: 1mm;
-    }
-
-    .quality-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        font-size: 10pt;
-    }
-
-    .quality-label {
-        display: flex;
-        align-items: center;
-        gap: 1mm;
-    }
-
-    .quality-val {
-        border-bottom: 1px dotted #ccc;
-        width: 60px;
-        text-align: center;
-        font-weight: bold;
-    }
-
-    .quality-conclusion-row {
-        display: flex;
-        align-items: baseline;
-        margin-top: 1mm;
-        font-size: 10pt;
-    }
-
-    .quality-conclusion-label {
-        width: 70px;
-        flex-shrink: 0;
-    }
-
-    .quality-conclusion-val {
-        flex-grow: 1;
-        border-bottom: 1px dotted #ccc;
-        font-weight: bold;
-    }
 
     .ticket-footer-signatures {
         display: flex;
