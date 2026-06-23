@@ -278,6 +278,66 @@ const avgNetWeight = computed(() => {
 });
 
 // Load all Vessels and Barges on component load
+interface BargeSummary {
+    id: number;
+    name: string;
+    truckCount: number;
+    totalWeight: number;
+    dateStart: string;
+    dateEnd: string;
+}
+
+const vesselBargesSummary = ref<BargeSummary[]>([]);
+const loadingVesselSummary = ref(false);
+
+// Helper function to load/update vessel summary data
+const refreshVesselSummary = async () => {
+    if (!activeVesselId.value) {
+        vesselBargesSummary.value = [];
+        return;
+    }
+    const vessel = vessels.value.find(v => v.id === activeVesselId.value);
+    if (!vessel || !vessel.barges || vessel.barges.length === 0) {
+        vesselBargesSummary.value = [];
+        return;
+    }
+    
+    loadingVesselSummary.value = true;
+    try {
+        const summaries = await Promise.all(vessel.barges.map(async (barge) => {
+            const list = await WeighbridgeService.getTrucks(barge.id);
+            let totalWeight = 0;
+            let minDate = '';
+            let maxDate = '';
+            
+            list.forEach(t => {
+                totalWeight += (t.weightNet || 0);
+                if (t.dateIn) {
+                    if (!minDate || t.dateIn < minDate) minDate = t.dateIn;
+                }
+                if (t.dateOut) {
+                    if (!maxDate || t.dateOut > maxDate) maxDate = t.dateOut;
+                }
+            });
+            
+            return {
+                id: barge.id,
+                name: barge.name,
+                truckCount: list.length,
+                totalWeight,
+                dateStart: minDate,
+                dateEnd: maxDate
+            };
+        }));
+        
+        vesselBargesSummary.value = summaries;
+    } catch (e) {
+        console.error('Error loading vessel summary:', e);
+    } finally {
+        loadingVesselSummary.value = false;
+    }
+};
+
 const loadVessels = async () => {
     loading.value = true;
     try {
@@ -290,6 +350,10 @@ const loadVessels = async () => {
                 expandedVesselIds.value[v.id] = true;
             }
         });
+
+        if (activeVesselId.value) {
+            await refreshVesselSummary();
+        }
     } catch (e) {
         showToast('Không thể tải danh sách tàu từ Supabase!', 'error');
     } finally {
@@ -333,64 +397,17 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
     }
 };
 
-interface BargeSummary {
-    id: number;
-    name: string;
-    truckCount: number;
-    totalWeight: number;
-    dateStart: string;
-    dateEnd: string;
-}
-
-const vesselBargesSummary = ref<BargeSummary[]>([]);
-const loadingVesselSummary = ref(false);
-
 const selectVessel = async (vesselId: number) => {
+    const isSameVessel = activeVesselId.value === vesselId;
+    const isBargeNull = activeBargeId.value === null;
+
     activeVesselId.value = vesselId;
     activeBargeId.value = null; // Deselect barge to show vessel report summary
     vesselFilterMonth.value = '';
     bargeSearchQuery.value = '';
-    
-    const vessel = vessels.value.find(v => v.id === vesselId);
-    if (!vessel || !vessel.barges || vessel.barges.length === 0) {
-        vesselBargesSummary.value = [];
-        return;
-    }
-    
-    loadingVesselSummary.value = true;
-    try {
-        const summaries = await Promise.all(vessel.barges.map(async (barge) => {
-            const list = await WeighbridgeService.getTrucks(barge.id);
-            let totalWeight = 0;
-            let minDate = '';
-            let maxDate = '';
-            
-            list.forEach(t => {
-                totalWeight += (t.weightNet || 0);
-                if (t.dateIn) {
-                    if (!minDate || t.dateIn < minDate) minDate = t.dateIn;
-                }
-                if (t.dateOut) {
-                    if (!maxDate || t.dateOut > maxDate) maxDate = t.dateOut;
-                }
-            });
-            
-            return {
-                id: barge.id,
-                name: barge.name,
-                truckCount: list.length,
-                totalWeight,
-                dateStart: minDate,
-                dateEnd: maxDate
-            };
-        }));
-        
-        vesselBargesSummary.value = summaries;
-    } catch (e) {
-        console.error('Error loading vessel summary:', e);
-        showToast('Không thể tải báo cáo tổng hợp tàu!', 'error');
-    } finally {
-        loadingVesselSummary.value = false;
+
+    if (isSameVessel && isBargeNull) {
+        await refreshVesselSummary();
     }
 };
 
@@ -585,6 +602,22 @@ const saveBargeConfigImmediately = async () => {
 watch(cfgForm, () => {
     saveBargeConfig();
 }, { deep: true });
+
+// Watch activeVesselId to automatically load vessel summary when switching vessels/barges
+watch(activeVesselId, async (newVesselId) => {
+    if (newVesselId) {
+        await refreshVesselSummary();
+    } else {
+        vesselBargesSummary.value = [];
+    }
+});
+
+// Watch activeBargeId: if we return to the vessel summary view (activeBargeId becomes null)
+watch(activeBargeId, async (newBargeId) => {
+    if (newBargeId === null && activeVesselId.value !== null) {
+        await refreshVesselSummary();
+    }
+});
 
 // Handle ticket prefix or seed change from UI to regenerate ticket numbers
 const handleTicketConfigChange = async () => {
@@ -1414,7 +1447,7 @@ onMounted(() => {
                 <!-- Sidebar (left): Vessels -> Barges tree -->
                 <aside class="w-72 bg-white border-r border-primary/10 flex flex-col shrink-0">
                     <div class="p-3 border-b border-primary/5 flex items-center justify-between">
-                        <span class="text-xs font-black text-gray-500 uppercase tracking-wider">Danh sách tàu & sà lan</span>
+                        <span @click="activeVesselId = null; activeBargeId = null" class="text-xs font-black text-gray-500 hover:text-primary cursor-pointer uppercase tracking-wider transition-colors" title="Quay lại Trang tổng quan">Dashboard</span>
                         <button @click="loadVessels" class="size-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Tải lại danh sách">
                             <span class="material-symbols-outlined text-lg" :class="{'animate-spin': loading}">refresh</span>
                         </button>
@@ -1613,6 +1646,8 @@ onMounted(() => {
                                 <div>
                                     <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Báo cáo tổng hợp tàu</div>
                                     <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
+                                        <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5" title="Quay lại Tổng quan"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
+                                        <span class="text-gray-300">&rsaquo;</span>
                                         Tàu: <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-black">{{ activeVessel?.name }}</span>
                                     </h1>
                                 </div>
@@ -1759,7 +1794,9 @@ onMounted(() => {
                             <div>
                                 <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Đang chọn hoạt động</div>
                                 <h1 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
-                                    Tàu: <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black">{{ activeVessel?.name }}</span>
+                                    <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5" title="Quay lại Tổng quan"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
+                                    <span class="text-gray-300">&rsaquo;</span>
+                                    Tàu: <span @click="activeBargeId = null" class="px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer rounded-full text-[10px] font-black" title="Xem báo cáo tổng hợp tàu">{{ activeVessel?.name }}</span>
                                     <span class="text-gray-300">&rsaquo;</span>
                                     Sà lan: <span class="px-2 py-0.5 bg-teal-500/10 text-teal-600 rounded-full text-[10px] font-black">{{ activeBarge?.name }}</span>
                                 </h1>
