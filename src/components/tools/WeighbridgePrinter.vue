@@ -29,6 +29,7 @@ const saving = ref(false);
 const vesselFilterMonth = ref<string>('');
 const bargeSearchQuery = ref<string>('');
 const searchQuery = ref<string>('');
+const globalBargeSearchQuery = ref<string>('');
 const sortKey = ref<string>('');
 const sortOrder = ref<'asc' | 'desc'>('asc');
 
@@ -134,6 +135,40 @@ const toggleSort = (key: string) => {
 // Computed properties
 const activeVessel = computed(() => vessels.value.find(v => v.id === activeVesselId.value) || null);
 const activeBarge = computed<Barge | null>(() => activeVessel.value?.barges?.find(b => b.id === activeBargeId.value) || null);
+
+const allBarges = computed(() => {
+    const list: Array<{ id: number; name: string; vesselId: number; vesselName: string; created_at?: string }> = [];
+    vessels.value.forEach(v => {
+        if (v.barges) {
+            v.barges.forEach(b => {
+                list.push({
+                    id: b.id,
+                    name: b.name,
+                    vesselId: v.id,
+                    vesselName: v.name,
+                    created_at: b.created_at
+                });
+            });
+        }
+    });
+    return list.sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA; // Show latest first
+    });
+});
+
+const filteredAllBarges = computed(() => {
+    let list = allBarges.value;
+    if (globalBargeSearchQuery.value.trim()) {
+        const query = removeAccents(globalBargeSearchQuery.value.trim().toLowerCase());
+        list = list.filter(b => 
+            removeAccents(b.name.toLowerCase()).includes(query) || 
+            removeAccents(b.vesselName.toLowerCase()).includes(query)
+        );
+    }
+    return list;
+});
 
 const availableVesselMonths = computed(() => {
     const vessel = activeVessel.value;
@@ -1460,13 +1495,116 @@ onMounted(() => {
 
                 <!-- Workspace (right) -->
                 <main class="flex-1 overflow-y-auto p-4 bg-cute-gradient flex flex-col gap-4">
-                    <!-- Empty State -->
-                    <div v-if="!activeVesselId" class="flex-1 flex flex-col items-center justify-center text-center p-8 max-w-2xl mx-auto">
-                        <div class="text-6xl mb-4 animate-bounce">🚢</div>
-                        <h2 class="text-2xl font-display font-black text-primary mb-2">Ứng Dụng In Phiếu Cân Xe</h2>
-                        <p class="text-xs font-medium text-[#1b0d11]/60 leading-relaxed mb-4">
-                            Vui lòng chọn hoặc tạo mới một Tàu ở cột bên trái để xem báo cáo tổng hợp tàu hoặc chọn một Sà lan để cấu hình thông tin và in phiếu.
-                        </p>
+                    <!-- Global Dashboard (Empty State replaced by All Barges Overview) -->
+                    <div v-if="!activeVesselId" class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-4 animate-fade-in">
+                        <!-- Welcome Header banner -->
+                        <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
+                            <div>
+                                <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Hệ thống in phiếu cân xe</div>
+                                <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
+                                    Báo cáo tổng quan hệ thống
+                                </h1>
+                            </div>
+                        </div>
+
+                        <!-- Stats Row -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                                <div class="size-11 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-xl">directions_boat</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số tàu</p>
+                                    <h4 class="text-lg font-black text-[#4a2c32]">{{ vessels.length }} <span class="text-xs text-gray-400 font-bold">tàu</span></h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                                <div class="size-11 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-xl">layers</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
+                                    <h4 class="text-lg font-black text-teal-600">{{ allBarges.length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                                <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-xl">cloud_done</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trạng thái dữ liệu</p>
+                                    <h4 class="text-lg font-black text-amber-600">Sẵn sàng <span class="text-xs text-gray-400 font-bold">offline</span></h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- All Barges Table Card -->
+                        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5">
+                            <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
+                                <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-base">analytics</span>
+                                    Danh sách quản lý tất cả sà lan
+                                </h3>
+                            </div>
+                            
+                            <!-- Search box for all barges -->
+                            <div v-if="allBarges.length > 0" class="relative flex items-center mb-4 p-3 bg-gray-50 rounded-[16px] border border-primary/5">
+                                <span class="material-symbols-outlined absolute left-6 text-gray-400 text-sm">search</span>
+                                <input 
+                                    v-model="globalBargeSearchQuery"
+                                    type="text"
+                                    placeholder="Tìm kiếm nhanh tên sà lan hoặc tên tàu..."
+                                    class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                                />
+                                <button 
+                                    v-if="globalBargeSearchQuery" 
+                                    @click="globalBargeSearchQuery = ''" 
+                                    class="absolute right-6 text-gray-400 hover:text-primary flex items-center"
+                                >
+                                    <span class="material-symbols-outlined text-xs">close</span>
+                                </button>
+                            </div>
+
+                            <div v-if="allBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                                Chưa có tàu hoặc sà lan nào được tạo. Vui lòng thêm ở cột bên trái.
+                            </div>
+                            <div v-else-if="filteredAllBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                                Không tìm thấy sà lan phù hợp với từ khóa tìm kiếm.
+                            </div>
+                            <div v-else class="overflow-x-auto rounded-[16px] border border-gray-100">
+                                <table class="w-full text-left border-collapse text-xs font-semibold">
+                                    <thead>
+                                        <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                            <th class="p-3 w-12 text-center bg-gray-50">STT</th>
+                                            <th class="p-3 bg-gray-50">Tên sà lan</th>
+                                            <th class="p-3 bg-gray-50">Thuộc Tàu</th>
+                                            <th class="p-3 bg-gray-50">Ngày tạo</th>
+                                            <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                                        <tr v-for="(b, idx) in filteredAllBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
+                                            <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
+                                            <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="p-3">
+                                                <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black">
+                                                    {{ b.vesselName }}
+                                                </span>
+                                            </td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.created_at ? formatDateTimeStr(b.created_at) : '-' }}</td>
+                                            <td class="p-3 text-center">
+                                                <button 
+                                                    @click="selectBarge(b.vesselId, b.id)" 
+                                                    class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
+                                                >
+                                                    Xem chi tiết
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Vessel Summary Dashboard -->
