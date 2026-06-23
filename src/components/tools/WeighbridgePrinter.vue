@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { authStore } from '@/stores/auth';
 import { excelService } from '@/services/excel/ExcelService';
-import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig } from '@/services/excel/WeighbridgeService';
+import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig } from '@/services/excel/WeighbridgeService';
 const props = withDefaults(defineProps<{
     hideCard?: boolean;
 }>(), {
@@ -12,6 +12,26 @@ const props = withDefaults(defineProps<{
 // Fullscreen state
 const isOpen = ref(false);
 const activeTab = ref<'data' | 'config'>('data');
+
+// Form default layout helper
+const getDefaultPrintFields = (): CustomFieldConfig[] => [
+    { id: 'plateNumber', label: 'Số xe', visible: true, column: 'left', order: 1 },
+    { id: 'goods', label: 'Hàng hóa', visible: true, column: 'left', order: 2 },
+    { id: 'owner', label: 'Tên chủ hàng', visible: true, column: 'left', order: 3 },
+    { id: 'weight1', label: 'Trọng lượng lần 1', visible: true, column: 'left', order: 4 },
+    { id: 'weight2', label: 'Trọng lượng lần 2', visible: true, column: 'left', order: 5 },
+    { id: 'weightNet', label: 'Trọng lượng hàng', visible: true, column: 'left', order: 6 },
+    { id: 'words', label: 'Bằng chữ', visible: true, column: 'left', order: 7 },
+    { id: 'barge', label: 'Sà lan', visible: true, column: 'left', order: 8 },
+    { id: 'note', label: 'Ghi chú', visible: true, column: 'left', order: 9 },
+    
+    { id: 'driver', label: 'Tài xế', visible: true, column: 'right', order: 1 },
+    { id: 'goodsCode', label: 'Mã hàng', visible: true, column: 'right', order: 2 },
+    { id: 'xn', label: 'X/N', visible: true, column: 'right', order: 3 },
+    { id: 'chinhpham', label: '*Chính phẩm', visible: true, column: 'right', order: 4 },
+    { id: 'phupham', label: '*Phụ phẩm', visible: true, column: 'right', order: 5 },
+    { id: 'ketluan', label: 'Kết luận', visible: true, column: 'right', order: 6 }
+];
 
 defineExpose({
     isOpen
@@ -62,7 +82,7 @@ interface ExcelColumn {
     name: string;
 }
 
-type ExcelField = 'plateNumber' | 'driver' | 'weight1' | 'weight2' | 'weightNet' | 'dateIn' | 'dateOut' | 'note';
+type ExcelField = 'ticketNo' | 'plateNumber' | 'driver' | 'weight1' | 'weight2' | 'weightNet' | 'dateIn' | 'dateOut' | 'note';
 
 interface PendingExcel {
     rawRows: any[][];
@@ -80,6 +100,7 @@ interface FieldInfo {
 }
 
 const mappingFields: FieldInfo[] = [
+    { id: 'ticketNo', label: 'Số phiếu (tự chọn)', required: false },
     { id: 'plateNumber', label: 'Biển số xe / Số xe *', required: true },
     { id: 'driver', label: 'Tên tài xế', required: false },
     { id: 'weight1', label: 'Trọng lượng lần 1 (kg) *', required: true },
@@ -102,7 +123,8 @@ const cfgForm = reactive<BargeConfig>({
     chinhpham: 100,
     phupham: 0,
     ketluan: 'Chính phẩm đạt tiêu chuẩn',
-    locked: false
+    locked: false,
+    printFields: getDefaultPrintFields()
 });
 
 const dialogTruck = reactive({
@@ -141,7 +163,7 @@ const activeVessel = computed(() => vessels.value.find(v => v.id === activeVesse
 const activeBarge = computed<Barge | null>(() => activeVessel.value?.barges?.find(b => b.id === activeBargeId.value) || null);
 
 const allBarges = computed(() => {
-    const list: Array<{ id: number; name: string; vesselId: number; vesselName: string; created_at?: string }> = [];
+    const list: Array<{ id: number; name: string; vesselId: number; vesselName: string; created_at?: string; locked: boolean }> = [];
     vessels.value.forEach(v => {
         if (v.barges) {
             v.barges.forEach(b => {
@@ -150,7 +172,8 @@ const allBarges = computed(() => {
                     name: b.name,
                     vesselId: v.id,
                     vesselName: v.name,
-                    created_at: b.created_at
+                    created_at: b.created_at,
+                    locked: b.config?.locked || false
                 });
             });
         }
@@ -340,6 +363,7 @@ interface BargeSummary {
     totalWeight: number;
     dateStart: string;
     dateEnd: string;
+    locked?: boolean;
 }
 
 const vesselBargesSummary = ref<BargeSummary[]>([]);
@@ -381,7 +405,8 @@ const refreshVesselSummary = async () => {
                 truckCount: list.length,
                 totalWeight,
                 dateStart: minDate,
-                dateEnd: maxDate
+                dateEnd: maxDate,
+                locked: barge.config?.locked || false
             };
         }));
         
@@ -419,7 +444,8 @@ const refreshGlobalBargesSummary = async () => {
                     truckCount: trks.length,
                     totalWeight,
                     dateStart: minDate,
-                    dateEnd: maxDate
+                    dateEnd: maxDate,
+                    locked: b.config?.locked || false
                 };
             });
         });
@@ -481,6 +507,7 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.phupham = cfg.phupham !== undefined ? cfg.phupham : 0;
         cfgForm.ketluan = cfg.ketluan || 'Chính phẩm đạt tiêu chuẩn';
         cfgForm.locked = cfg.locked || false;
+        cfgForm.printFields = cfg.printFields || getDefaultPrintFields();
 
         // Fetch trucks
         loading.value = true;
@@ -731,6 +758,117 @@ const toggleBargeLock = async () => {
     } finally {
         saving.value = false;
     }
+};
+
+// Custom field layouts computed and methods
+const printFieldsLeft = computed(() => {
+    return (cfgForm.printFields || [])
+        .filter(f => f.column === 'left')
+        .sort((a, b) => a.order - b.order);
+});
+
+const printFieldsRight = computed(() => {
+    return (cfgForm.printFields || [])
+        .filter(f => f.column === 'right')
+        .sort((a, b) => a.order - b.order);
+});
+
+const isFirstQualityField = (fieldId: string) => {
+    const visibleRight = printFieldsRight.value.filter(f => f.visible);
+    const firstQuality = visibleRight.find(f => f.id === 'chinhpham' || f.id === 'phupham');
+    return firstQuality?.id === fieldId;
+};
+
+const getFieldValue = (fieldId: string, truck?: Truck) => {
+    const sampleTruck = {
+        id: 0,
+        barge_id: 0,
+        ticketNo: 'PC-001',
+        plateNumber: '51C-123.45',
+        driver: 'Nguyễn Văn Hùng',
+        weight1: 35400,
+        weight2: 12200,
+        weightNet: 23200,
+        dateIn: '2026-06-20T08:30:00Z',
+        dateOut: '2026-06-20T09:00:00Z',
+        note: 'Đạt chuẩn'
+    };
+    
+    const t = truck || sampleTruck;
+    
+    switch (fieldId) {
+        case 'plateNumber': return t.plateNumber;
+        case 'goods': return cfgForm.goods || 'Đất sét nguyên liệu';
+        case 'owner': return cfgForm.owner || 'Công ty Cảng Nguyên Ngọc';
+        case 'weight1': return `${formatNumber(t.weight1)} kg`;
+        case 'weight2': return `${formatNumber(t.weight2)} kg`;
+        case 'weightNet': return `${formatNumber(t.weightNet)} kg`;
+        case 'words': return DocSoThanhChu(t.weightNet);
+        case 'barge': return activeBarge.value?.name || 'Sà lan SG-9921';
+        case 'note': return t.note || '-';
+        case 'driver': return t.driver || '-';
+        case 'goodsCode': return cfgForm.goodsCode || '-';
+        case 'xn': return cfgForm.xn;
+        case 'chinhpham': return `${cfgForm.chinhpham} %`;
+        case 'phupham': return `${cfgForm.phupham} %`;
+        case 'ketluan': return cfgForm.ketluan || '-';
+        default: return '';
+    }
+};
+
+const moveField = (fieldId: string, direction: 'up' | 'down') => {
+    if (cfgForm.locked) return;
+    const fields = cfgForm.printFields || [];
+    const index = fields.findIndex(f => f.id === fieldId);
+    if (index === -1) return;
+    
+    const currentField = fields[index];
+    if (!currentField) return;
+    
+    const columnFields = fields.filter(f => f.column === currentField.column).sort((a, b) => a.order - b.order);
+    const colIndex = columnFields.findIndex(f => f.id === fieldId);
+    
+    if (direction === 'up' && colIndex > 0) {
+        const prevField = columnFields[colIndex - 1];
+        if (prevField) {
+            const tempOrder = currentField.order;
+            currentField.order = prevField.order;
+            prevField.order = tempOrder;
+        }
+    } else if (direction === 'down' && colIndex < columnFields.length - 1) {
+        const nextField = columnFields[colIndex + 1];
+        if (nextField) {
+            const tempOrder = currentField.order;
+            currentField.order = nextField.order;
+            nextField.order = tempOrder;
+        }
+    }
+    resequenceFields();
+};
+
+const switchColumn = (fieldId: string) => {
+    if (cfgForm.locked) return;
+    const fields = cfgForm.printFields || [];
+    const field = fields.find(f => f.id === fieldId);
+    if (!field) return;
+    
+    field.column = field.column === 'left' ? 'right' : 'left';
+    const maxOrder = fields.filter(f => f.column === field.column).reduce((max, f) => Math.max(max, f.order), 0);
+    field.order = maxOrder + 1;
+    
+    resequenceFields();
+};
+
+const resequenceFields = () => {
+    const fields = cfgForm.printFields || [];
+    ['left', 'right'].forEach(col => {
+        fields
+            .filter(f => f.column === col)
+            .sort((a, b) => a.order - b.order)
+            .forEach((f, idx) => {
+                f.order = idx + 1;
+            });
+    });
 };
 
 // Watch config form for auto-saving
@@ -1034,6 +1172,7 @@ const analyzeExcelHeaders = (rawRows: any[][]) => {
     let maxMatches = 0;
 
     const keywords: Record<ExcelField, string[]> = {
+        ticketNo: ["số phiếu", "phiếu số", "phieu", "ticket", "mã phiếu", "ma phieu", "so phieu"],
         plateNumber: ["số xe", "biển số", "biển xe", "xe", "sks", "số kiểm soát", "plate", "phương tiện"],
         weight1: ["lần 1", "trọng lượng 1", "tl 1", "cân 1", "lần một", "gross", "tổng"],
         weight2: ["lần 2", "trọng lượng 2", "tl 2", "cân 2", "lần hai", "tare", "xe", "xác"],
@@ -1082,6 +1221,7 @@ const analyzeExcelHeaders = (rawRows: any[][]) => {
     }));
 
     const mapping: Record<ExcelField, number> = {
+        ticketNo: -1,
         plateNumber: -1,
         weight1: -1,
         weight2: -1,
@@ -1151,6 +1291,7 @@ const confirmExcelMapping = async () => {
         return;
     }
 
+    const ticketNoCol = mapping.ticketNo;
     const plateCol = mapping.plateNumber;
     const w1Col = mapping.weight1;
     const w2Col = mapping.weight2;
@@ -1216,9 +1357,15 @@ const confirmExcelMapping = async () => {
             const driver = driverCol !== undefined && driverCol !== -1 && row[driverCol] ? String(row[driverCol]).trim() : '';
             const note = noteCol !== undefined && noteCol !== -1 && row[noteCol] ? String(row[noteCol]).trim() : '';
 
-            const padNum = String(seed).padStart(padLength, '0');
-            const ticketNo = `${prefix}${padNum}`;
-            seed++;
+            let ticketNo = '';
+            if (ticketNoCol !== undefined && ticketNoCol !== -1 && row[ticketNoCol] !== undefined && row[ticketNoCol] !== null) {
+                ticketNo = String(row[ticketNoCol]).trim();
+            }
+            if (!ticketNo) {
+                const padNum = String(seed).padStart(padLength, '0');
+                ticketNo = `${prefix}${padNum}`;
+                seed++;
+            }
 
             importedTrucks.push({
                 id: Date.now() + r,
@@ -1262,10 +1409,10 @@ const confirmExcelMapping = async () => {
 const downloadSampleExcel = () => {
     try {
         const sampleHeaders = [
-            ['STT', 'Biển số xe', 'Tài xế', 'Trọng lượng lần 1 (Gross)', 'Trọng lượng lần 2 (Tare)', 'Trọng lượng hàng (Net)', 'Thời gian vào', 'Thời gian ra', 'Ghi chú'],
-            [1, '51C-123.45', 'Nguyễn Văn Hùng', 35400, 12200, 23200, '2026-06-20 08:30', '2026-06-20 09:00', 'Đạt chuẩn'],
-            [2, '60C-554.89', 'Lê Hữu Tình', 28900, 11800, 17100, '2026-06-20 09:15', '2026-06-20 09:45', 'Hàng ẩm nhẹ'],
-            [3, '72H-992.11', 'Phạm Quốc Bảo', 31500, 12000, 19500, '2026-06-20 10:00', '2026-06-20 10:30', '']
+            ['STT', 'Số phiếu', 'Biển số xe', 'Tài xế', 'Trọng lượng lần 1 (Gross)', 'Trọng lượng lần 2 (Tare)', 'Trọng lượng hàng (Net)', 'Thời gian vào', 'Thời gian ra', 'Ghi chú'],
+            [1, 'PC-001', '51C-123.45', 'Nguyễn Văn Hùng', 35400, 12200, 23200, '2026-06-20 08:30', '2026-06-20 09:00', 'Đạt chuẩn'],
+            [2, 'PC-002', '60C-554.89', 'Lê Hữu Tình', 28900, 11800, 17100, '2026-06-20 09:15', '2026-06-20 09:45', 'Hàng ẩm nhẹ'],
+            [3, 'PC-003', '72H-992.11', 'Phạm Quốc Bảo', 31500, 12000, 19500, '2026-06-20 10:00', '2026-06-20 10:30', '']
         ];
         
         // Dynamically import ExcelJS if not globally imported
@@ -1824,6 +1971,7 @@ onMounted(() => {
                                             <th class="p-3 w-12 text-center bg-gray-50">STT</th>
                                             <th class="p-3 bg-gray-50">Tên sà lan</th>
                                             <th class="p-3 bg-gray-50">Thuộc Tàu</th>
+                                            <th class="p-3 bg-gray-50">Trạng thái</th>
                                             <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
                                             <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
                                             <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
@@ -1836,6 +1984,14 @@ onMounted(() => {
                                             <td class="p-3">
                                                 <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black">
                                                     {{ b.vesselName }}
+                                                </span>
+                                            </td>
+                                            <td class="p-3">
+                                                <span v-if="b.locked" class="px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                                    <span class="material-symbols-outlined text-[11px]">lock</span> Khóa
+                                                </span>
+                                                <span v-else class="px-2.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                                    <span class="material-symbols-outlined text-[11px]">lock_open</span> Mở
                                                 </span>
                                             </td>
                                             <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateStart ? formatDateTimeStr(b.dateStart) : '-' }}</td>
@@ -1974,6 +2130,7 @@ onMounted(() => {
                                         <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
                                             <th class="p-3 w-12 text-center bg-gray-50">STT</th>
                                             <th class="p-3 bg-gray-50">Tên sà lan</th>
+                                            <th class="p-3 bg-gray-50 text-center">Trạng thái</th>
                                             <th class="p-3 text-right bg-gray-50">Số chuyến xe chạy</th>
                                             <th class="p-3 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
                                             <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
@@ -1985,6 +2142,14 @@ onMounted(() => {
                                         <tr v-for="(b, idx) in filteredVesselBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
                                             <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
                                             <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="p-3 flex justify-center">
+                                                <span v-if="b.locked" class="px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                                    <span class="material-symbols-outlined text-[11px]">lock</span> Khóa
+                                                </span>
+                                                <span v-else class="px-2.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                                    <span class="material-symbols-outlined text-[11px]">lock_open</span> Mở
+                                                </span>
+                                            </td>
                                             <td class="p-3 text-right font-medium">{{ formatNumber(b.truckCount) }}</td>
                                             <td class="p-3 text-right font-bold text-teal-600">{{ formatNumber(b.totalWeight) }}</td>
                                             <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateStart) || '-' }}</td>
@@ -2343,6 +2508,151 @@ onMounted(() => {
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Visual Template Designer Section (Full width) -->
+                            <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5">
+                                <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                                    <span class="material-symbols-outlined text-base">design_services</span>
+                                    Thiết kế bố cục và Tùy biến nhãn biểu in
+                                </h3>
+                                
+                                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                                    <!-- Field Control Panel (xl:col-span-6) -->
+                                    <div class="xl:col-span-6 space-y-3">
+                                        <div class="flex items-center justify-between text-[10px] font-bold text-gray-400 pb-1.5 border-b border-gray-100 select-none">
+                                            <span>Trường thông tin</span>
+                                            <span>Hiện | Cột hiển thị | Thứ tự</span>
+                                        </div>
+                                        
+                                        <div class="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+                                            <div 
+                                                v-for="f in (cfgForm.printFields || [])" 
+                                                :key="f.id" 
+                                                class="flex items-center justify-between p-2 rounded-[10px] border border-gray-100 hover:border-primary/20 transition-all gap-3 bg-gray-50/50"
+                                            >
+                                                <!-- Left: Label renaming input -->
+                                                <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                                                    <span class="material-symbols-outlined text-gray-300 text-xs shrink-0 select-none">drag_indicator</span>
+                                                    <input 
+                                                        v-model="f.label" 
+                                                        :disabled="cfgForm.locked" 
+                                                        type="text" 
+                                                        class="px-2 py-1 bg-white border border-gray-200 rounded-[6px] text-xs font-semibold focus:outline-none focus:border-primary w-full truncate disabled:bg-transparent disabled:border-none"
+                                                    />
+                                                </div>
+                                                
+                                                <!-- Right: Actions -->
+                                                <div class="flex items-center gap-2 shrink-0">
+                                                    <!-- Visibility Checkbox -->
+                                                    <label class="flex items-center cursor-pointer select-none" title="Bật/Tắt hiển thị">
+                                                        <input 
+                                                            v-model="f.visible" 
+                                                            :disabled="cfgForm.locked" 
+                                                            type="checkbox" 
+                                                            class="rounded border-gray-300 text-primary focus:ring-primary size-3.5 cursor-pointer disabled:opacity-50"
+                                                        />
+                                                    </label>
+                                                    
+                                                    <!-- Column Switcher -->
+                                                    <button 
+                                                        @click="switchColumn(f.id)" 
+                                                        :disabled="cfgForm.locked"
+                                                        class="px-2 py-1 text-[9px] font-black rounded-lg border transition-all select-none w-14 text-center"
+                                                        :class="f.column === 'left' ? 'bg-teal-50 text-teal-600 border-teal-100 hover:bg-teal-100' : 'bg-primary/5 text-primary border-primary/10 hover:bg-primary/10'"
+                                                    >
+                                                        Cột {{ f.column === 'left' ? 'Trái' : 'Phải' }}
+                                                    </button>
+                                                    
+                                                    <!-- Order Buttons -->
+                                                    <div class="flex items-center gap-0.5 select-none">
+                                                        <button 
+                                                            @click="moveField(f.id, 'up')" 
+                                                            :disabled="cfgForm.locked"
+                                                            class="size-5 rounded-md hover:bg-gray-150 text-gray-500 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                                                            title="Di chuyển lên"
+                                                        >
+                                                            <span class="material-symbols-outlined text-[10px] font-bold">arrow_upward</span>
+                                                        </button>
+                                                        <button 
+                                                            @click="moveField(f.id, 'down')" 
+                                                            :disabled="cfgForm.locked"
+                                                            class="size-5 rounded-md hover:bg-gray-150 text-gray-500 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                                                            title="Di chuyển xuống"
+                                                        >
+                                                            <span class="material-symbols-outlined text-[10px] font-bold">arrow_downward</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Live Preview Mockup (xl:col-span-6) -->
+                                    <div class="xl:col-span-6 flex flex-col items-center border border-gray-100 rounded-2xl p-4 bg-gray-50/50">
+                                        <div class="text-[9px] uppercase font-black text-gray-400 mb-3 select-none">Xem trước biểu mẫu in</div>
+                                        
+                                        <!-- Real Mockup Container -->
+                                        <div class="bg-white border border-gray-200 rounded-xl p-4 select-none w-full max-w-[480px] shadow-sm font-serif text-[10px] text-black">
+                                            <!-- Mockup Header -->
+                                            <div class="flex justify-between items-start text-[8px] mb-2 font-bold line-clamp-1 border-b border-gray-100 pb-1.5">
+                                                <div>CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC</div>
+                                                <div class="text-right">Phiếu số: PC-001</div>
+                                            </div>
+                                            
+                                            <!-- Title -->
+                                            <div class="text-center mb-3">
+                                                <div class="text-xs font-black">PHIẾU CÂN XE</div>
+                                                <div class="text-[7px] italic text-gray-400">Ngày giờ vào/ra: 2026-06-20...</div>
+                                            </div>
+                                            
+                                            <!-- Columns mockup -->
+                                            <div class="grid grid-cols-2 gap-4 border-t border-b border-gray-100 py-3">
+                                                <!-- Left -->
+                                                <div class="space-y-1.5">
+                                                    <div v-for="f in printFieldsLeft.filter(f => f.visible)" :key="f.id" class="flex items-baseline">
+                                                        <span class="w-20 shrink-0 text-gray-500 font-semibold">{{ f.label }}</span>
+                                                        <span class="w-2 shrink-0 text-center font-semibold">:</span>
+                                                        <span class="grow font-bold text-gray-800 truncate" :class="(f.id === 'plateNumber' || f.id === 'weightNet') ? 'text-[11px]' : ''">
+                                                            {{ getFieldValue(f.id) }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Right -->
+                                                <div class="space-y-1.5">
+                                                    <template v-for="f in printFieldsRight.filter(f => f.visible)" :key="f.id">
+                                                        <div v-if="f.id === 'chinhpham' && isFirstQualityField(f.id)" class="font-bold text-[8px] text-primary uppercase pt-1 border-t border-gray-50 mb-1">
+                                                            ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA
+                                                        </div>
+                                                        <div class="flex items-baseline">
+                                                            <span class="w-20 shrink-0 text-gray-500 font-semibold" :class="f.id === 'chinhpham' || f.id === 'phupham' ? 'font-normal' : ''">
+                                                                {{ f.label }}
+                                                            </span>
+                                                            <span class="w-2 shrink-0 text-center font-semibold">{{ f.id === 'chinhpham' || f.id === 'phupham' ? ':' : ' ' }}</span>
+                                                            <div v-if="f.id === 'chinhpham' || f.id === 'phupham'" class="grow flex items-baseline">
+                                                                <span class="border-b border-black w-14 text-center font-bold pb-0.5">
+                                                                    {{ f.id === 'chinhpham' ? cfgForm.chinhpham : cfgForm.phupham }}
+                                                                </span>
+                                                                <span class="ml-1 text-[8px] font-normal">%</span>
+                                                            </div>
+                                                            <span v-else class="grow font-bold text-gray-850 truncate">{{ getFieldValue(f.id) }}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Signatures -->
+                                            <div class="flex justify-between text-[7px] font-black text-gray-800 mt-4 text-center">
+                                                <div>NV TRẠM CÂN</div>
+                                                <div>BẢO VỆ</div>
+                                                <div>CHỦ HÀNG</div>
+                                                <div>THỦ KHO</div>
+                                                <div>TÀI XẾ</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             
                             <div class="flex justify-end pt-2">
                                 <button 
@@ -2502,94 +2812,56 @@ onMounted(() => {
                 <div class="ticket-body">
                     <!-- Left Column -->
                     <div class="ticket-col-left">
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Số xe</span>
+                        <div 
+                            v-for="field in printFieldsLeft.filter(f => f.visible)" 
+                            :key="field.id" 
+                            class="ticket-row"
+                        >
+                            <span class="ticket-row-label">{{ field.label }}</span>
                             <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val highlight">{{ truck.plateNumber }}</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Hàng hóa</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val">{{ cfgForm.goods }}</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Tên chủ hàng</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val">{{ cfgForm.owner }}</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Trọng lượng lần 1</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val highlight normal-weight">{{ formatNumber(truck.weight1) }} kg</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Trọng lượng lần 2</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val highlight normal-weight">{{ formatNumber(truck.weight2) }} kg</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Trọng lượng hàng</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val highlight">{{ formatNumber(truck.weightNet) }} kg</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Bằng chữ</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val text-italic" style="font-size: 9.5pt;">{{ DocSoThanhChu(truck.weightNet) }}</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Sà lan</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val">{{ activeBarge?.name }} ({{ activeVessel?.name }})</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Ghi chú</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val normal-weight">{{ truck.note || '-' }}</span>
+                            <span 
+                                :class="[
+                                    'ticket-row-val', 
+                                    (field.id === 'plateNumber' || field.id === 'weightNet') ? 'highlight' : '', 
+                                    (field.id === 'weight1' || field.id === 'weight2') ? 'highlight normal-weight' : '',
+                                    (field.id === 'words') ? 'text-italic' : '',
+                                    (field.id !== 'plateNumber' && field.id !== 'weightNet' && field.id !== 'weight1' && field.id !== 'weight2') ? 'normal-weight' : ''
+                                ]"
+                            >
+                                {{ getFieldValue(field.id, truck) }}
+                            </span>
                         </div>
                     </div>
 
                     <!-- Right Column -->
                     <div class="ticket-col-right">
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Tài xế</span>
-                            <span class="ticket-row-separator">&nbsp;</span>
-                            <span class="ticket-row-val normal-weight">{{ truck.driver || '-' }}</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Mã hàng</span>
-                            <span class="ticket-row-separator">&nbsp;</span>
-                            <span class="ticket-row-val normal-weight">{{ cfgForm.goodsCode || '-' }}</span>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">X/N</span>
-                            <span class="ticket-row-separator">&nbsp;</span>
-                            <span class="ticket-row-val normal-weight">{{ cfgForm.xn }}</span>
-                        </div>
-                        
-                        <!-- Quality evaluation section -->
-                        <div class="ticket-quality-header">ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA</div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label font-normal">*Chính phẩm</span>
-                            <span class="ticket-row-separator">:</span>
-                            <div class="ticket-row-val-underline-container">
-                                <span class="ticket-row-val-underline">{{ cfgForm.chinhpham }}</span>
-                                <span class="ticket-row-unit">%</span>
+                        <template v-for="field in printFieldsRight.filter(f => f.visible)" :key="field.id">
+                            <!-- Section header for Quality Evaluation -->
+                            <div v-if="field.id === 'chinhpham' && isFirstQualityField(field.id)" class="ticket-quality-header">
+                                ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA
                             </div>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label font-normal">*Phụ phẩm</span>
-                            <span class="ticket-row-separator">:</span>
-                            <div class="ticket-row-val-underline-container">
-                                <span class="ticket-row-val-underline">{{ cfgForm.phupham }}</span>
-                                <span class="ticket-row-unit">%</span>
+                            
+                            <div class="ticket-row">
+                                <span class="ticket-row-label" :class="field.id === 'chinhpham' || field.id === 'phupham' ? 'font-normal' : ''">
+                                    {{ field.label }}
+                                </span>
+                                <span class="ticket-row-separator">{{ field.id === 'chinhpham' || field.id === 'phupham' ? ':' : '&nbsp;' }}</span>
+                                
+                                <div v-if="field.id === 'chinhpham' || field.id === 'phupham'" class="ticket-row-val-underline-container">
+                                    <span class="ticket-row-val-underline">
+                                        {{ field.id === 'chinhpham' ? cfgForm.chinhpham : cfgForm.phupham }}
+                                    </span>
+                                    <span class="ticket-row-unit">%</span>
+                                </div>
+                                
+                                <span 
+                                    v-else
+                                    class="ticket-row-val normal-weight"
+                                >
+                                    {{ getFieldValue(field.id, truck) }}
+                                </span>
                             </div>
-                        </div>
-                        <div class="ticket-row">
-                            <span class="ticket-row-label">Kết luận</span>
-                            <span class="ticket-row-separator">&nbsp;</span>
-                            <span class="ticket-row-val normal-weight">{{ cfgForm.ketluan || '-' }}</span>
-                        </div>
+                        </template>
                     </div>
                 </div>
 

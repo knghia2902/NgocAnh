@@ -8,6 +8,14 @@ export interface Vessel {
     barges?: Barge[];
 }
 
+export interface CustomFieldConfig {
+    id: string;
+    label: string;
+    visible: boolean;
+    column: 'left' | 'right';
+    order: number;
+}
+
 export interface BargeConfig {
     goods: string;
     goodsCode: string;
@@ -20,6 +28,7 @@ export interface BargeConfig {
     phupham: number;
     ketluan: string;
     locked?: boolean;
+    printFields?: CustomFieldConfig[];
 }
 
 export interface Barge {
