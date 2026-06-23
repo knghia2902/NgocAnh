@@ -30,6 +30,7 @@ const handleFileSelect = async (e: Event) => {
             await extractHeaders(masterFile.value);
         }
     }
+    target.value = '';
 };
 
 const extractHeaders = async (file: File) => {

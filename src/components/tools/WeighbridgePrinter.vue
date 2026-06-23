@@ -858,6 +858,7 @@ const handleFileSelect = (e: Event) => {
         const file = target.files[0];
         if (file) handleExcelFile(file);
     }
+    target.value = '';
 };
 
 const handleExcelDrop = (e: DragEvent) => {

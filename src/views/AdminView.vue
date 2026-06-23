@@ -95,6 +95,7 @@ const handleHeroImageUpload = async (e: Event) => {
             await ContentService.saveAll();
         }
     }
+    target.value = '';
 };
 
 // Consolidated Image Management via handleHeroImageUpload per user request
@@ -158,6 +159,7 @@ const handleProjectImageUpload = async (e: Event) => {
         const url = await StorageService.uploadImage(target.files[0], 'projects');
         if (url) newProject.value.image = url;
     }
+    target.value = '';
 };
 const addProject = async () => {
     if (!newProject.value.title) return;

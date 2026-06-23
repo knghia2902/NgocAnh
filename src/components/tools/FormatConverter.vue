@@ -31,6 +31,7 @@ const handleFileSelect = (event: Event) => {
   if (target.files && target.files[0]) {
     processFile(target.files[0]);
   }
+  target.value = '';
 };
 
 const handleDrop = (event: DragEvent) => {
