@@ -176,8 +176,7 @@ const availableVesselMonths = computed(() => {
     
     const months = new Set<string>();
     vesselBargesSummary.value.forEach(b => {
-        const originalBarge = vessel.barges?.find(ob => ob.id === b.id);
-        const dates = [b.dateStart, b.dateEnd, originalBarge?.created_at].filter(Boolean);
+        const dates = [b.dateStart, b.dateEnd].filter(Boolean);
         dates.forEach(dStr => {
             const date = new Date(dStr!);
             if (!isNaN(date.getTime())) {
@@ -205,8 +204,7 @@ const filteredVesselBarges = computed<BargeSummary[]>(() => {
     
     if (vesselFilterMonth.value) {
         list = list.filter(b => {
-            const originalBarge = activeVessel.value?.barges?.find(ob => ob.id === b.id);
-            const dates = [b.dateStart, b.dateEnd, originalBarge?.created_at].filter(Boolean);
+            const dates = [b.dateStart, b.dateEnd].filter(Boolean);
             return dates.some(dStr => {
                 const d = new Date(dStr!);
                 if (isNaN(d.getTime())) return false;
