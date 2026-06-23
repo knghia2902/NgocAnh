@@ -101,7 +101,8 @@ const cfgForm = reactive<BargeConfig>({
     ticketSeed: 1,
     chinhpham: 100,
     phupham: 0,
-    ketluan: 'Chính phẩm đạt tiêu chuẩn'
+    ketluan: 'Chính phẩm đạt tiêu chuẩn',
+    locked: false
 });
 
 const dialogTruck = reactive({
@@ -479,6 +480,7 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.chinhpham = cfg.chinhpham !== undefined ? cfg.chinhpham : 100;
         cfgForm.phupham = cfg.phupham !== undefined ? cfg.phupham : 0;
         cfgForm.ketluan = cfg.ketluan || 'Chính phẩm đạt tiêu chuẩn';
+        cfgForm.locked = cfg.locked || false;
 
         // Fetch trucks
         loading.value = true;
@@ -648,6 +650,7 @@ let saveDebounceTimer: any = null;
 const saveBargeConfig = () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
+    if (cfgForm.locked) return; // Prevent auto-saving when locked
     
     if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
@@ -672,6 +675,10 @@ const saveBargeConfig = () => {
 const saveBargeConfigImmediately = async () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể lưu cấu hình.', 'error');
+        return;
+    }
 
     if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
     
@@ -689,6 +696,38 @@ const saveBargeConfigImmediately = async () => {
     } catch (e) {
         console.error('Error saving barge config:', e);
         showToast('Lỗi kết nối khi lưu cấu hình!', 'error');
+    } finally {
+        saving.value = false;
+    }
+};
+
+const toggleBargeLock = async () => {
+    const bargeId = activeBargeId.value;
+    if (!bargeId) return;
+
+    const newLockState = !cfgForm.locked;
+    saving.value = true;
+    try {
+        const success = await WeighbridgeService.updateBargeConfig(bargeId, { ...cfgForm, locked: newLockState });
+        if (success) {
+            cfgForm.locked = newLockState;
+            if (activeBarge.value) {
+                activeBarge.value.config = { ...cfgForm };
+            }
+            // Update in local vessels list
+            vessels.value.forEach(v => {
+                const b = v.barges?.find(barge => barge.id === bargeId);
+                if (b) {
+                    b.config = { ...cfgForm };
+                }
+            });
+            showToast(cfgForm.locked ? 'Đã khóa sà lan thành công! 🔒' : 'Đã mở khóa sà lan thành công! 🔓');
+        } else {
+            showToast('Không thể thay đổi trạng thái khóa!', 'error');
+        }
+    } catch (e) {
+        console.error('Error toggling barge lock:', e);
+        showToast('Lỗi kết nối khi đổi trạng thái khóa!', 'error');
     } finally {
         saving.value = false;
     }
@@ -724,6 +763,10 @@ watch(activeBargeId, async (newBargeId) => {
 const handleTicketConfigChange = async () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể thay đổi số phiếu.', 'error');
+        return;
+    }
 
     // Save configuration immediately to Supabase
     saving.value = true;
@@ -853,6 +896,12 @@ const addBarge = async (vesselId: number) => {
 };
 
 const renameBarge = async (id: number, currentName: string) => {
+    const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
+    if (barge?.config?.locked) {
+        showToast('Sà lan đang bị khóa! Vui lòng mở khóa để đổi tên.', 'error');
+        return;
+    }
+
     const name = prompt('Nhập tên sà lan mới:', currentName);
     if (!name || !name.trim() || name.trim() === currentName) return;
 
@@ -876,6 +925,12 @@ const renameBarge = async (id: number, currentName: string) => {
 };
 
 const deleteBarge = async (_vesselId: number, id: number, name: string) => {
+    const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
+    if (barge?.config?.locked) {
+        showToast('Sà lan đang bị khóa! Vui lòng mở khóa để xóa.', 'error');
+        return;
+    }
+
     if (!confirm(`Bạn có chắc chắn muốn xóa sà lan "${name}" cùng toàn bộ danh sách xe không?`)) return;
 
     loading.value = true;
@@ -902,6 +957,10 @@ const deleteBarge = async (_vesselId: number, id: number, name: string) => {
 const handleExcelFile = async (file: File) => {
     if (!activeBargeId.value) {
         showToast('Vui lòng chọn một sà lan trước!', 'error');
+        return;
+    }
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể nhập Excel.', 'error');
         return;
     }
     
@@ -1078,6 +1137,10 @@ const parseExcelDate = (val: any): string => {
 const confirmExcelMapping = async () => {
     const bargeId = activeBargeId.value;
     if (!pendingExcelData.value || !bargeId) return;
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể nhập dữ liệu.', 'error');
+        return;
+    }
 
     const mapping = pendingExcelData.value.mapping;
     const requiredFields: ExcelField[] = ['plateNumber', 'weight1', 'weight2'];
@@ -1225,6 +1288,10 @@ const downloadSampleExcel = () => {
 
 // Truck CRUD Dialog Functions
 const openAddTruckDialog = () => {
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể thêm xe.', 'error');
+        return;
+    }
     dialogTruck.id = 0;
     dialogTruck.ticketNo = '';
     dialogTruck.plateNumber = '';
@@ -1244,6 +1311,10 @@ const openAddTruckDialog = () => {
 };
 
 const openEditTruckDialog = (truck: Truck) => {
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể sửa thông tin.', 'error');
+        return;
+    }
     dialogTruck.id = truck.id;
     dialogTruck.ticketNo = truck.ticketNo;
     dialogTruck.plateNumber = truck.plateNumber;
@@ -1263,6 +1334,10 @@ const onWeightInput = () => {
 };
 
 const saveTruck = async () => {
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể lưu dữ liệu.', 'error');
+        return;
+    }
     if (!dialogTruck.plateNumber.trim()) {
         alert("Vui lòng nhập biển số xe.");
         return;
@@ -1320,6 +1395,10 @@ const saveTruck = async () => {
 };
 
 const deleteTruck = async (id: number, plate: string) => {
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể xóa xe.', 'error');
+        return;
+    }
     if (!confirm(`Bạn có muốn xóa xe "${plate}" ra khỏi danh sách không?`)) return;
 
     const bargeId = activeBargeId.value;
@@ -1344,6 +1423,10 @@ const deleteTruck = async (id: number, plate: string) => {
 const clearTrucks = async () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể xóa danh sách.', 'error');
+        return;
+    }
     if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ danh sách xe của sà lan này?")) return;
 
     loading.value = true;
@@ -1607,6 +1690,7 @@ onMounted(() => {
                                     <div class="flex items-center gap-1.5 truncate">
                                         <span class="material-symbols-outlined text-sm">layers</span>
                                         <span class="truncate">{{ barge.name }}</span>
+                                        <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white/90' : 'text-red-500'" title="Sà lan đang bị khóa">lock</span>
                                     </div>
                                     <div class="flex items-center gap-0.5" @click.stopPropagation>
                                         <button @click="renameBarge(barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-primary'" title="Đổi tên">
@@ -1932,12 +2016,22 @@ onMounted(() => {
                                     Tàu: <span @click="activeBargeId = null" class="px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer rounded-full text-[10px] font-black" title="Xem báo cáo tổng hợp tàu">{{ activeVessel?.name }}</span>
                                     <span class="text-gray-300">&rsaquo;</span>
                                     Sà lan: <span class="px-2 py-0.5 bg-teal-500/10 text-teal-600 rounded-full text-[10px] font-black">{{ activeBarge?.name }}</span>
+                                    <button 
+                                        @click="toggleBargeLock" 
+                                        :class="['ml-2 p-1 rounded-full flex items-center justify-center transition-all', cfgForm.locked ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200']"
+                                        :title="cfgForm.locked ? 'Mở khóa sà lan' : 'Khóa sà lan'"
+                                    >
+                                        <span class="material-symbols-outlined text-[12px] font-bold">{{ cfgForm.locked ? 'lock' : 'lock_open' }}</span>
+                                    </button>
                                 </h1>
                             </div>
 
                             <!-- Sync indicator -->
                             <div class="flex items-center gap-1.5">
-                                <span v-if="saving" class="text-[10px] font-medium text-gray-400 flex items-center gap-0.5">
+                                <span v-if="cfgForm.locked" class="text-[10px] font-black text-red-600 flex items-center gap-0.5 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                                    <span class="material-symbols-outlined text-[12px]">lock</span> ĐÃ KHÓA
+                                </span>
+                                <span v-else-if="saving" class="text-[10px] font-medium text-gray-400 flex items-center gap-0.5">
                                     <span class="material-symbols-outlined text-xs animate-spin">sync</span> Đang đồng bộ...
                                 </span>
                                 <span v-else class="text-[10px] font-medium text-teal-500 flex items-center gap-0.5">
@@ -2002,8 +2096,8 @@ onMounted(() => {
                                 <!-- Compact Excel Upload (4 cols) -->
                                 <div 
                                     @dragover.prevent
-                                    @drop="handleExcelDrop"
-                                    class="lg:col-span-4 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50"
+                                    @drop="cfgForm.locked ? null : handleExcelDrop($event)"
+                                    :class="['lg:col-span-4 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50', cfgForm.locked ? 'opacity-50 pointer-events-none' : '']"
                                 >
                                     <input 
                                         type="file" 
@@ -2011,8 +2105,9 @@ onMounted(() => {
                                         class="hidden" 
                                         @change="handleFileSelect" 
                                         accept=".xlsx, .xls" 
+                                        :disabled="cfgForm.locked"
                                     />
-                                    <div class="flex items-center gap-2.5 min-w-0" @click="fileInput?.click()">
+                                    <div class="flex items-center gap-2.5 min-w-0" @click="cfgForm.locked ? null : fileInput?.click()">
                                         <div class="size-9 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">upload_file</span>
                                         </div>
@@ -2033,6 +2128,7 @@ onMounted(() => {
                                         <button 
                                             @click="fileInput?.click()"
                                             class="px-2.5 py-1.5 bg-primary text-white text-[9px] font-black rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                            :disabled="cfgForm.locked"
                                         >
                                             Chọn File
                                         </button>
@@ -2051,14 +2147,16 @@ onMounted(() => {
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         <button 
                                             @click="openAddTruckDialog"
-                                            class="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all"
+                                            :disabled="cfgForm.locked"
+                                            class="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all"
                                         >
                                             <span class="material-symbols-outlined text-xs">add</span>
                                             Thêm xe
                                         </button>
                                         <button 
                                             @click="clearTrucks"
-                                            class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all"
+                                            :disabled="cfgForm.locked"
+                                            class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                         >
                                             <span class="material-symbols-outlined text-xs">delete_sweep</span>
                                             Xóa tất cả
@@ -2151,10 +2249,10 @@ onMounted(() => {
                                                         <button @click="triggerPrint(truck)" class="size-7 rounded-full bg-teal-50 hover:bg-teal-100 text-teal-600 flex items-center justify-center transition-all" title="In phiếu này">
                                                             <span class="material-symbols-outlined text-sm">print</span>
                                                         </button>
-                                                        <button @click="openEditTruckDialog(truck)" class="size-7 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all" title="Sửa">
+                                                        <button @click="openEditTruckDialog(truck)" :disabled="cfgForm.locked" class="size-7 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none" title="Sửa">
                                                             <span class="material-symbols-outlined text-sm">edit</span>
                                                         </button>
-                                                        <button @click="deleteTruck(truck.id, truck.plateNumber)" class="size-7 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all" title="Xóa">
+                                                        <button @click="deleteTruck(truck.id, truck.plateNumber)" :disabled="cfgForm.locked" class="size-7 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none" title="Xóa">
                                                             <span class="material-symbols-outlined text-sm">delete</span>
                                                         </button>
                                                     </div>
@@ -2168,9 +2266,15 @@ onMounted(() => {
 
                         <!-- TAB 2: CONFIGURATION -->
                         <div v-if="activeTab === 'config'" class="flex flex-col gap-4 animate-fade-in">
+                            <!-- Banner lock warning -->
+                            <div v-if="cfgForm.locked" class="bg-red-50 text-red-700 text-xs font-bold p-3 rounded-lg border border-red-200 mb-2 flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-sm">warning</span>
+                                Sà lan này đang bị khóa. Vui lòng mở khóa để sửa đổi cấu hình.
+                            </div>
+
                             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                                <!-- Print Configuration (12 cols) -->
-                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-12 flex flex-col justify-between">
+                                <!-- Print Configuration (7 cols) -->
+                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-7 flex flex-col justify-between">
                                     <div>
                                         <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5">
                                             <span class="material-symbols-outlined text-base">settings_applications</span>
@@ -2180,23 +2284,23 @@ onMounted(() => {
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên hàng hóa (mặc định)</label>
-                                                <input v-model="cfgForm.goods" type="text" placeholder="Đất sét nguyên liệu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.goods" :disabled="cfgForm.locked" type="text" placeholder="Đất sét nguyên liệu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Mã hàng hóa</label>
-                                                <input v-model="cfgForm.goodsCode" type="text" placeholder="Mã hàng..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.goodsCode" :disabled="cfgForm.locked" type="text" placeholder="Mã hàng..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1 md:col-span-2">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên chủ hàng (mặc định)</label>
-                                                <input v-model="cfgForm.owner" type="text" placeholder="Công ty xuất nhập khẩu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.owner" :disabled="cfgForm.locked" type="text" placeholder="Công ty xuất nhập khẩu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Người cân (NV trạm cân)</label>
-                                                <input v-model="cfgForm.operator" type="text" placeholder="Tên nhân viên..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.operator" :disabled="cfgForm.locked" type="text" placeholder="Tên nhân viên..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Hình thức xuất/nhập</label>
-                                                <select v-model="cfgForm.xn" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-bold bg-white">
+                                                <select v-model="cfgForm.xn" :disabled="cfgForm.locked" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-bold bg-white disabled:opacity-50 disabled:cursor-not-allowed">
                                                     <option value="XUẤT KHẨU">XUẤT KHẨU</option>
                                                     <option value="NHẬP KHẨU">NHẬP KHẨU</option>
                                                     <option value="NỘI BỘ">NỘI BỘ</option>
@@ -2204,11 +2308,36 @@ onMounted(() => {
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tiền tố số phiếu (Mẫu số)</label>
-                                                <input v-model="cfgForm.ticketPrefix" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: PC-" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.ticketPrefix" :disabled="cfgForm.locked" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: PC-" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Số phiếu bắt đầu</label>
-                                                <input v-model="cfgForm.ticketSeed" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: 1 hoặc 001" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.ticketSeed" :disabled="cfgForm.locked" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: 1 hoặc 001" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Quality Evaluation Configuration (5 cols) -->
+                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-5 flex flex-col justify-between">
+                                    <div>
+                                        <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5">
+                                            <span class="material-symbols-outlined text-base">analytics</span>
+                                            Cấu hình Đánh giá chất lượng
+                                        </h3>
+                                        
+                                        <div class="space-y-3">
+                                            <div class="flex flex-col gap-1">
+                                                <label class="text-[10px] font-bold text-gray-500">Tỷ lệ Chính phẩm (%)</label>
+                                                <input v-model.number="cfgForm.chinhpham" :disabled="cfgForm.locked" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                            </div>
+                                            <div class="flex flex-col gap-1">
+                                                <label class="text-[10px] font-bold text-gray-500">Tỷ lệ Phụ phẩm (%)</label>
+                                                <input v-model.number="cfgForm.phupham" :disabled="cfgForm.locked" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                            </div>
+                                            <div class="flex flex-col gap-1">
+                                                <label class="text-[10px] font-bold text-gray-500">Kết luận</label>
+                                                <textarea v-model="cfgForm.ketluan" :disabled="cfgForm.locked" rows="3" placeholder="Nhập kết luận đánh giá..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed resize-none"></textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -2218,7 +2347,8 @@ onMounted(() => {
                             <div class="flex justify-end pt-2">
                                 <button 
                                     @click="saveBargeConfigImmediately" 
-                                    class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-[8px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                                    :disabled="cfgForm.locked"
+                                    class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-[8px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                 >
                                     <span class="material-symbols-outlined text-sm">save</span>
                                     Lưu cấu hình mẫu phiếu
@@ -2423,49 +2553,53 @@ onMounted(() => {
                     <div class="ticket-col-right">
                         <div class="ticket-row">
                             <span class="ticket-row-label">Tài xế</span>
-                            <span class="ticket-row-separator">:</span>
+                            <span class="ticket-row-separator">&nbsp;</span>
                             <span class="ticket-row-val normal-weight">{{ truck.driver || '-' }}</span>
                         </div>
                         <div class="ticket-row">
                             <span class="ticket-row-label">Mã hàng</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span class="ticket-row-val normal-weight">{{ cfgForm.goodsCode }}</span>
+                            <span class="ticket-row-separator">&nbsp;</span>
+                            <span class="ticket-row-val normal-weight">{{ cfgForm.goodsCode || '-' }}</span>
                         </div>
                         <div class="ticket-row">
                             <span class="ticket-row-label">X/N</span>
-                            <span class="ticket-row-separator">:</span>
+                            <span class="ticket-row-separator">&nbsp;</span>
                             <span class="ticket-row-val normal-weight">{{ cfgForm.xn }}</span>
+                        </div>
+                        
+                        <!-- Quality evaluation section -->
+                        <div class="ticket-quality-header">ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA</div>
+                        <div class="ticket-row">
+                            <span class="ticket-row-label font-normal">*Chính phẩm</span>
+                            <span class="ticket-row-separator">:</span>
+                            <div class="ticket-row-val-underline-container">
+                                <span class="ticket-row-val-underline">{{ cfgForm.chinhpham }}</span>
+                                <span class="ticket-row-unit">%</span>
+                            </div>
+                        </div>
+                        <div class="ticket-row">
+                            <span class="ticket-row-label font-normal">*Phụ phẩm</span>
+                            <span class="ticket-row-separator">:</span>
+                            <div class="ticket-row-val-underline-container">
+                                <span class="ticket-row-val-underline">{{ cfgForm.phupham }}</span>
+                                <span class="ticket-row-unit">%</span>
+                            </div>
+                        </div>
+                        <div class="ticket-row">
+                            <span class="ticket-row-label">Kết luận</span>
+                            <span class="ticket-row-separator">&nbsp;</span>
+                            <span class="ticket-row-val normal-weight">{{ cfgForm.ketluan || '-' }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Signatures -->
                 <div class="ticket-footer-signatures">
-                    <div class="sig-col">
-                        <div class="sig-title">NV TRẠM CÂN</div>
-                        <div class="sig-subtext">(Ký, ghi rõ họ tên)</div>
-                        <div class="sig-name">{{ cfgForm.operator }}</div>
-                    </div>
-                    <div class="sig-col">
-                        <div class="sig-title">BẢO VỆ</div>
-                        <div class="sig-subtext">(Ký, ghi rõ họ tên)</div>
-                        <div class="sig-name"></div>
-                    </div>
-                    <div class="sig-col">
-                        <div class="sig-title">CHỦ HÀNG</div>
-                        <div class="sig-subtext">(Ký, ghi rõ họ tên)</div>
-                        <div class="sig-name"></div>
-                    </div>
-                    <div class="sig-col">
-                        <div class="sig-title">THỦ KHO</div>
-                        <div class="sig-subtext">(Ký, ghi rõ họ tên)</div>
-                        <div class="sig-name"></div>
-                    </div>
-                    <div class="sig-col">
-                        <div class="sig-title">TÀI XẾ</div>
-                        <div class="sig-subtext">(Ký tên)</div>
-                        <div class="sig-name">{{ truck.driver }}</div>
-                    </div>
+                    <div class="sig-col">NV TRẠM CÂN</div>
+                    <div class="sig-col">BẢO VỆ</div>
+                    <div class="sig-col">CHỦ HÀNG</div>
+                    <div class="sig-col">THỦ KHO</div>
+                    <div class="sig-col">TÀI XẾ</div>
                 </div>
             </div>
         </div>
@@ -2640,7 +2774,6 @@ onMounted(() => {
     .ticket-row-val {
         flex-grow: 1;
         font-weight: bold;
-        border-bottom: 1px dotted #ccc;
         min-height: 18px;
     }
     
@@ -2657,42 +2790,48 @@ onMounted(() => {
         font-style: italic;
     }
 
+    .ticket-quality-header {
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 10.5pt;
+        margin-top: 2.5mm;
+        margin-bottom: 1.5mm;
+    }
 
+    .ticket-row-val-underline-container {
+        flex-grow: 1;
+        display: flex;
+        align-items: baseline;
+    }
+
+    .ticket-row-val-underline {
+        border-bottom: 1px solid black;
+        width: 120px;
+        text-align: center;
+        font-weight: bold;
+        display: inline-block;
+        min-height: 18px;
+    }
+
+    .ticket-row-unit {
+        margin-left: 5px;
+        font-weight: normal;
+    }
 
     .ticket-footer-signatures {
         display: flex;
         justify-content: space-between;
         width: 100%;
-        margin-top: 3mm;
+        margin-top: 12mm; /* Give plenty of space for signatures */
         font-size: 9.5pt;
     }
 
     .sig-col {
         width: 18%;
         text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        min-height: 22mm;
-    }
-
-    .sig-title {
         font-weight: bold;
         text-transform: uppercase;
         font-size: 9.5pt;
-    }
-
-    .sig-subtext {
-        font-size: 8pt;
-        font-style: italic;
-        color: #555;
-    }
-
-    .sig-name {
-        font-weight: bold;
-        margin-top: auto;
-        font-size: 9.5pt;
-        padding-top: 1mm;
     }
 }
 </style>

@@ -19,6 +19,7 @@ export interface BargeConfig {
     chinhpham: number;
     phupham: number;
     ketluan: string;
+    locked?: boolean;
 }
 
 export interface Barge {
