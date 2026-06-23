@@ -1446,9 +1446,17 @@ onMounted(() => {
             <div class="flex-1 flex overflow-hidden">
                 <!-- Sidebar (left): Vessels -> Barges tree -->
                 <aside class="w-72 bg-white border-r border-primary/10 flex flex-col shrink-0">
-                    <div class="p-3 border-b border-primary/5 flex items-center justify-between">
-                        <span @click="activeVesselId = null; activeBargeId = null" class="text-xs font-black text-gray-500 hover:text-primary cursor-pointer uppercase tracking-wider transition-colors" title="Quay lại Trang tổng quan">Dashboard</span>
-                        <button @click="loadVessels" class="size-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Tải lại danh sách">
+                    <div class="p-3 border-b border-primary/5 flex items-center justify-between gap-2">
+                        <div class="size-7 flex-shrink-0"></div> <!-- Left placeholder to balance layout centering -->
+                        <button 
+                            @click="activeVesselId = null; activeBargeId = null" 
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-[12px] bg-primary/5 text-primary hover:bg-primary/10 hover:scale-[1.02] active:scale-[0.98] transition-all font-black text-xs border border-primary/10 mx-auto"
+                            title="Quay lại Trang tổng quan"
+                        >
+                            <span class="material-symbols-outlined text-[14px]">dashboard</span>
+                            Dashboard
+                        </button>
+                        <button @click="loadVessels" class="size-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-primary transition-colors flex-shrink-0" title="Tải lại danh sách">
                             <span class="material-symbols-outlined text-lg" :class="{'animate-spin': loading}">refresh</span>
                         </button>
                     </div>
