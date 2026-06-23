@@ -165,7 +165,7 @@ const onFileSelected = async (file: File) => {
       </div>
 
       <!-- Preview Box -->
-      <div class="bg-gray-50/50 border border-primary/10 rounded-3xl p-4 overflow-hidden max-h-[500px] flex flex-col shadow-sm">
+      <div class="bg-gray-50/50 border border-primary/10 rounded-2xl p-4 overflow-hidden max-h-[500px] flex flex-col shadow-sm">
         <!-- Excel Preview -->
         <div v-if="targetFormat === 'xlsx' && previewResult.pagesGrids && previewResult.pagesGrids.length > 0" class="overflow-auto flex-1 max-w-full select-text scrollbar-thin">
           <div v-for="(grid, pageIdx) in previewResult.pagesGrids" :key="pageIdx" class="mb-8 last:mb-0">
@@ -173,7 +173,7 @@ const onFileSelected = async (file: File) => {
               Trang {{ pageIdx + 1 }}
             </div>
             
-            <table class="border-collapse text-[11px] font-display min-w-full bg-white shadow-sm rounded-2xl overflow-hidden border border-primary/5">
+            <table class="border-collapse text-[11px] font-display min-w-full bg-white shadow-sm rounded-xl overflow-hidden border border-primary/5">
               <tbody>
                 <tr 
                   v-for="(row, rowIdx) in grid" 

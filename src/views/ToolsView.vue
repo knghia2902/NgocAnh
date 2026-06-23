@@ -89,7 +89,7 @@ const handleSidebarSwitch = (id: string) => {
       <div 
         v-for="tool in toolsList" 
         :key="tool.id"
-        class="bg-white rounded-3xl p-6 soft-shadow border border-primary/5 flex flex-col justify-between h-full group hover:border-primary/20 hover:scale-[1.01] transition-all relative overflow-hidden"
+        class="bg-white rounded-2xl p-6 soft-shadow border border-primary/5 flex flex-col justify-between h-full group hover:border-primary/20 hover:scale-[1.01] transition-all relative overflow-hidden"
       >
         <!-- Background Icon decoration -->
         <div class="absolute -top-6 -right-6 p-6 opacity-[0.03] group-hover:opacity-[0.07] group-hover:scale-110 transition-all pointer-events-none">
@@ -135,7 +135,7 @@ const handleSidebarSwitch = (id: string) => {
       </div>
 
       <!-- Placeholder card for future tools -->
-      <div class="bg-white/30 rounded-3xl p-6 border border-dashed border-primary/20 flex flex-col justify-center items-center text-center h-full min-h-[220px]">
+      <div class="bg-white/30 rounded-2xl p-6 border border-dashed border-primary/20 flex flex-col justify-center items-center text-center h-full min-h-[220px]">
         <div class="size-11 bg-primary/5 text-primary/30 rounded-full flex items-center justify-center mb-3">
           <span class="material-symbols-outlined text-lg">add_circle</span>
         </div>

@@ -150,7 +150,7 @@ const reset = () => {
 
       <!-- File Active Info -->
       <div v-else class="space-y-6">
-        <div class="bg-pastel-pink/30 rounded-3xl p-6 flex items-center justify-between border border-soft-pink/50">
+        <div class="bg-pastel-pink/30 rounded-2xl p-6 flex items-center justify-between border border-soft-pink/50">
           <div class="flex items-center gap-4">
             <div class="size-12 bg-white rounded-2xl flex items-center justify-center text-primary shadow-sm">
               <span class="material-symbols-outlined">{{ sourceFormat === 'xlsx' ? 'table_chart' : 'description' }}</span>

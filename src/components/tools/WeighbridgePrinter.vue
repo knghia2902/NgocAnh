@@ -25,6 +25,13 @@ const trucks = ref<Truck[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 
+// Filters and sorting state
+const vesselFilterMonth = ref<string>('');
+const bargeSearchQuery = ref<string>('');
+const searchQuery = ref<string>('');
+const sortKey = ref<string>('');
+const sortOrder = ref<'asc' | 'desc'>('asc');
+
 // UI elements and modals
 const expandedVesselIds = ref<Record<number, boolean>>({});
 const showMappingModal = ref(false);
@@ -106,17 +113,135 @@ const dialogTruck = reactive({
     note: ''
 });
 
+// Helper functions for filtering and sorting
+const removeAccents = (str: string): string => {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D');
+};
+
+const toggleSort = (key: string) => {
+    if (sortKey.value === key) {
+        sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortKey.value = key;
+        sortOrder.value = 'asc';
+    }
+};
+
 // Computed properties
 const activeVessel = computed(() => vessels.value.find(v => v.id === activeVesselId.value) || null);
 const activeBarge = computed<Barge | null>(() => activeVessel.value?.barges?.find(b => b.id === activeBargeId.value) || null);
 
+const availableVesselMonths = computed(() => {
+    const vessel = activeVessel.value;
+    if (!vessel || !vesselBargesSummary.value) return [];
+    
+    const months = new Set<string>();
+    vesselBargesSummary.value.forEach(b => {
+        const originalBarge = vessel.barges?.find(ob => ob.id === b.id);
+        const dates = [b.dateStart, b.dateEnd, originalBarge?.created_at].filter(Boolean);
+        dates.forEach(dStr => {
+            const date = new Date(dStr!);
+            if (!isNaN(date.getTime())) {
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const yyyy = date.getFullYear();
+                months.add(`${mm}/${yyyy}`);
+            }
+        });
+    });
+    
+    return Array.from(months).sort((a, b) => {
+        const partsA = a.split('/');
+        const partsB = b.split('/');
+        const mA = Number(partsA[0]) || 0;
+        const yA = Number(partsA[1]) || 0;
+        const mB = Number(partsB[0]) || 0;
+        const yB = Number(partsB[1]) || 0;
+        if (yA !== yB) return yB - yA;
+        return mB - mA;
+    });
+});
+
+const filteredVesselBarges = computed<BargeSummary[]>(() => {
+    let list = vesselBargesSummary.value;
+    
+    if (vesselFilterMonth.value) {
+        list = list.filter(b => {
+            const originalBarge = activeVessel.value?.barges?.find(ob => ob.id === b.id);
+            const dates = [b.dateStart, b.dateEnd, originalBarge?.created_at].filter(Boolean);
+            return dates.some(dStr => {
+                const d = new Date(dStr!);
+                if (isNaN(d.getTime())) return false;
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                return `${mm}/${yyyy}` === vesselFilterMonth.value;
+            });
+        });
+    }
+    
+    if (bargeSearchQuery.value.trim()) {
+        const query = removeAccents(bargeSearchQuery.value.trim().toLowerCase());
+        list = list.filter(b => removeAccents(b.name.toLowerCase()).includes(query));
+    }
+    
+    return list;
+});
+
+const filteredTrucks = computed(() => {
+    let list = [...trucks.value];
+
+    // 1. Search Filter
+    const query = removeAccents(searchQuery.value.trim().toLowerCase());
+    if (query) {
+        list = list.filter(t => {
+            const plate = removeAccents((t.plateNumber || '').toLowerCase());
+            const drv = removeAccents((t.driver || '').toLowerCase());
+            const ticket = removeAccents((t.ticketNo || '').toLowerCase());
+            const noteStr = removeAccents((t.note || '').toLowerCase());
+            return plate.includes(query) || drv.includes(query) || ticket.includes(query) || noteStr.includes(query);
+        });
+    }
+
+    // 2. Sort Filter
+    if (sortKey.value) {
+        list.sort((a, b) => {
+            let valA: any = a[sortKey.value as keyof Truck];
+            let valB: any = b[sortKey.value as keyof Truck];
+
+            if (valA === undefined || valA === null) valA = '';
+            if (valB === undefined || valB === null) valB = '';
+
+            if (sortKey.value === 'dateIn' || sortKey.value === 'dateOut') {
+                const timeA = valA ? new Date(valA).getTime() : 0;
+                const timeB = valB ? new Date(valB).getTime() : 0;
+                return sortOrder.value === 'asc' ? timeA - timeB : timeB - timeA;
+            }
+
+            if (typeof valA === 'number' && typeof valB === 'number') {
+                return sortOrder.value === 'asc' ? valA - valB : valB - valA;
+            }
+
+            const strA = String(valA).trim();
+            const strB = String(valB).trim();
+            return sortOrder.value === 'asc' 
+                ? strA.localeCompare(strB, 'vi', { numeric: true }) 
+                : strB.localeCompare(strA, 'vi', { numeric: true });
+        });
+    }
+
+    return list;
+});
+
 const totalNetWeight = computed(() => {
-    return trucks.value.reduce((sum, t) => sum + (t.weightNet || 0), 0);
+    return filteredTrucks.value.reduce((sum, t) => sum + (t.weightNet || 0), 0);
 });
 
 const avgNetWeight = computed(() => {
-    if (trucks.value.length === 0) return 0;
-    return Math.round(totalNetWeight.value / trucks.value.length);
+    if (filteredTrucks.value.length === 0) return 0;
+    return Math.round(totalNetWeight.value / filteredTrucks.value.length);
 });
 
 // Load all Vessels and Barges on component load
@@ -143,6 +268,11 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
     activeVesselId.value = vesselId;
     activeBargeId.value = bargeId;
     
+    // Reset filters and sorting when switching barges
+    searchQuery.value = '';
+    sortKey.value = '';
+    sortOrder.value = 'asc';
+    
     // Load config of active barge
     if (activeBarge.value) {
         const cfg = activeBarge.value.config || {};
@@ -167,6 +297,203 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         } finally {
             loading.value = false;
         }
+    }
+};
+
+interface BargeSummary {
+    id: number;
+    name: string;
+    truckCount: number;
+    totalWeight: number;
+    dateStart: string;
+    dateEnd: string;
+}
+
+const vesselBargesSummary = ref<BargeSummary[]>([]);
+const loadingVesselSummary = ref(false);
+
+const selectVessel = async (vesselId: number) => {
+    activeVesselId.value = vesselId;
+    activeBargeId.value = null; // Deselect barge to show vessel report summary
+    vesselFilterMonth.value = '';
+    bargeSearchQuery.value = '';
+    
+    const vessel = vessels.value.find(v => v.id === vesselId);
+    if (!vessel || !vessel.barges || vessel.barges.length === 0) {
+        vesselBargesSummary.value = [];
+        return;
+    }
+    
+    loadingVesselSummary.value = true;
+    try {
+        const summaries = await Promise.all(vessel.barges.map(async (barge) => {
+            const list = await WeighbridgeService.getTrucks(barge.id);
+            let totalWeight = 0;
+            let minDate = '';
+            let maxDate = '';
+            
+            list.forEach(t => {
+                totalWeight += (t.weightNet || 0);
+                if (t.dateIn) {
+                    if (!minDate || t.dateIn < minDate) minDate = t.dateIn;
+                }
+                if (t.dateOut) {
+                    if (!maxDate || t.dateOut > maxDate) maxDate = t.dateOut;
+                }
+            });
+            
+            return {
+                id: barge.id,
+                name: barge.name,
+                truckCount: list.length,
+                totalWeight,
+                dateStart: minDate,
+                dateEnd: maxDate
+            };
+        }));
+        
+        vesselBargesSummary.value = summaries;
+    } catch (e) {
+        console.error('Error loading vessel summary:', e);
+        showToast('Không thể tải báo cáo tổng hợp tàu!', 'error');
+    } finally {
+        loadingVesselSummary.value = false;
+    }
+};
+
+const exportVesselSummaryExcel = () => {
+    const vessel = activeVessel.value;
+    if (!vessel) return;
+    
+    try {
+        import('exceljs').then(async (ExcelJS) => {
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('Báo Cáo Tổng Hợp Tàu');
+            
+            sheet.pageSetup.margins = {
+                left: 0.7, right: 0.7,
+                top: 0.75, bottom: 0.75,
+                header: 0.3, footer: 0.3
+            };
+            
+            sheet.addRow([`BÁO CÁO TỔNG HỢP TÀU: ${vessel.name}`]);
+            sheet.addRow([`Cảng Nguyên Ngọc - Đồng bộ lúc: ${formatDateTimeStr(new Date().toISOString())}`]);
+            sheet.addRow([]);
+            
+            const headerRow = sheet.addRow(['STT', 'Tên sà lan', 'Số chuyến xe chạy', 'Tổng khối lượng hàng (Net - kg)', 'Thời gian bắt đầu', 'Thời gian kết thúc']);
+            
+            sheet.mergeCells('A1:F1');
+            const titleCell = sheet.getCell('A1');
+            titleCell.font = { name: 'Times New Roman', size: 16, bold: true };
+            titleCell.alignment = { horizontal: 'center' };
+            
+            sheet.mergeCells('A2:F2');
+            const subtitleCell = sheet.getCell('A2');
+            subtitleCell.font = { name: 'Times New Roman', size: 10, italic: true };
+            subtitleCell.alignment = { horizontal: 'center' };
+            
+            headerRow.font = { name: 'Times New Roman', size: 11, bold: true };
+            headerRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFE8DCD0' }
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            });
+            
+            let totalTrips = 0;
+            let grandTotalWeight = 0;
+            
+            filteredVesselBarges.value.forEach((b, idx) => {
+                const row = sheet.addRow([
+                    idx + 1,
+                    b.name,
+                    b.truckCount,
+                    b.totalWeight,
+                    formatDateTimeStr(b.dateStart) || '-',
+                    formatDateTimeStr(b.dateEnd) || '-'
+                ]);
+                totalTrips += b.truckCount;
+                grandTotalWeight += b.totalWeight;
+                
+                row.font = { name: 'Times New Roman', size: 11 };
+                row.eachCell((cell, colNumber) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    if (colNumber === 1 || colNumber === 2 || colNumber === 5 || colNumber === 6) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    } else if (colNumber === 3) {
+                        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                    } else if (colNumber === 4) {
+                        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                        cell.numFmt = '#,##0';
+                    }
+                });
+            });
+            
+            const totalRow = sheet.addRow([
+                'TỔNG CỘNG',
+                '',
+                totalTrips,
+                grandTotalWeight,
+                '',
+                ''
+            ]);
+            sheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
+            
+            totalRow.font = { name: 'Times New Roman', size: 11, bold: true };
+            totalRow.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFF5EBE6' }
+                };
+                if (colNumber === 1) {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                } else if (colNumber === 3) {
+                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                } else if (colNumber === 4) {
+                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                    cell.numFmt = '#,##0';
+                }
+            });
+            
+            sheet.columns.forEach((col, idx) => {
+                let maxLen = 10;
+                sheet.eachRow((row) => {
+                    const val = row.getCell(idx + 1).value;
+                    if (val) maxLen = Math.max(maxLen, String(val).length);
+                });
+                col.width = maxLen + 4;
+            });
+            
+            const buffer = await workbook.xlsx.writeBuffer();
+            excelService.downloadFile(
+                buffer, 
+                `BAO_CAO_TONG_HOP_TAU_${vessel.name.replace(/\s+/g, '_')}.xlsx`, 
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            showToast('Xuất báo cáo tổng hợp tàu thành công!');
+        });
+    } catch (e: any) {
+        showToast('Lỗi khi xuất báo cáo: ' + e.message, 'error');
     }
 };
 
@@ -972,11 +1299,11 @@ const triggerPrint = (singleTruck?: Truck) => {
     if (singleTruck) {
         printTrucksList.value = [singleTruck];
     } else {
-        if (trucks.value.length === 0) {
+        if (filteredTrucks.value.length === 0) {
             alert("Danh sách xe trống! Vui lòng tải file Excel hoặc thêm xe thủ công trước khi in.");
             return;
         }
-        printTrucksList.value = [...trucks.value];
+        printTrucksList.value = [...filteredTrucks.value];
     }
 
     // Wait for DOM to render the print section
@@ -993,7 +1320,7 @@ onMounted(() => {
 
 <template>
     <div class="weighbridge-printer-wrapper">
-        <div v-if="!hideCard" class="bg-white rounded-[2.5rem] p-8 md:p-10 soft-shadow border border-primary/5 relative overflow-hidden flex flex-col justify-between h-full group">
+        <div v-if="!hideCard" class="bg-white rounded-[24px] p-8 md:p-10 soft-shadow border border-primary/5 relative overflow-hidden flex flex-col justify-between h-full group">
             <div class="absolute -top-6 -right-6 p-8 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all pointer-events-none">
                 <span class="material-symbols-outlined text-[120px] text-primary">print</span>
             </div>
@@ -1066,11 +1393,11 @@ onMounted(() => {
                             Chưa có dữ liệu tàu. Nhấn nút bên dưới để thêm tàu mới.
                         </div>
 
-                        <div v-for="vessel in vessels" :key="vessel.id" class="border border-primary/5 rounded-xl overflow-hidden bg-gray-50">
+                        <div v-for="vessel in vessels" :key="vessel.id" class="border border-primary/5 rounded-[16px] overflow-hidden bg-gray-50">
                             <!-- Vessel Header -->
                             <div 
-                                @click="expandedVesselIds[vessel.id] = !expandedVesselIds[vessel.id]"
-                                class="flex items-center justify-between p-2.5 hover:bg-primary/5 cursor-pointer transition-colors"
+                                @click="selectVessel(vessel.id); expandedVesselIds[vessel.id] = !expandedVesselIds[vessel.id]"
+                                :class="['flex items-center justify-between p-2.5 hover:bg-primary/5 cursor-pointer transition-colors', activeVesselId === vessel.id && activeBargeId === null ? 'bg-primary/10 border-l-4 border-primary' : '']"
                             >
                                 <div class="flex items-center gap-1.5 font-bold text-xs text-[#4a2c32]">
                                     <span class="material-symbols-outlined text-primary text-base">directions_boat</span>
@@ -1100,7 +1427,7 @@ onMounted(() => {
                                     v-for="barge in vessel.barges" 
                                     :key="barge.id"
                                     @click="selectBarge(vessel.id, barge.id)"
-                                    :class="['flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all text-[11px] font-bold', activeBargeId === barge.id ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
+                                    :class="['flex items-center justify-between p-2 rounded-[12px] cursor-pointer transition-all text-[11px] font-bold', activeBargeId === barge.id ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
                                 >
                                     <div class="flex items-center gap-1.5 truncate">
                                         <span class="material-symbols-outlined text-sm">layers</span>
@@ -1123,7 +1450,7 @@ onMounted(() => {
                     <div class="p-3 border-t border-primary/10 bg-gray-50">
                         <button 
                             @click="addVessel" 
-                            class="w-full py-2 bg-white border border-primary/20 hover:border-primary text-primary font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 hover:bg-primary/5 transition-all shadow-sm"
+                            class="w-full py-2 bg-white border border-primary/20 hover:border-primary text-primary font-bold rounded-[12px] text-xs flex items-center justify-center gap-1.5 hover:bg-primary/5 transition-all shadow-sm"
                         >
                             <span class="material-symbols-outlined text-xs">add</span>
                             Thêm tàu mới
@@ -1134,18 +1461,165 @@ onMounted(() => {
                 <!-- Workspace (right) -->
                 <main class="flex-1 overflow-y-auto p-4 bg-cute-gradient flex flex-col gap-4">
                     <!-- Empty State -->
-                    <div v-if="!activeBargeId" class="flex-1 flex flex-col items-center justify-center text-center p-8 max-w-2xl mx-auto">
+                    <div v-if="!activeVesselId" class="flex-1 flex flex-col items-center justify-center text-center p-8 max-w-2xl mx-auto">
                         <div class="text-6xl mb-4 animate-bounce">🚢</div>
                         <h2 class="text-2xl font-display font-black text-primary mb-2">Ứng Dụng In Phiếu Cân Xe</h2>
                         <p class="text-xs font-medium text-[#1b0d11]/60 leading-relaxed mb-4">
-                            Vui lòng chọn hoặc tạo mới một Tàu và Sà lan ở cột bên trái để bắt đầu cấu hình thông tin, tải danh sách xe cân từ Excel và thực hiện in phiếu tự động.
+                            Vui lòng chọn hoặc tạo mới một Tàu ở cột bên trái để xem báo cáo tổng hợp tàu hoặc chọn một Sà lan để cấu hình thông tin và in phiếu.
                         </p>
+                    </div>
+
+                    <!-- Vessel Summary Dashboard -->
+                    <div v-else-if="activeVesselId && !activeBargeId" class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-4 animate-fade-in">
+                        <!-- Vessel header breadcrumbs -->
+                        <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
+                            <div class="flex items-center gap-3">
+                                <div>
+                                    <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Báo cáo tổng hợp tàu</div>
+                                    <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
+                                        Tàu: <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-black">{{ activeVessel?.name }}</span>
+                                    </h1>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-2">
+                                <button 
+                                    v-if="filteredVesselBarges.length > 0"
+                                    @click="exportVesselSummaryExcel"
+                                    class="px-4 py-2 bg-teal-600 text-white font-bold text-xs rounded-[12px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                                >
+                                    <span class="material-symbols-outlined text-sm">download</span>
+                                    Xuất báo cáo (Excel)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Stats Row -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                                <div class="size-11 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-xl">layers</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
+                                    <h4 class="text-lg font-black text-[#4a2c32]">{{ filteredVesselBarges.length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                                <div class="size-11 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-xl">local_shipping</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số chuyến xe</p>
+                                    <h4 class="text-lg font-black text-teal-600">{{ formatNumber(filteredVesselBarges.reduce((sum, b) => sum + b.truckCount, 0)) }} <span class="text-xs font-bold text-gray-400">lượt</span></h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                                <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-xl">scale</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng khối lượng nhận</p>
+                                    <h4 class="text-lg font-black text-amber-600">{{ formatNumber(filteredVesselBarges.reduce((sum, b) => sum + b.totalWeight, 0)) }} <span class="text-xs font-bold text-gray-400">kg</span></h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Barges Summary Table Card -->
+                        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5">
+                            <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
+                                <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-base">analytics</span>
+                                    Chi tiết danh sách sà lan đã làm
+                                </h3>
+                            </div>
+                            
+                            <!-- Filters Row (The red-boxed area in the screenshot) -->
+                            <div v-if="vesselBargesSummary.length > 0" class="flex flex-col md:flex-row gap-3 mb-4 p-3 bg-gray-50 rounded-[16px] border border-primary/5">
+                                <!-- Search Barge Input -->
+                                <div class="relative flex-1 flex items-center">
+                                    <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                                    <input 
+                                        v-model="bargeSearchQuery"
+                                        type="text"
+                                        placeholder="Tìm kiếm tên sà lan..."
+                                        class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                                    />
+                                    <button 
+                                        v-if="bargeSearchQuery" 
+                                        @click="bargeSearchQuery = ''" 
+                                        class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                                    >
+                                        <span class="material-symbols-outlined text-xs">close</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Month Filter for Barges -->
+                                <div v-if="availableVesselMonths.length > 0" class="relative min-w-[200px] flex items-center">
+                                    <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">calendar_month</span>
+                                    <select 
+                                        v-model="vesselFilterMonth" 
+                                        class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary cursor-pointer appearance-none"
+                                    >
+                                        <option value="">Tất cả các tháng (Thời gian)</option>
+                                        <option v-for="month in availableVesselMonths" :key="month" :value="month">
+                                            Tháng {{ month }}
+                                        </option>
+                                    </select>
+                                    <span class="material-symbols-outlined absolute right-3 text-gray-400 text-sm pointer-events-none">expand_more</span>
+                                </div>
+                            </div>
+
+                            <div v-if="loadingVesselSummary" class="text-center py-10 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
+                                <span class="material-symbols-outlined text-2xl animate-spin text-primary">sync</span>
+                                Đang tính toán và tải dữ liệu sà lan...
+                            </div>
+                            <div v-else-if="vesselBargesSummary.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                                Tàu này chưa có sà lan nào.
+                            </div>
+                            <div v-else-if="filteredVesselBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                                Không có sà lan nào hoạt động trong thời gian được lọc.
+                            </div>
+                            <div v-else class="overflow-x-auto rounded-[16px] border border-gray-100">
+                                <table class="w-full text-left border-collapse text-xs font-semibold">
+                                    <thead>
+                                        <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                            <th class="p-3 w-12 text-center bg-gray-50">STT</th>
+                                            <th class="p-3 bg-gray-50">Tên sà lan</th>
+                                            <th class="p-3 text-right bg-gray-50">Số chuyến xe chạy</th>
+                                            <th class="p-3 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
+                                            <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
+                                            <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
+                                            <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                                        <tr v-for="(b, idx) in filteredVesselBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
+                                            <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
+                                            <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="p-3 text-right font-medium">{{ formatNumber(b.truckCount) }}</td>
+                                            <td class="p-3 text-right font-bold text-teal-600">{{ formatNumber(b.totalWeight) }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateStart) || '-' }}</td>
+                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateEnd) || '-' }}</td>
+                                            <td class="p-3 text-center">
+                                                <button 
+                                                    @click="selectBarge(activeVesselId!, b.id)" 
+                                                    class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
+                                                >
+                                                    Xem chi tiết
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Active Barge Workspace -->
                     <div v-else class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-4">
                         <!-- Header with breadcrumbs -->
-                        <div class="flex flex-wrap items-center justify-between bg-white rounded-2xl p-3 px-4 soft-shadow border border-primary/5 gap-3">
+                        <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-3 px-4 soft-shadow border border-primary/5 gap-3">
                             <div>
                                 <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Đang chọn hoạt động</div>
                                 <h1 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
@@ -1170,14 +1644,14 @@ onMounted(() => {
                         <div class="flex gap-1.5 border-b border-primary/15 pb-1.5">
                             <button 
                                 @click="activeTab = 'data'"
-                                :class="['px-4 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1', activeTab === 'data' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
+                                :class="['px-4 py-1.5 rounded-[12px] font-bold text-xs transition-all flex items-center gap-1', activeTab === 'data' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
                             >
                                 <span class="material-symbols-outlined text-sm">local_shipping</span>
                                 Danh sách xe & In ấn
                             </button>
                             <button 
                                 @click="activeTab = 'config'"
-                                :class="['px-4 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1', activeTab === 'config' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
+                                :class="['px-4 py-1.5 rounded-[12px] font-bold text-xs transition-all flex items-center gap-1', activeTab === 'config' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
                             >
                                 <span class="material-symbols-outlined text-sm">settings</span>
                                 Cấu hình mẫu phiếu
@@ -1191,16 +1665,16 @@ onMounted(() => {
                                 <!-- Stats Grid (8 cols) -->
                                 <div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div class="bg-white rounded-2xl p-3 soft-shadow border border-primary/5 flex items-center gap-3">
-                                        <div class="size-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <div class="size-9 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">local_shipping</span>
                                         </div>
                                         <div>
                                             <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Tổng số xe</p>
-                                            <h4 class="text-base font-black text-[#4a2c32]">{{ trucks.length }} <span class="text-[10px] text-gray-400 font-bold">xe</span></h4>
+                                            <h4 class="text-base font-black text-[#4a2c32]">{{ filteredTrucks.length }} <span class="text-[10px] text-gray-400 font-bold">xe</span></h4>
                                         </div>
                                     </div>
                                     <div class="bg-white rounded-2xl p-3 soft-shadow border border-primary/5 flex items-center gap-3">
-                                        <div class="size-9 bg-teal-500/10 text-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <div class="size-9 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">scale</span>
                                         </div>
                                         <div>
@@ -1209,7 +1683,7 @@ onMounted(() => {
                                         </div>
                                     </div>
                                     <div class="bg-white rounded-2xl p-3 soft-shadow border border-primary/5 flex items-center gap-3">
-                                        <div class="size-9 bg-amber-500/10 text-amber-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <div class="size-9 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">monitoring</span>
                                         </div>
                                         <div>
@@ -1233,7 +1707,7 @@ onMounted(() => {
                                         accept=".xlsx, .xls" 
                                     />
                                     <div class="flex items-center gap-2.5 min-w-0" @click="fileInput?.click()">
-                                        <div class="size-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <div class="size-9 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">upload_file</span>
                                         </div>
                                         <div class="text-left min-w-0">
@@ -1245,14 +1719,14 @@ onMounted(() => {
                                     <div class="flex items-center gap-1 flex-shrink-0">
                                         <button 
                                             @click="downloadSampleExcel"
-                                            class="size-7 bg-gray-100 hover:bg-gray-200 text-[#4a2c32] rounded-lg flex items-center justify-center border border-gray-200 transition-colors"
+                                            class="size-7 bg-gray-100 hover:bg-gray-200 text-[#4a2c32] rounded-[8px] flex items-center justify-center border border-gray-200 transition-colors"
                                             title="Tải Excel mẫu"
                                         >
                                             <span class="material-symbols-outlined text-sm">download</span>
                                         </button>
                                         <button 
                                             @click="fileInput?.click()"
-                                            class="px-2.5 py-1.5 bg-primary text-white text-[9px] font-black rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                            class="px-2.5 py-1.5 bg-primary text-white text-[9px] font-black rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all"
                                         >
                                             Chọn File
                                         </button>
@@ -1261,7 +1735,7 @@ onMounted(() => {
                             </div>
 
                             <!-- Truck List Table Card -->
-                            <div class="bg-white rounded-3xl p-4 soft-shadow border border-primary/5">
+                             <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5">
                                 <div class="flex flex-wrap items-center justify-between mb-3 gap-3">
                                     <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
                                         <span class="material-symbols-outlined text-base">list_alt</span>
@@ -1271,14 +1745,14 @@ onMounted(() => {
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         <button 
                                             @click="openAddTruckDialog"
-                                            class="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 font-bold rounded-lg text-[10px] flex items-center gap-1 transition-all"
+                                            class="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all"
                                         >
                                             <span class="material-symbols-outlined text-xs">add</span>
                                             Thêm xe
                                         </button>
                                         <button 
                                             @click="clearTrucks"
-                                            class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-lg text-[10px] flex items-center gap-1 transition-all"
+                                            class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all"
                                         >
                                             <span class="material-symbols-outlined text-xs">delete_sweep</span>
                                             Xóa tất cả
@@ -1294,29 +1768,69 @@ onMounted(() => {
                                 </div>
 
                                 <!-- Table -->
-                                <div class="overflow-x-auto max-h-[350px] overflow-y-auto rounded-xl border border-gray-100">
+                                <div class="overflow-x-auto max-h-[350px] overflow-y-auto rounded-[16px] border border-gray-100">
                                     <table class="w-full text-left border-collapse text-[11px] font-semibold">
                                         <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
-                                            <tr class="text-gray-500 border-b border-gray-100 font-bold">
+                                            <tr class="text-gray-500 border-b border-gray-100 font-bold select-none">
                                                 <th class="p-2.5 w-10 text-center bg-gray-50">STT</th>
-                                                <th class="p-2.5 bg-gray-50">Số xe (Biển số)</th>
-                                                <th class="p-2.5 bg-gray-50">Tài xế</th>
-                                                <th class="p-2.5 text-right bg-gray-50">TL Lần 1 (kg)</th>
-                                                <th class="p-2.5 text-right bg-gray-50">TL Lần 2 (kg)</th>
-                                                <th class="p-2.5 text-right text-primary bg-gray-50">TL Hàng (Net)</th>
-                                                <th class="p-2.5 bg-gray-50">Giờ vào</th>
-                                                <th class="p-2.5 bg-gray-50">Giờ ra</th>
-                                                <th class="p-2.5 bg-gray-50">Ghi chú</th>
+                                                <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('plateNumber')">
+                                                    <div class="flex items-center gap-1">
+                                                        Số xe (Biển số)
+                                                        <span v-if="sortKey === 'plateNumber'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('driver')">
+                                                    <div class="flex items-center gap-1">
+                                                        Tài xế
+                                                        <span v-if="sortKey === 'driver'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 text-right bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('weight1')">
+                                                    <div class="flex items-center justify-end gap-1">
+                                                        TL Lần 1 (kg)
+                                                        <span v-if="sortKey === 'weight1'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 text-right bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('weight2')">
+                                                    <div class="flex items-center justify-end gap-1">
+                                                        TL Lần 2 (kg)
+                                                        <span v-if="sortKey === 'weight2'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 text-right text-primary bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('weightNet')">
+                                                    <div class="flex items-center justify-end gap-1">
+                                                        TL Hàng (Net)
+                                                        <span v-if="sortKey === 'weightNet'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('dateIn')">
+                                                    <div class="flex items-center gap-1">
+                                                        Giờ vào
+                                                        <span v-if="sortKey === 'dateIn'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('dateOut')">
+                                                    <div class="flex items-center gap-1">
+                                                        Giờ ra
+                                                        <span v-if="sortKey === 'dateOut'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
+                                                <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('note')">
+                                                    <div class="flex items-center gap-1">
+                                                        Ghi chú
+                                                        <span v-if="sortKey === 'note'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
                                                 <th class="p-2.5 text-center w-28 bg-gray-50">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
-                                            <tr v-if="trucks.length === 0">
+                                            <tr v-if="filteredTrucks.length === 0">
                                                 <td colspan="10" class="p-6 text-center text-gray-400 italic">
                                                     Chưa có dữ liệu xe. Hãy tải file Excel hoặc thêm xe thủ công để hiển thị.
                                                 </td>
                                             </tr>
-                                            <tr v-for="(truck, index) in trucks" :key="truck.id" class="hover:bg-gray-50 transition-colors">
+                                            <tr v-for="(truck, index) in filteredTrucks" :key="truck.id" class="hover:bg-gray-50 transition-colors">
                                                 <td class="p-2 text-center text-gray-400 font-bold">{{ index + 1 }}</td>
                                                 <td class="p-2 font-bold text-gray-900">{{ truck.plateNumber }}</td>
                                                 <td class="p-2 text-gray-600">{{ truck.driver || '-' }}</td>
@@ -1350,7 +1864,7 @@ onMounted(() => {
                         <div v-if="activeTab === 'config'" class="flex flex-col gap-4 animate-fade-in">
                             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                                 <!-- Left: Print Configuration (7 cols) -->
-                                <div class="bg-white rounded-3xl p-5 soft-shadow border border-primary/5 lg:col-span-7 flex flex-col justify-between">
+                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-7 flex flex-col justify-between">
                                     <div>
                                         <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5">
                                             <span class="material-symbols-outlined text-base">settings_applications</span>
@@ -1360,23 +1874,23 @@ onMounted(() => {
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên hàng hóa (mặc định)</label>
-                                                <input v-model="cfgForm.goods" type="text" placeholder="Đất sét nguyên liệu..." class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.goods" type="text" placeholder="Đất sét nguyên liệu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Mã hàng hóa</label>
-                                                <input v-model="cfgForm.goodsCode" type="text" placeholder="Mã hàng..." class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.goodsCode" type="text" placeholder="Mã hàng..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1 md:col-span-2">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên chủ hàng (mặc định)</label>
-                                                <input v-model="cfgForm.owner" type="text" placeholder="Công ty xuất nhập khẩu..." class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.owner" type="text" placeholder="Công ty xuất nhập khẩu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Người cân (NV trạm cân)</label>
-                                                <input v-model="cfgForm.operator" type="text" placeholder="Tên nhân viên..." class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.operator" type="text" placeholder="Tên nhân viên..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Hình thức xuất/nhập</label>
-                                                <select v-model="cfgForm.xn" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-bold bg-white">
+                                                <select v-model="cfgForm.xn" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-bold bg-white">
                                                     <option value="XUẤT KHẨU">XUẤT KHẨU</option>
                                                     <option value="NHẬP KHẨU">NHẬP KHẨU</option>
                                                     <option value="NỘI BỘ">NỘI BỘ</option>
@@ -1384,18 +1898,18 @@ onMounted(() => {
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tiền tố số phiếu (Mẫu số)</label>
-                                                <input v-model="cfgForm.ticketPrefix" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: PC-" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.ticketPrefix" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: PC-" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Số phiếu bắt đầu</label>
-                                                <input v-model="cfgForm.ticketSeed" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: 1 hoặc 001" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.ticketSeed" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: 1 hoặc 001" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                         </div>
                                     </div>
                                 </div>
     
                                 <!-- Right: Quality Evaluation (5 cols) -->
-                                <div class="bg-white rounded-3xl p-5 soft-shadow border border-primary/5 lg:col-span-5 flex flex-col justify-between">
+                                <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5 lg:col-span-5 flex flex-col justify-between">
                                     <div>
                                         <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5">
                                             <span class="material-symbols-outlined text-base">verified</span>
@@ -1405,15 +1919,15 @@ onMounted(() => {
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Chính phẩm (%)</label>
-                                                <input v-model.number="cfgForm.chinhpham" type="number" min="0" max="100" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model.number="cfgForm.chinhpham" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Phụ phẩm (%)</label>
-                                                <input v-model.number="cfgForm.phupham" type="number" min="0" max="100" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model.number="cfgForm.phupham" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                             <div class="flex flex-col gap-1 md:col-span-2">
                                                 <label class="text-[10px] font-bold text-gray-500">Kết luận chất lượng</label>
-                                                <input v-model="cfgForm.ketluan" type="text" placeholder="Chính phẩm đạt chuẩn..." class="px-3 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
+                                                <input v-model="cfgForm.ketluan" type="text" placeholder="Chính phẩm đạt chuẩn..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold">
                                             </div>
                                         </div>
                                     </div>
@@ -1423,7 +1937,7 @@ onMounted(() => {
                             <div class="flex justify-end pt-2">
                                 <button 
                                     @click="saveBargeConfigImmediately" 
-                                    class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-xl shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                                    class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-[8px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
                                 >
                                     <span class="material-symbols-outlined text-sm">save</span>
                                     Lưu cấu hình mẫu phiếu
@@ -1437,7 +1951,7 @@ onMounted(() => {
 
         <!-- COLUMN MAPPING MODAL -->
         <div v-if="showMappingModal && pendingExcelData" class="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4 animate-fade-in no-print font-display">
-            <div class="bg-white rounded-3xl max-w-xl w-full p-6 md:p-8 soft-shadow border border-primary/10 flex flex-col gap-6">
+            <div class="bg-white rounded-2xl max-w-xl w-full p-6 md:p-8 soft-shadow border border-primary/10 flex flex-col gap-6">
                 <div>
                     <h3 class="text-xl font-black text-primary mb-1">Cấu hình ánh xạ cột Excel</h3>
                     <p class="text-xs text-[#1b0d11]/60">Hệ thống đã nhận diện các cột. Vui lòng kiểm tra và sửa lại nếu chưa khớp.</p>
@@ -1451,7 +1965,7 @@ onMounted(() => {
                         </label>
                         <select 
                             v-model="pendingExcelData.mapping[field.id]" 
-                            class="col-span-3 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold bg-white focus:outline-none focus:border-primary"
+                            class="col-span-3 px-3 py-2 border border-gray-200 rounded-[8px] text-xs font-bold bg-white focus:outline-none focus:border-primary"
                         >
                             <option :value="-1">-- Không ánh xạ --</option>
                             <option v-for="col in pendingExcelData.columns" :key="col.index" :value="col.index">
@@ -1481,7 +1995,7 @@ onMounted(() => {
 
         <!-- DIALOG: ADD/EDIT TRUCK -->
         <div v-if="showTruckDialog" class="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4 animate-fade-in no-print font-display">
-            <div class="bg-white rounded-3xl max-w-md w-full p-6 md:p-8 soft-shadow border border-primary/10 flex flex-col gap-6">
+            <div class="bg-white rounded-[16px] max-w-md w-full p-6 md:p-8 soft-shadow border border-primary/10 flex flex-col gap-6">
                 <div>
                     <h3 class="text-xl font-black text-primary mb-1">{{ dialogTruck.id ? 'Sửa thông tin xe cân' : 'Thêm thông tin xe cân thủ công' }}</h3>
                     <p class="text-xs text-[#1b0d11]/60">Nhập đầy đủ thông tin chi tiết xe cân bên dưới.</p>
@@ -1491,35 +2005,35 @@ onMounted(() => {
                 <form class="grid grid-cols-2 gap-4 text-xs font-bold text-gray-500">
                     <div class="col-span-2 flex flex-col gap-1.5">
                         <label>Biển số xe / Số xe *</label>
-                        <input v-model="dialogTruck.plateNumber" type="text" placeholder="Ví dụ: 51C-12345" class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model="dialogTruck.plateNumber" type="text" placeholder="Ví dụ: 51C-12345" class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                     <div class="col-span-2 flex flex-col gap-1.5">
                         <label>Họ tên tài xế</label>
-                        <input v-model="dialogTruck.driver" type="text" placeholder="Tên tài xế..." class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model="dialogTruck.driver" type="text" placeholder="Tên tài xế..." class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                     <div class="flex flex-col gap-1.5">
                         <label>TL lần 1 (kg) *</label>
-                        <input v-model.number="dialogTruck.weight1" type="number" @input="onWeightInput" class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model.number="dialogTruck.weight1" type="number" @input="onWeightInput" class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                     <div class="flex flex-col gap-1.5">
                         <label>TL lần 2 (kg) *</label>
-                        <input v-model.number="dialogTruck.weight2" type="number" @input="onWeightInput" class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model.number="dialogTruck.weight2" type="number" @input="onWeightInput" class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                     <div class="col-span-2 flex flex-col gap-1.5">
                         <label>Trọng lượng hàng (Net) (kg)</label>
-                        <input :value="dialogTruck.weightNet" type="number" readonly class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-black focus:outline-none bg-gray-50 text-teal-600">
+                        <input :value="dialogTruck.weightNet" type="number" readonly class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-black focus:outline-none bg-gray-50 text-teal-600">
                     </div>
                     <div class="flex flex-col gap-1.5">
                         <label>Ngày giờ vào</label>
-                        <input v-model="dialogTruck.dateIn" type="datetime-local" class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model="dialogTruck.dateIn" type="datetime-local" class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                     <div class="flex flex-col gap-1.5">
                         <label>Ngày giờ ra</label>
-                        <input v-model="dialogTruck.dateOut" type="datetime-local" class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model="dialogTruck.dateOut" type="datetime-local" class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                     <div class="col-span-2 flex flex-col gap-1.5">
                         <label>Ghi chú</label>
-                        <input v-model="dialogTruck.note" type="text" placeholder="Ghi chú thêm..." class="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
+                        <input v-model="dialogTruck.note" type="text" placeholder="Ghi chú thêm..." class="px-4 py-2.5 rounded-[8px] border border-gray-200 text-sm font-semibold focus:outline-none focus:border-primary">
                     </div>
                 </form>
 
@@ -1542,7 +2056,7 @@ onMounted(() => {
         </div>
 
         <!-- GLOBAL TOAST BANNER -->
-        <div v-if="toastMessage" :class="['fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-2xl shadow-lg border text-sm font-bold flex items-center gap-2 animate-fade-in no-print', toastType === 'success' ? 'bg-teal-50 border-teal-200 text-teal-700' : 'bg-red-50 border-red-200 text-red-700']">
+        <div v-if="toastMessage" :class="['fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-[16px] shadow-lg border text-sm font-bold flex items-center gap-2 animate-fade-in no-print', toastType === 'success' ? 'bg-teal-50 border-teal-200 text-teal-700' : 'bg-red-50 border-red-200 text-red-700']">
             <span class="material-symbols-outlined text-lg">{{ toastType === 'success' ? 'check_circle' : 'error' }}</span>
             <span>{{ toastMessage }}</span>
         </div>

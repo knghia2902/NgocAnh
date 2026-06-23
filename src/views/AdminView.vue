@@ -273,7 +273,7 @@ onMounted(async () => {
                         </button>
                         
                         <!-- Notifications Popup -->
-                        <div v-if="showNotifications" class="absolute right-0 mt-4 w-80 bg-white rounded-3xl shadow-2xl p-6 z-50 border border-gray-100 animate-fade-in">
+                        <div v-if="showNotifications" class="absolute right-0 mt-4 w-80 bg-white rounded-2xl shadow-2xl p-6 z-50 border border-gray-100 animate-fade-in">
                             <h3 class="font-black mb-4 text-sm">Notifications</h3>
                             <div class="space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
                                 <div v-if="contentStore.messages.length === 0" class="text-center py-8 text-gray-400 italic text-xs">No magic letters yet...</div>
