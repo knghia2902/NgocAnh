@@ -1130,6 +1130,11 @@ function clearHistory() {
     }
 }
 
+// Total history cargo weight in tons
+const historyTotalWeightTons = computed(() => {
+    return existingTrips.value.reduce((sum, t) => sum + (t.weightTons || 0), 0);
+});
+
 // Export source tickets (Tab 1) as Excel
 async function exportSourceTickets() {
     if (csvRecords.value.length === 0) {
@@ -1193,8 +1198,9 @@ async function exportSourceTickets() {
 
 // Execute Excel update and download
 async function compileAndDownload() {
-    if (generatedTrips.value.length === 0) {
-        addToast('Không có dữ liệu chuyến xe để xuất!', 'info');
+    const dataToExport = activeDataTab.value === 'template' ? generatedTrips.value : existingTrips.value;
+    if (dataToExport.length === 0) {
+        addToast(activeDataTab.value === 'template' ? 'Không có dữ liệu phân bổ để xuất!' : 'Không có dữ liệu lịch sử để xuất!', 'info');
         return;
     }
     
@@ -1249,6 +1255,11 @@ async function compileAndDownload() {
             
             for (let colIdx = 1; colIdx <= 15; colIdx++) {
                 const cell = headerRow.getCell(colIdx);
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFE2EBF5' } // soft light blue fill
+                };
                 cell.border = {
                     top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
                     left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
@@ -1259,7 +1270,7 @@ async function compileAndDownload() {
             headerRow.height = 25;
             
             let currentRowIdx = 2;
-            generatedTrips.value.forEach(trip => {
+            dataToExport.forEach(trip => {
                 const row = dsSheet.getRow(currentRowIdx);
                 row.getCell(1).value = trip.ticketNo;
                 row.getCell(2).value = trip.plateNumber;
@@ -1346,7 +1357,7 @@ async function compileAndDownload() {
             let currentSTT = 0;
             let currentRowIdx = 10;
             
-            generatedTrips.value.forEach(trip => {
+            dataToExport.forEach(trip => {
                 currentSTT++;
                 
                 const row = dsSheet.getRow(currentRowIdx);
@@ -1393,13 +1404,13 @@ async function compileAndDownload() {
         link.href = url;
         link.download = activeDataTab.value === 'template' 
             ? 'SỔ PHÂN BỔ CHI TIẾT_PhanBo.xlsx' 
-            : 'SỔ THEO DÕI XẾP HÀNG HÓA_PhanBo.xlsx';
+            : 'SỔ THEO DÕI XẾP HÀNG HÓA_LichSu.xlsx';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         
-        addToast('Đã phân bổ và xuất tệp Excel thành công!', 'success');
+        addToast('Đã xuất tệp Excel thành công!', 'success');
     } catch (error) {
         console.error(error);
         addToast('Lỗi khi xuất tệp Excel!', 'error');
@@ -1544,7 +1555,7 @@ async function compileAndDownload() {
                                 : 'text-gray-500 hover:bg-gray-50'
                         ]"
                     >
-                        3. Theo dõi ({{ generatedTrips.length }})
+                        3. Theo dõi ({{ existingTrips.length }})
                     </button>
 
                     <!-- Cloud Sync Indicator -->
@@ -1615,6 +1626,14 @@ async function compileAndDownload() {
                         KL phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
                     </div>
                     <button 
+                        @click="saveToHistory"
+                        :disabled="generatedTrips.length === 0"
+                        class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">save</span>
+                        Lưu vào Sổ Theo Dõi
+                    </button>
+                    <button 
                         @click="compileAndDownload"
                         :disabled="generatedTrips.length === 0 || compiling"
                         class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1628,14 +1647,22 @@ async function compileAndDownload() {
                 <!-- Stats summary badges for Tab 3 (Generated / Theo dõi) -->
                 <div v-if="activeDataTab === 'generated'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
                     <div class="h-7 px-2.5 bg-primary/10 rounded-[8px] border border-transparent text-primary flex items-center">
-                        Số chuyến: {{ generatedTrips.length }}
+                        Số chuyến: {{ existingTrips.length }}
                     </div>
                     <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center">
-                        KL phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
+                        KL lịch sử: {{ historyTotalWeightTons.toFixed(2) }}t
                     </div>
                     <button 
+                        @click="clearHistory"
+                        :disabled="existingTrips.length === 0"
+                        class="h-7 px-3 bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold rounded-[8px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">delete_forever</span>
+                        Xóa lịch sử
+                    </button>
+                    <button 
                         @click="compileAndDownload"
-                        :disabled="generatedTrips.length === 0 || compiling"
+                        :disabled="existingTrips.length === 0 || compiling"
                         class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <span v-if="compiling" class="material-symbols-outlined text-[14px] animate-spin">sync</span>
@@ -1761,13 +1788,13 @@ async function compileAndDownload() {
                         <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
                         <input 
                             type="text" 
-                            v-model="searchQuery" 
+                            v-model="historySearchQuery" 
                             placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
                             class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
                         >
                         <button 
-                            v-if="searchQuery" 
-                            @click="searchQuery = ''" 
+                            v-if="historySearchQuery" 
+                            @click="historySearchQuery = ''" 
                             class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
                         >
                             <span class="material-symbols-outlined text-xs">close</span>
@@ -1775,7 +1802,7 @@ async function compileAndDownload() {
                     </div>
                     
                     <span class="text-[10px] font-bold text-gray-400">
-                        Đang hiển thị {{ filteredTrips.length }} / {{ generatedTrips.length }} dòng kết quả
+                        Đang hiển thị {{ filteredHistoryTrips.length }} / {{ existingTrips.length }} dòng kết quả
                     </span>
                 </div>
 
@@ -1797,13 +1824,13 @@ async function compileAndDownload() {
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
                             <tr 
-                                v-for="trip in pagedTrips" 
+                                v-for="trip in pagedHistoryTrips" 
                                 :key="trip.stt"
                                 class="hover:bg-gray-50 transition-colors"
                             >
                                 <td class="py-2 px-3 text-center font-bold text-gray-400">
                                     <span class="flex items-center justify-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-primary" title="Chuyến sẽ thêm mới"></span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-teal-500" title="Chuyến đã lưu lịch sử"></span>
                                         {{ trip.stt }}
                                     </span>
                                 </td>
@@ -1811,9 +1838,9 @@ async function compileAndDownload() {
                                 <td class="py-2 px-3 font-bold text-gray-900 flex items-center gap-2">
                                     <span class="whitespace-nowrap">{{ trip.plateNumber }}</span>
                                     <span 
-                                        class="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-black border border-primary/20 uppercase tracking-wide select-none"
+                                        class="text-[8px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-600 font-black border border-teal-200 uppercase tracking-wide select-none"
                                     >
-                                        Mới
+                                        Đã lưu
                                     </span>
                                 </td>
                                 <td class="py-2 px-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
@@ -1838,7 +1865,7 @@ async function compileAndDownload() {
                                     </span>
                                 </td>
                             </tr>
-                            <tr v-if="filteredTrips.length === 0">
+                            <tr v-if="filteredHistoryTrips.length === 0">
                                 <td colspan="9" class="p-8 text-center text-gray-400 italic">
                                     Không tìm thấy bản ghi nào khớp bộ lọc!
                                 </td>
@@ -1848,20 +1875,20 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Table Pagination -->
-                <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-2">
+                <div v-if="historyTotalPages > 1" class="flex items-center justify-center gap-2 pt-2">
                     <button 
-                        @click="currentPage = Math.max(1, currentPage - 1)" 
-                        :disabled="currentPage === 1"
+                        @click="historyCurrentPage = Math.max(1, historyCurrentPage - 1)" 
+                        :disabled="historyCurrentPage === 1"
                         class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
                     >
                         <span class="material-symbols-outlined text-lg">chevron_left</span>
                     </button>
                     <span class="text-xs font-bold text-gray-500">
-                        Trang {{ currentPage }} / {{ totalPages }}
+                        Trang {{ historyCurrentPage }} / {{ historyTotalPages }}
                     </span>
                     <button 
-                        @click="currentPage = Math.min(totalPages, currentPage + 1)" 
-                        :disabled="currentPage === totalPages"
+                        @click="historyCurrentPage = Math.min(historyTotalPages, historyCurrentPage + 1)" 
+                        :disabled="historyCurrentPage === historyTotalPages"
                         class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
                     >
                         <span class="material-symbols-outlined text-lg">chevron_right</span>
