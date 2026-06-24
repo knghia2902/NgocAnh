@@ -3443,7 +3443,7 @@ onUnmounted(() => {
                                         <div class="w-full overflow-auto bg-gray-50 border border-gray-200 rounded-2xl p-4 flex justify-center items-center shadow-inner relative group">
                                             <div 
                                                 class="relative bg-white border border-dashed border-gray-300 shadow-lg select-none overflow-hidden"
-                                                style="width: 840px; height: 592px; background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px;"
+                                                style="width: 840px; height: 592px; box-sizing: content-box; background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px;"
                                                 @mousedown="selectedElementId = null; selectedElementIds = []"
                                             >
                                                 <!-- Alignment Snap Guides -->
