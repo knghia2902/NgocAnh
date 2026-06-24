@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useToast } from '@/composables/useToast';
+import { dbContext } from '@/services/storage/DBContext';
 
 const { addToast } = useToast();
 
 // Types
 interface CSVRecord {
+    id?: string;
     ticketNo: string;
     plateNumber: string;
     customer: string;
@@ -187,6 +189,7 @@ function parseCSVText(text: string): CSVRecord[] {
         if (!plate) continue;
 
         records.push({
+            id: 'ticket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
             ticketNo: parts[idxTicket] || '',
             plateNumber: plate,
             customer: (idxCustomer !== -1 ? parts[idxCustomer] : '') || '',
@@ -228,14 +231,38 @@ function formatPlate(plate: string): string {
 // Convert DD/MM/YYYY and HH:mm:ss strings to Date object
 function parseDateTime(dateStr: string, timeStr: string): Date {
     try {
-        const dParts = dateStr.split('/');
-        const tParts = timeStr.split(':');
-        const day = parseInt(dParts[0] || '0', 10);
-        const month = parseInt(dParts[1] || '0', 10) - 1; // 0-indexed
-        const year = parseInt(dParts[2] || '0', 10);
-        const hour = parseInt(tParts[0] || '0', 10);
-        const minute = parseInt(tParts[1] || '0', 10);
-        const second = parseInt(tParts[2] || '0', 10);
+        if (!dateStr) return new Date();
+        
+        // If dateStr contains both date and time
+        if (dateStr.includes(' ') && !timeStr) {
+            const parts = dateStr.split(' ');
+            dateStr = parts[0] || '';
+            timeStr = parts[1] || '';
+        }
+        
+        // Replace dashes with slashes
+        const normalizedDate = dateStr.replace(/-/g, '/');
+        const dParts = normalizedDate.split('/');
+        
+        let day = parseInt(dParts[0] || '0', 10);
+        let month = parseInt(dParts[1] || '0', 10) - 1; // 0-indexed
+        let year = parseInt(dParts[2] || '0', 10);
+        
+        if (year < 100) {
+            year += 2000;
+        }
+        
+        let hour = 0;
+        let minute = 0;
+        let second = 0;
+        
+        if (timeStr) {
+            const tParts = timeStr.split(':');
+            hour = parseInt(tParts[0] || '0', 10);
+            minute = parseInt(tParts[1] || '0', 10);
+            second = parseInt(tParts[2] || '0', 10);
+        }
+        
         return new Date(year, month, day, hour, minute, second);
     } catch (e) {
         return new Date();
@@ -254,27 +281,333 @@ function formatExcelDateTime(date: Date): string {
     return `${hh}:${mm}:${ss}\n${DD}/${MM}/${YYYY}`;
 }
 
-// Handle CSV File upload
-async function handleCSVUpload(event: Event) {
+// Handle Ticket Import (accepts CSV and Excel)
+async function handleTicketImport(event: Event) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
     if (!file) return;
     
     csvFile.value = file;
-    loadingCSV.value = true;
+    const ext = file.name.split('.').pop()?.toLowerCase();
     
+    if (ext === 'csv') {
+        loadingCSV.value = true;
+        try {
+            const text = await file.text();
+            const newRecords = parseCSVText(text);
+            mergeTickets(newRecords);
+            addToast(`Đã tải lên và import thêm ${newRecords.length} phiếu cân từ tệp CSV`, 'success');
+        } catch (error) {
+            console.error(error);
+            addToast('Lỗi khi đọc file CSV!', 'error');
+        } finally {
+            loadingCSV.value = false;
+        }
+    } else if (ext === 'xlsx') {
+        await handleTicketExcelUpload(file);
+    } else {
+        addToast('Định dạng tệp không được hỗ trợ (chỉ hỗ trợ .csv, .xlsx)', 'error');
+    }
+}
+
+// Handle Excel tickets file upload
+async function handleTicketExcelUpload(file: File) {
+    loadingCSV.value = true;
     try {
-        const text = await file.text();
-        csvRecords.value = parseCSVText(text);
-        addToast(`Đã tải lên tệp CSV và đọc được ${csvRecords.value.length} bản ghi`, 'success');
-        detectNewVehicles();
-    } catch (error) {
-        console.error(error);
-        addToast('Lỗi khi đọc file CSV!', 'error');
+        const ExcelJS = await import('exceljs');
+        const workbook = new ExcelJS.Workbook();
+        const arrayBuffer = await file.arrayBuffer();
+        await workbook.xlsx.load(arrayBuffer);
+        
+        const sheet = workbook.worksheets[0];
+        if (!sheet) {
+            addToast('Không tìm thấy sheet nào trong file Excel!', 'error');
+            return;
+        }
+        
+        let headerRowIdx = -1;
+        let headers: string[] = [];
+        
+        for (let r = 1; r <= Math.min(10, sheet.rowCount); r++) {
+            const row = sheet.getRow(r);
+            const rowValues = [];
+            let hasKeywords = false;
+            for (let c = 1; c <= Math.min(25, row.cellCount); c++) {
+                const val = String(row.getCell(c).value || '').trim();
+                rowValues.push(val);
+                if (
+                    val.toLowerCase().includes('phieu') || 
+                    val.toLowerCase().includes('xe') || 
+                    (val.toLowerCase().includes('kl') && val.toLowerCase().includes('hang'))
+                ) {
+                    hasKeywords = true;
+                }
+            }
+            if (hasKeywords) {
+                headerRowIdx = r;
+                headers = rowValues;
+                break;
+            }
+        }
+        
+        if (headerRowIdx === -1) {
+            addToast('Không tìm thấy dòng tiêu đề phù hợp trong file Excel!', 'info');
+            return;
+        }
+        
+        // Map headers to column indexes
+        const idxTicket = headers.findIndex(h => h.toLowerCase().includes('phieu'));
+        const idxPlate = headers.findIndex(h => h.toLowerCase().includes('xe'));
+        const idxCustomer = headers.findIndex(h => h.toLowerCase().includes('khach'));
+        const idxWeight1 = headers.findIndex(h => h.toLowerCase().includes('lan 1'));
+        const idxWeight2 = headers.findIndex(h => h.toLowerCase().includes('lan 2'));
+        const idxWeightNet = headers.findIndex(h => h.toLowerCase().includes('kl') && h.toLowerCase().includes('hang'));
+        const idxDate1 = headers.findIndex(h => h.toLowerCase().includes('ngay can lan 1') || h.toLowerCase().includes('ngày cân lần 1') || h.toLowerCase() === 'ngay can 1' || h.toLowerCase() === 'ngày cân 1');
+        const idxTime1 = headers.findIndex(h => h.toLowerCase().includes('gio can lan 1') || h.toLowerCase().includes('giờ cân lần 1') || h.toLowerCase() === 'gio can 1' || h.toLowerCase() === 'giờ cân 1');
+        const idxDate2 = headers.findIndex(h => h.toLowerCase().includes('ngay can lan 2') || h.toLowerCase().includes('ngày cân lần 2') || h.toLowerCase() === 'ngay can 2' || h.toLowerCase() === 'ngày cân 2');
+        const idxTime2 = headers.findIndex(h => h.toLowerCase().includes('gio can lan 2') || h.toLowerCase().includes('giờ cân lần 2') || h.toLowerCase() === 'gio can 2' || h.toLowerCase() === 'giờ cân 2');
+        const idxDirection = headers.findIndex(h => h.toLowerCase().includes('xuat/nhap') || h.toLowerCase().includes('xuất/nhập'));
+        const idxCargoType = headers.findIndex(h => h.toLowerCase().includes('loai hang') || h.toLowerCase().includes('loại hàng'));
+        const idxBarge = headers.findIndex(h => h.toLowerCase().includes('salan') || h.toLowerCase().includes('sa lan'));
+        const idxDriver = headers.findIndex(h => h.toLowerCase().includes('tai xe') || h.toLowerCase().includes('tài xế'));
+        const idxNotes = headers.findIndex(h => h.toLowerCase().includes('ghi chu') || h.toLowerCase().includes('ghi chú'));
+        
+        const newRecords: CSVRecord[] = [];
+        
+        for (let r = headerRowIdx + 1; r <= sheet.rowCount; r++) {
+            const row = sheet.getRow(r);
+            const getVal = (idx: number) => {
+                if (idx === -1) return '';
+                const cell = row.getCell(idx + 1);
+                if (cell.value && typeof cell.value === 'object') {
+                    if ((cell.value as any).result !== undefined) {
+                        return String((cell.value as any).result);
+                    }
+                    if (cell.value instanceof Date) {
+                        return cell.value.toLocaleDateString('vi-VN');
+                    }
+                }
+                return cell.value !== null && cell.value !== undefined ? String(cell.value) : '';
+            };
+            
+            const plate = getVal(idxPlate);
+            if (!plate) continue;
+            
+            newRecords.push({
+                ticketNo: getVal(idxTicket),
+                plateNumber: plate,
+                customer: getVal(idxCustomer),
+                weight1: parseFloat(getVal(idxWeight1)) || 0,
+                weight2: parseFloat(getVal(idxWeight2)) || 0,
+                weightNet: parseFloat(getVal(idxWeightNet)) || 0,
+                dateInStr: getVal(idxDate1),
+                timeInStr: getVal(idxTime1),
+                dateOutStr: getVal(idxDate2),
+                timeOutStr: getVal(idxTime2),
+                direction: getVal(idxDirection),
+                cargoType: getVal(idxCargoType),
+                bargeName: getVal(idxBarge),
+                driverName: getVal(idxDriver),
+                notes: getVal(idxNotes)
+            });
+        }
+        
+        if (newRecords.length === 0) {
+            addToast('Không tìm thấy dữ liệu phiếu cân hợp lệ nào trong file Excel!', 'info');
+            return;
+        }
+        
+        mergeTickets(newRecords);
+        addToast(`Đã import thêm ${newRecords.length} phiếu cân từ tệp Excel`, 'success');
+        
+    } catch (e) {
+        console.error(e);
+        addToast('Lỗi khi phân tích tệp Excel phiếu cân!', 'error');
     } finally {
         loadingCSV.value = false;
     }
 }
+
+// Smart merge tickets to prevent duplicates
+function mergeTickets(newRecords: CSVRecord[]) {
+    const currentList = [...csvRecords.value];
+    
+    newRecords.forEach(rec => {
+        const matchIdx = rec.ticketNo 
+            ? currentList.findIndex(x => x.ticketNo === rec.ticketNo)
+            : -1;
+            
+        const id = rec.id || 'ticket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        const mergedRec = { ...rec, id };
+        
+        if (matchIdx !== -1) {
+            currentList[matchIdx] = mergedRec;
+        } else {
+            currentList.push(mergedRec);
+        }
+    });
+    
+    csvRecords.value = currentList;
+}
+
+// CRUD State & Functions
+const showTicketDialog = ref(false);
+const editingTicket = ref<CSVRecord | null>(null);
+
+const dialogTicket = ref<CSVRecord>({
+    id: '',
+    ticketNo: '',
+    plateNumber: '',
+    customer: '',
+    weight1: 0,
+    weight2: 0,
+    weightNet: 0,
+    dateInStr: '',
+    timeInStr: '',
+    dateOutStr: '',
+    timeOutStr: '',
+    direction: 'XUẤT KHẨU',
+    cargoType: '',
+    bargeName: '',
+    driverName: '',
+    notes: ''
+});
+
+function openAddTicketDialog() {
+    editingTicket.value = null;
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    
+    dialogTicket.value = {
+        id: '',
+        ticketNo: 'PC' + Date.now().toString().slice(-6),
+        plateNumber: '',
+        customer: '',
+        weight1: 0,
+        weight2: 0,
+        weightNet: 0,
+        dateInStr: dateStr,
+        timeInStr: timeStr,
+        dateOutStr: dateStr,
+        timeOutStr: timeStr,
+        direction: 'XUẤT KHẨU',
+        cargoType: 'Viên Nén Gỗ',
+        bargeName: '',
+        driverName: '',
+        notes: ''
+    };
+    showTicketDialog.value = true;
+}
+
+function openEditTicketDialog(ticket: CSVRecord) {
+    editingTicket.value = ticket;
+    dialogTicket.value = { ...ticket };
+    showTicketDialog.value = true;
+}
+
+function saveTicket() {
+    if (!dialogTicket.value.plateNumber.trim()) {
+        addToast('Vui lòng nhập biển số xe!', 'info');
+        return;
+    }
+    
+    if (dialogTicket.value.weightNet === 0 && dialogTicket.value.weight1 > 0 && dialogTicket.value.weight2 > 0) {
+        dialogTicket.value.weightNet = Math.abs(dialogTicket.value.weight1 - dialogTicket.value.weight2);
+    }
+    
+    if (dialogTicket.value.weightNet <= 0) {
+        addToast('Vui lòng nhập khối lượng hàng hợp lệ!', 'info');
+        return;
+    }
+
+    const currentList = [...csvRecords.value];
+    
+    if (editingTicket.value && editingTicket.value.id) {
+        const idx = currentList.findIndex(t => t.id === editingTicket.value!.id);
+        if (idx !== -1) {
+            currentList[idx] = { ...dialogTicket.value };
+            addToast('Đã cập nhật phiếu cân thành công!', 'success');
+        }
+    } else {
+        const id = 'ticket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        currentList.push({
+            ...dialogTicket.value,
+            id
+        });
+        addToast('Đã thêm phiếu cân mới thành công!', 'success');
+    }
+    
+    csvRecords.value = currentList;
+    showTicketDialog.value = false;
+}
+
+function deleteTicket(ticket: CSVRecord) {
+    if (confirm(`Bạn có chắc chắn muốn xóa phiếu cân ${ticket.ticketNo || ticket.plateNumber} không?`)) {
+        csvRecords.value = csvRecords.value.filter(t => t.id !== ticket.id);
+        addToast('Đã xóa phiếu cân!', 'info');
+    }
+}
+
+// Clear all tickets
+function clearAllTickets() {
+    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ danh sách phiếu cân hiện tại không?')) {
+        csvRecords.value = [];
+        csvFile.value = null;
+        addToast('Đã xóa sạch danh sách phiếu cân!', 'info');
+    }
+}
+
+// Tabs and filters for Source tickets
+const activeDataTab = ref<'source' | 'generated'>('source');
+const sourceCurrentPage = ref(1);
+const sourceSearchQuery = ref('');
+
+const filteredSourceTickets = computed(() => {
+    if (!sourceSearchQuery.value.trim()) return csvRecords.value;
+    const q = sourceSearchQuery.value.toLowerCase();
+    return csvRecords.value.filter(t => 
+        t.plateNumber.toLowerCase().includes(q) || 
+        t.ticketNo.toLowerCase().includes(q) || 
+        t.cargoType.toLowerCase().includes(q)
+    );
+});
+
+const pagedSourceTickets = computed(() => {
+    const start = (sourceCurrentPage.value - 1) * itemsPerPage;
+    return filteredSourceTickets.value.slice(start, start + itemsPerPage);
+});
+
+const sourceTotalPages = computed(() => {
+    return Math.ceil(filteredSourceTickets.value.length / itemsPerPage);
+});
+
+watch(sourceSearchQuery, () => {
+    sourceCurrentPage.value = 1;
+});
+
+// Mounted hook to load tickets from IndexedDB
+onMounted(async () => {
+    try {
+        const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
+        if (saved && Array.isArray(saved)) {
+            csvRecords.value = saved;
+        }
+    } catch (e) {
+        console.error('Lỗi khi nạp danh sách phiếu cân từ IndexedDB:', e);
+    }
+});
+
+// Auto-save tickets on change
+watch(csvRecords, async (newVal) => {
+    try {
+        await dbContext.set('allocator_tickets', newVal);
+        detectNewVehicles();
+    } catch (e) {
+        console.error('Lỗi khi lưu danh sách phiếu cân vào IndexedDB:', e);
+    }
+}, { deep: true });
 
 // Handle Excel File upload
 async function handleExcelUpload(event: Event) {
@@ -750,21 +1083,21 @@ async function compileAndDownload() {
             <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
                 <div class="flex items-center gap-2.5">
                     <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-                        <span class="material-symbols-outlined text-base">csv</span>
+                        <span class="material-symbols-outlined text-base">receipt_long</span>
                     </span>
                     <div>
                         <h4 class="text-xs font-black text-[#4a2c32]">1. Tải lên tệp Phiếu Cân Thực Tế</h4>
-                        <p class="text-[10px] text-gray-500">Định dạng .csv chứa thông tin xe cân & tải trọng thực tế</p>
+                        <p class="text-[10px] text-gray-500">Định dạng .csv hoặc .xlsx chứa thông tin xe cân & tải trọng thực tế</p>
                     </div>
                 </div>
                 
                 <label 
                     class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
                 >
-                    <input type="file" accept=".csv" @change="handleCSVUpload" class="hidden">
+                    <input type="file" accept=".csv,.xlsx" @change="handleTicketImport" class="hidden">
                     <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
                     <span class="text-xs font-bold text-[#4a2c32]">
-                        {{ csvFile ? csvFile.name : 'Chọn tệp CSV phiếu cân' }}
+                        {{ csvFile ? csvFile.name : 'Chọn tệp phiếu cân (CSV hoặc Excel)' }}
                     </span>
                     <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingCSV">Đang đọc dữ liệu...</span>
                     <span class="text-[10px] text-gray-400" v-else>
@@ -773,7 +1106,7 @@ async function compileAndDownload() {
                 </label>
 
                 <div v-if="csvRecords.length > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
-                    <span class="text-gray-500">Tổng cộng bản ghi:</span>
+                    <span class="text-gray-500">Tổng cộng bản ghi hiện tại:</span>
                     <span class="text-primary font-black">{{ csvRecords.length }} xe ({{ totalCsvWeightTons.toFixed(2) }} tấn)</span>
                 </div>
             </div>
@@ -938,142 +1271,289 @@ async function compileAndDownload() {
             </div>
         </div>
 
-        <!-- Preview Results Table Section -->
-        <div v-if="generatedTrips.length > 0" class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-base">pageview</span>
-                        Bản xem trước kết quả phân bổ tải trọng
-                    </h4>
-                    <p class="text-[10px] text-gray-500 mt-0.5">Dưới đây là danh sách chi tiết các chuyến sẽ được thêm mới vào Sổ Theo Dõi.</p>
+        <!-- Tabbed Data Panel -->
+        <div v-if="csvRecords.length > 0 || generatedTrips.length > 0" class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
+            <!-- Tabs Header -->
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <button 
+                        @click="activeDataTab = 'source'"
+                        :class="[
+                            'px-4 py-2 text-xs font-black rounded-lg transition-all',
+                            activeDataTab === 'source' 
+                                ? 'bg-primary/10 text-primary border border-primary/20' 
+                                : 'text-gray-500 hover:bg-gray-50'
+                        ]"
+                    >
+                        1. Phiếu cân thực tế ({{ csvRecords.length }})
+                    </button>
+                    <button 
+                        @click="activeDataTab = 'generated'"
+                        :class="[
+                            'px-4 py-2 text-xs font-black rounded-lg transition-all',
+                            activeDataTab === 'generated' 
+                                ? 'bg-primary/10 text-primary border border-primary/20' 
+                                : 'text-gray-500 hover:bg-gray-50'
+                        ]"
+                    >
+                        2. Kết quả phân bổ tải trọng ({{ generatedTrips.length }})
+                    </button>
                 </div>
 
-                <!-- Stats summary badges -->
-                <div class="flex items-center gap-2 flex-wrap">
-                    <div v-if="existingTrips.length > 0" class="px-2.5 py-1.5 bg-gray-50 rounded-[12px] border border-primary/5 text-[10px] font-black text-gray-500">
+                <!-- Action buttons for Tab 1 (Source) -->
+                <div v-if="activeDataTab === 'source'" class="flex items-center gap-2">
+                    <button 
+                        @click="openAddTicketDialog"
+                        class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">add</span>
+                        Thêm phiếu cân
+                    </button>
+                    <button 
+                        @click="clearAllTickets"
+                        class="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded-[10px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">delete</span>
+                        Xóa tất cả
+                    </button>
+                </div>
+
+                <!-- Stats summary badges for Tab 2 (Generated) -->
+                <div v-if="activeDataTab === 'generated'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
+                    <div v-if="existingTrips.length > 0" class="px-2.5 py-1.5 bg-gray-50 rounded-[12px] border border-primary/5">
                         Dòng bắt đầu: từ dòng số {{ nextSTT }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-[10px] font-black text-primary">
+                    <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-primary">
                         Số chuyến sẽ thêm: {{ generatedTrips.length }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-[10px] font-black text-teal-700">
+                    <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-teal-700">
                         Khối lượng phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
                     </div>
                 </div>
             </div>
 
-            <!-- Search Filter Row -->
-            <div class="flex items-center justify-between gap-4">
-                <div class="relative w-full max-w-[320px] flex items-center">
-                    <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
-                    <input 
-                        type="text" 
-                        v-model="searchQuery" 
-                        placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
-                        class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
-                    >
+            <!-- Tab Content: Source Tickets -->
+            <div v-if="activeDataTab === 'source'" class="flex flex-col gap-4">
+                <!-- Search & Info -->
+                <div class="flex items-center justify-between gap-4">
+                    <div class="relative w-full max-w-[320px] flex items-center">
+                        <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                        <input 
+                            type="text" 
+                            v-model="sourceSearchQuery" 
+                            placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
+                            class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                        >
+                        <button 
+                            v-if="sourceSearchQuery" 
+                            @click="sourceSearchQuery = ''" 
+                            class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                        >
+                            <span class="material-symbols-outlined text-xs">close</span>
+                        </button>
+                    </div>
+                    
+                    <span class="text-[10px] font-bold text-gray-400">
+                        Đang hiển thị {{ filteredSourceTickets.length }} / {{ csvRecords.length }} phiếu cân
+                    </span>
+                </div>
+
+                <!-- Source Tickets Table -->
+                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                    <table class="w-full text-left border-collapse text-xs font-semibold">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                <th class="p-3 w-12 text-center bg-gray-55 font-bold">STT</th>
+                                <th class="p-3 bg-gray-50 font-bold">Số phiếu</th>
+                                <th class="p-3 bg-gray-55 font-bold">Số xe</th>
+                                <th class="p-3 bg-gray-50 font-bold">Loại hàng</th>
+                                <th class="p-3 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
+                                <th class="p-3 bg-gray-50 font-bold">Thời gian vào</th>
+                                <th class="p-3 bg-gray-55 font-bold">Thời gian ra</th>
+                                <th class="p-3 bg-gray-50 font-bold">Tài xế</th>
+                                <th class="p-3 text-center w-24 bg-gray-55 font-bold">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                            <tr 
+                                v-for="(ticket, idx) in pagedSourceTickets" 
+                                :key="ticket.id || idx"
+                                class="hover:bg-gray-50 transition-colors"
+                            >
+                                <td class="p-3 text-center font-bold text-gray-400">
+                                    {{ (sourceCurrentPage - 1) * itemsPerPage + idx + 1 }}
+                                </td>
+                                <td class="p-3 font-semibold text-gray-500">{{ ticket.ticketNo }}</td>
+                                <td class="p-3 font-bold text-gray-900">{{ formatPlate(ticket.plateNumber) }}</td>
+                                <td class="p-3 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
+                                <td class="p-3 text-right font-black text-primary">{{ ticket.weightNet.toLocaleString() }}</td>
+                                <td class="p-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeInStr }} {{ ticket.dateInStr }}</td>
+                                <td class="p-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeOutStr }} {{ ticket.dateOutStr }}</td>
+                                <td class="p-3 text-gray-500 truncate max-w-[100px]" :title="ticket.driverName">{{ ticket.driverName || '-' }}</td>
+                                <td class="p-3 text-center">
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <button 
+                                            @click="openEditTicketDialog(ticket)" 
+                                            class="size-7 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all"
+                                            title="Sửa"
+                                        >
+                                            <span class="material-symbols-outlined text-[15px]">edit</span>
+                                        </button>
+                                        <button 
+                                            @click="deleteTicket(ticket)" 
+                                            class="size-7 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all"
+                                            title="Xóa"
+                                        >
+                                            <span class="material-symbols-outlined text-[15px]">delete</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredSourceTickets.length === 0">
+                                <td colspan="9" class="p-8 text-center text-gray-400 italic">
+                                    Không tìm thấy phiếu cân nào khớp bộ lọc!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Source Pagination -->
+                <div v-if="sourceTotalPages > 1" class="flex items-center justify-center gap-2 pt-2">
                     <button 
-                        v-if="searchQuery" 
-                        @click="searchQuery = ''" 
-                        class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                        @click="sourceCurrentPage = Math.max(1, sourceCurrentPage - 1)" 
+                        :disabled="sourceCurrentPage === 1"
+                        class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
                     >
-                        <span class="material-symbols-outlined text-xs">close</span>
+                        <span class="material-symbols-outlined text-lg">chevron_left</span>
+                    </button>
+                    <span class="text-xs font-bold text-gray-500">
+                        Trang {{ sourceCurrentPage }} / {{ sourceTotalPages }}
+                    </span>
+                    <button 
+                        @click="sourceCurrentPage = Math.min(sourceTotalPages, sourceCurrentPage + 1)" 
+                        :disabled="sourceCurrentPage === sourceTotalPages"
+                        class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
+                    >
+                        <span class="material-symbols-outlined text-lg">chevron_right</span>
                     </button>
                 </div>
-                
-                <span class="text-[10px] font-bold text-gray-400">
-                    Đang hiển thị {{ filteredTrips.length }} / {{ generatedTrips.length }} dòng kết quả
-                </span>
             </div>
 
-            <!-- Preview Data Table -->
-            <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
-                <table class="w-full text-left border-collapse text-xs font-semibold">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
-                            <th class="p-3 w-12 text-center bg-gray-50">STT</th>
-                            <th class="p-3 bg-gray-50">Thời gian rời bến (Giờ/Ngày)</th>
-                            <th class="p-3 bg-gray-50">Số đăng ký xe</th>
-                            <th class="p-3 text-center bg-gray-50">TTTP (tấn)</th>
-                            <th class="p-3 text-center bg-gray-50">Trọng lượng hàng CP (tấn)</th>
-                            <th class="p-3 bg-gray-50">Số phiếu</th>
-                            <th class="p-3 bg-gray-55 text-center w-28 bg-gray-50">Loại hàng</th>
-                            <th class="p-3 text-right bg-gray-50">Khối lượng (tấn)</th>
-                            <th class="p-3 text-center w-16 bg-gray-50">Trạng thái</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
-                        <tr 
-                            v-for="trip in pagedTrips" 
-                            :key="trip.stt"
-                            class="hover:bg-gray-50 transition-colors"
+            <!-- Tab Content: Generated Split Trips -->
+            <div v-if="activeDataTab === 'generated'" class="flex flex-col gap-4">
+                <!-- Search Filter Row -->
+                <div class="flex items-center justify-between gap-4">
+                    <div class="relative w-full max-w-[320px] flex items-center">
+                        <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                        <input 
+                            type="text" 
+                            v-model="searchQuery" 
+                            placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
+                            class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
                         >
-                            <td class="p-3 text-center font-bold text-gray-400">
-                                <span class="flex items-center justify-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-primary" title="Chuyến sẽ thêm mới"></span>
-                                    {{ trip.stt }}
-                                </span>
-                            </td>
-                            <td class="p-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
-                            <td class="p-3 font-bold text-gray-900 flex items-center gap-2">
-                                <span>{{ trip.plateNumber }}</span>
-                                <span 
-                                    class="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-black border border-primary/20 uppercase tracking-wide select-none"
-                                >
-                                    Mới
-                                </span>
-                            </td>
-                            <td class="p-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
-                            <td class="p-3 text-center">{{ trip.limit.toFixed(1) }}</td>
-                            <td class="p-3 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
-                            <td class="p-3 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
-                            <td class="p-3 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
-                            <td class="p-3 text-center">
-                                <span 
-                                    v-if="trip.weightTons <= trip.limit" 
-                                    class="size-5 rounded-full bg-teal-50 text-teal-655 border border-teal-200 flex items-center justify-center mx-auto"
-                                    title="Hợp lệ - Dưới hạn mức"
-                                >
-                                    <span class="material-symbols-outlined text-[13px] font-black">check</span>
-                                </span>
-                                <span 
-                                    v-else 
-                                    class="size-5 rounded-full bg-red-50 text-red-600 border border-red-200 flex items-center justify-center mx-auto"
-                                    title="Quá tải!"
-                                >
-                                    <span class="material-symbols-outlined text-[13px] font-black">close</span>
-                                </span>
-                            </td>
-                        </tr>
-                        <tr v-if="filteredTrips.length === 0">
-                            <td colspan="9" class="p-8 text-center text-gray-400 italic">
-                                Không tìm thấy bản ghi nào khớp bộ lọc!
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                        <button 
+                            v-if="searchQuery" 
+                            @click="searchQuery = ''" 
+                            class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                        >
+                            <span class="material-symbols-outlined text-xs">close</span>
+                        </button>
+                    </div>
+                    
+                    <span class="text-[10px] font-bold text-gray-400">
+                        Đang hiển thị {{ filteredTrips.length }} / {{ generatedTrips.length }} dòng kết quả
+                    </span>
+                </div>
 
-            <!-- Table Pagination -->
-            <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-2">
-                <button 
-                    @click="currentPage = Math.max(1, currentPage - 1)" 
-                    :disabled="currentPage === 1"
-                    class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
-                >
-                    <span class="material-symbols-outlined text-lg">chevron_left</span>
-                </button>
-                <span class="text-xs font-bold text-gray-500">
-                    Trang {{ currentPage }} / {{ totalPages }}
-                </span>
-                <button 
-                    @click="currentPage = Math.min(totalPages, currentPage + 1)" 
-                    :disabled="currentPage === totalPages"
-                    class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
-                >
-                    <span class="material-symbols-outlined text-lg">chevron_right</span>
-                </button>
+                <!-- Preview Data Table -->
+                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                    <table class="w-full text-left border-collapse text-xs font-semibold">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                <th class="p-3 w-12 text-center bg-gray-50 font-bold">STT</th>
+                                <th class="p-3 bg-gray-50 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
+                                <th class="p-3 bg-gray-55 font-bold">Số xe</th>
+                                <th class="p-3 text-center bg-gray-50 font-bold">TTTP (tấn)</th>
+                                <th class="p-3 text-center bg-gray-55 font-bold">Trọng lượng hàng CP (tấn)</th>
+                                <th class="p-3 bg-gray-50 font-bold">Số phiếu</th>
+                                <th class="p-3 text-center w-28 bg-gray-55 font-bold">Loại hàng</th>
+                                <th class="p-3 text-right bg-gray-50 font-bold">Khối lượng (tấn)</th>
+                                <th class="p-3 text-center w-16 bg-gray-55 font-bold">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                            <tr 
+                                v-for="trip in pagedTrips" 
+                                :key="trip.stt"
+                                class="hover:bg-gray-50 transition-colors"
+                            >
+                                <td class="p-3 text-center font-bold text-gray-400">
+                                    <span class="flex items-center justify-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-primary" title="Chuyến sẽ thêm mới"></span>
+                                        {{ trip.stt }}
+                                    </span>
+                                </td>
+                                <td class="p-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
+                                <td class="p-3 font-bold text-gray-900 flex items-center gap-2">
+                                    <span>{{ trip.plateNumber }}</span>
+                                    <span 
+                                        class="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-black border border-primary/20 uppercase tracking-wide select-none"
+                                    >
+                                        Mới
+                                    </span>
+                                </td>
+                                <td class="p-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
+                                <td class="p-3 text-center">{{ trip.limit.toFixed(1) }}</td>
+                                <td class="p-3 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
+                                <td class="p-3 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
+                                <td class="p-3 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
+                                <td class="p-3 text-center">
+                                    <span 
+                                        v-if="trip.weightTons <= trip.limit" 
+                                        class="size-5 rounded-full bg-teal-50 text-teal-655 border border-teal-200 flex items-center justify-center mx-auto"
+                                        title="Hợp lệ - Dưới hạn mức"
+                                    >
+                                        <span class="material-symbols-outlined text-[13px] font-black">check</span>
+                                    </span>
+                                    <span 
+                                        v-else 
+                                        class="size-5 rounded-full bg-red-50 text-red-600 border border-red-200 flex items-center justify-center mx-auto"
+                                        title="Quá tải!"
+                                    >
+                                        <span class="material-symbols-outlined text-[13px] font-black">close</span>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredTrips.length === 0">
+                                <td colspan="9" class="p-8 text-center text-gray-400 italic">
+                                    Không tìm thấy bản ghi nào khớp bộ lọc!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Pagination -->
+                <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-2">
+                    <button 
+                        @click="currentPage = Math.max(1, currentPage - 1)" 
+                        :disabled="currentPage === 1"
+                        class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
+                    >
+                        <span class="material-symbols-outlined text-lg">chevron_left</span>
+                    </button>
+                    <span class="text-xs font-bold text-gray-500">
+                        Trang {{ currentPage }} / {{ totalPages }}
+                    </span>
+                    <button 
+                        @click="currentPage = Math.min(totalPages, currentPage + 1)" 
+                        :disabled="currentPage === totalPages"
+                        class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
+                    >
+                        <span class="material-symbols-outlined text-lg">chevron_right</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1089,12 +1569,216 @@ async function compileAndDownload() {
                 {{ compiling ? 'Đang xử lý dữ liệu...' : 'Xử lý & Tải xuống SỔ THEO DÕI XẾP HÀNG HÓA' }}
             </button>
         </div>
+
+        <!-- DIALOG: ADD/EDIT TICKET -->
+        <div v-if="showTicketDialog" class="fixed inset-0 bg-black/50 z-[120] flex items-center justify-center p-4 animate-fade-in font-display no-print">
+            <div class="bg-white rounded-[24px] soft-shadow border border-primary/5 w-full max-w-lg overflow-hidden flex flex-col animate-scale-up">
+                <!-- Dialog Header -->
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-primary text-base">receipt_long</span>
+                            {{ editingTicket ? 'Chỉnh sửa phiếu cân' : 'Thêm phiếu cân thủ công' }}
+                        </h3>
+                        <p class="text-[10px] text-gray-400">Nhập thông tin chi tiết của xe cân thực tế</p>
+                    </div>
+                    <button 
+                        @click="showTicketDialog = false"
+                        class="size-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition-all"
+                    >
+                        <span class="material-symbols-outlined text-lg">close</span>
+                    </button>
+                </div>
+                
+                <!-- Dialog Body -->
+                <div class="p-5 flex flex-col gap-4 overflow-y-auto max-h-[75vh]">
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Plate Number -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số đăng ký xe (Biển số) *</label>
+                            <input 
+                                v-model="dialogTicket.plateNumber" 
+                                type="text" 
+                                placeholder="Ví dụ: 61H-16907" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary uppercase"
+                            >
+                        </div>
+                        
+                        <!-- Ticket Number -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số phiếu cân</label>
+                            <input 
+                                v-model="dialogTicket.ticketNo" 
+                                type="text" 
+                                placeholder="Tự động nếu để trống" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Weight 1 -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Khối lượng cân lần 1 (kg)</label>
+                            <input 
+                                v-model.number="dialogTicket.weight1" 
+                                type="number" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Weight 2 -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Khối lượng cân lần 2 (kg)</label>
+                            <input 
+                                v-model.number="dialogTicket.weight2" 
+                                type="number" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Weight Net -->
+                        <div class="flex flex-col gap-1.5 col-span-2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Khối lượng hàng thực tế (Net - kg) *</label>
+                            <input 
+                                v-model.number="dialogTicket.weightNet" 
+                                type="number" 
+                                placeholder="Khối lượng net thực tế chở" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-bold text-primary focus:outline-none focus:border-primary"
+                            >
+                            <span class="text-[9px] text-gray-400">
+                                Nếu nhập Lần 1 & Lần 2, khối lượng Net sẽ tự động được tính bằng hiệu của hai lần cân khi bấm Lưu.
+                            </span>
+                        </div>
+
+                        <!-- Cargo Type -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Loại hàng hóa</label>
+                            <input 
+                                v-model="dialogTicket.cargoType" 
+                                type="text" 
+                                placeholder="Ví dụ: Viên Nén Gỗ" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Driver Name -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tên tài xế</label>
+                            <input 
+                                v-model="dialogTicket.driverName" 
+                                type="text" 
+                                placeholder="Tên tài xế..." 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Date In -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ngày cân vào (DD/MM/YYYY)</label>
+                            <input 
+                                v-model="dialogTicket.dateInStr" 
+                                type="text" 
+                                placeholder="DD/MM/YYYY" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Time In -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Giờ cân vào (HH:mm:ss)</label>
+                            <input 
+                                v-model="dialogTicket.timeInStr" 
+                                type="text" 
+                                placeholder="HH:mm:ss" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Date Out -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ngày cân ra (DD/MM/YYYY)</label>
+                            <input 
+                                v-model="dialogTicket.dateOutStr" 
+                                type="text" 
+                                placeholder="DD/MM/YYYY" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Time Out -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Giờ cân ra (HH:mm:ss)</label>
+                            <input 
+                                v-model="dialogTicket.timeOutStr" 
+                                type="text" 
+                                placeholder="HH:mm:ss" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Direction -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hình thức</label>
+                            <select 
+                                v-model="dialogTicket.direction" 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary bg-white cursor-pointer"
+                            >
+                                <option value="XUẤT KHẨU">XUẤT KHẨU</option>
+                                <option value="NHẬP KHẨU">NHẬP KHẨU</option>
+                                <option value="NỘI BỘ">NỘI BỘ</option>
+                            </select>
+                        </div>
+
+                        <!-- Customer -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Khách hàng</label>
+                            <input 
+                                v-model="dialogTicket.customer" 
+                                type="text" 
+                                placeholder="Tên khách hàng..." 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="flex flex-col gap-1.5 col-span-2">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ghi chú</label>
+                            <textarea 
+                                v-model="dialogTicket.notes" 
+                                rows="2"
+                                placeholder="Ghi chú thêm..." 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary resize-none"
+                            ></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dialog Footer -->
+                <div class="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+                    <button 
+                        @click="showTicketDialog = false"
+                        class="px-4 py-2 border border-gray-200 rounded-[12px] text-xs font-bold text-[#4a2c32] hover:bg-gray-100 active:scale-[0.98] transition-all"
+                    >
+                        Hủy
+                    </button>
+                    <button 
+                        @click="saveTicket"
+                        class="px-4 py-2 bg-primary text-white rounded-[12px] text-xs font-bold hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                        Lưu phiếu cân
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <style scoped>
 .fade-in {
     animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-scale-up {
+    animation: scaleUp 0.2s ease-out forwards;
 }
 
 @keyframes fadeIn {
@@ -1105,6 +1789,17 @@ async function compileAndDownload() {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes scaleUp {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
     }
 }
 </style>
