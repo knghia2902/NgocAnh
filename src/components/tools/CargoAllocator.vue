@@ -1508,7 +1508,7 @@ async function compileAndDownload() {
                     </button>
                     <button 
                         @click="openAddTicketDialog"
-                        class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                        class="h-7 px-3 bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold rounded-[8px] hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center gap-1.5"
                     >
                         <span class="material-symbols-outlined text-[14px]">add</span>
                         Thêm
