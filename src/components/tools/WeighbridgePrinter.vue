@@ -1505,16 +1505,6 @@ const addRectElement = () => {
     saveBargeConfig();
 };
 
-const isFieldEmpty = (fieldId?: string) => {
-    if (!fieldId) return false;
-    if (fieldId === 'goods') return !cfgForm.goods;
-    if (fieldId === 'goodsCode') return !cfgForm.goodsCode;
-    if (fieldId === 'owner') return !cfgForm.owner;
-    if (fieldId === 'operator') return !cfgForm.operator;
-    if (fieldId === 'xn') return !cfgForm.xn;
-    return false;
-};
-
 const getFieldValue = (fieldId: string, truck?: Truck) => {
     const sampleTruck = {
         id: 0,
@@ -1535,8 +1525,8 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
     switch (fieldId) {
         case 'ticketNo': return t.ticketNo || '';
         case 'plateNumber': return t.plateNumber;
-        case 'goods': return cfgForm.goods || 'Đất sét nguyên liệu';
-        case 'owner': return cfgForm.owner || 'Công ty Cảng Nguyên Ngọc';
+        case 'goods': return cfgForm.goods || '';
+        case 'owner': return cfgForm.owner || '';
         case 'weight1': return `${formatNumber(t.weight1)} kg`;
         case 'weight2': return `${formatNumber(t.weight2)} kg`;
         case 'weightNet': return `${formatNumber(t.weightNet)} kg`;
@@ -1544,8 +1534,8 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
         case 'barge': return activeBarge.value?.name || 'Sà lan SG-9921';
         case 'note': return t.note || '-';
         case 'driver': return t.driver || '-';
-        case 'goodsCode': return cfgForm.goodsCode || '-';
-        case 'operator': return cfgForm.operator || '-';
+        case 'goodsCode': return cfgForm.goodsCode || '';
+        case 'operator': return cfgForm.operator || '';
         case 'xn': {
             const val = cfgForm.xn || '';
             if (val.toUpperCase() === 'XUẤT KHẨU') return 'XUẤT';
@@ -3827,7 +3817,6 @@ onUnmounted(() => {
                                     <div 
                                         v-for="el in (cfgForm.printElements || [])" 
                                         :key="el.id"
-                                        v-show="el.type !== 'field' || !isFieldEmpty(el.fieldId)"
                                         class="print-element"
                                         :style="{
                                             position: 'absolute',
