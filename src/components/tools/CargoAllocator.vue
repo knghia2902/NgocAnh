@@ -881,7 +881,10 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             
             // Xác xe (tare weight) được tính bằng Trọng tải cho phép (TTTP) - Hạn mức hàng (tính theo kg)
             // Đảm bảo xác xe luôn dao động trong khoảng tiêu chuẩn từ 1.5t - 2.5t (1,500 - 2,500 kg)
-            const tareWeight = Math.round((capacity.tttp - capacity.limit) * 1000);
+            // Thêm jitter ngẫu nhiên ±150kg để số cân không bao giờ tròn chẵn
+            const baseTare = (capacity.tttp - capacity.limit) * 1000;
+            const tareJitter = Math.round((Math.random() * 300 - 150) + (Math.random() * 10 - 5));
+            const tareWeight = Math.round(baseTare + tareJitter);
             
             // Phân bổ cân lần 1 và lần 2 dựa trên hướng Xuất/Nhập
             const isXuat = record.direction.toUpperCase().includes('XUẤT') || record.direction.toUpperCase().includes('XUAT');
@@ -1031,6 +1034,67 @@ const totalPages = computed(() => {
 watch(searchQuery, () => {
     currentPage.value = 1;
 });
+
+// Export source tickets (Tab 1) as Excel
+async function exportSourceTickets() {
+    if (csvRecords.value.length === 0) {
+        addToast('Không có phiếu cân nào để xuất!', 'info');
+        return;
+    }
+    compiling.value = true;
+    try {
+        const ExcelJS = await import('exceljs');
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Phiếu cân');
+        
+        const headers = ['STT', 'Số phiếu', 'Biển số xe', 'Khách hàng', 'Cân lần 1', 'Cân lần 2', 'KL hàng (kg)', 'Loại hàng', 'Ngày vào', 'Giờ vào', 'Ngày ra', 'Giờ ra', 'Xuất/Nhập', 'Sà lan', 'Tài xế', 'Ghi chú'];
+        const headerRow = sheet.getRow(1);
+        headers.forEach((h, i) => { headerRow.getCell(i + 1).value = h; });
+        headerRow.font = { name: 'Arial', size: 10, bold: true };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        
+        csvRecords.value.forEach((r, idx) => {
+            const row = sheet.getRow(idx + 2);
+            row.getCell(1).value = idx + 1;
+            row.getCell(2).value = r.ticketNo;
+            row.getCell(3).value = r.plateNumber;
+            row.getCell(4).value = r.customer;
+            row.getCell(5).value = r.weight1;
+            row.getCell(6).value = r.weight2;
+            row.getCell(7).value = r.weightNet;
+            row.getCell(8).value = r.cargoType;
+            row.getCell(9).value = r.dateInStr;
+            row.getCell(10).value = r.timeInStr;
+            row.getCell(11).value = r.dateOutStr;
+            row.getCell(12).value = r.timeOutStr;
+            row.getCell(13).value = r.direction;
+            row.getCell(14).value = r.bargeName;
+            row.getCell(15).value = r.driverName;
+            row.getCell(16).value = r.notes;
+            row.font = { name: 'Arial', size: 10 };
+        });
+        
+        // Auto-width columns
+        sheet.columns.forEach((col: any) => { col.width = 18; });
+        
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'PHIẾU_CÂN_THỰC_TẾ.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addToast('Đã xuất phiếu cân thực tế thành công!', 'success');
+    } catch (error) {
+        console.error(error);
+        addToast('Lỗi khi xuất tệp Excel!', 'error');
+    } finally {
+        compiling.value = false;
+    }
+}
 
 // Execute Excel update and download
 async function compileAndDownload() {
@@ -1418,35 +1482,71 @@ async function compileAndDownload() {
                         :disabled="loadingCSV"
                     >
                         <span class="material-symbols-outlined text-[14px]">upload_file</span>
-                        {{ loadingCSV ? 'Đang đọc...' : 'Import phiếu cân' }}
+                        {{ loadingCSV ? 'Đang đọc...' : 'Import' }}
                     </button>
                     <button 
                         @click="openAddTicketDialog"
                         class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
                     >
                         <span class="material-symbols-outlined text-[14px]">add</span>
-                        Thêm phiếu cân
+                        Thêm
                     </button>
                     <button 
                         @click="clearAllTickets"
                         class="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded-[10px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5"
                     >
                         <span class="material-symbols-outlined text-[14px]">delete</span>
-                        Xóa tất cả
+                        Xóa hết
+                    </button>
+                    <button 
+                        @click="exportSourceTickets"
+                        :disabled="csvRecords.length === 0 || compiling"
+                        class="px-3 py-1.5 bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold rounded-[10px] hover:bg-teal-100 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">download</span>
+                        Xuất Excel
                     </button>
                 </div>
 
-                <!-- Stats summary badges for Tab 2 (Generated) -->
-                <div v-if="activeDataTab === 'generated'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
+                <!-- Stats summary badges for Tab 2 (Template / Phân bổ) -->
+                <div v-if="activeDataTab === 'template'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
                     <div v-if="existingTrips.length > 0" class="px-2.5 py-1.5 bg-gray-50 rounded-[12px] border border-primary/5">
                         Dòng bắt đầu: từ dòng số {{ nextSTT }}
                     </div>
                     <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-primary">
-                        Số chuyến sẽ thêm: {{ generatedTrips.length }}
+                        Số chuyến: {{ generatedTrips.length }}
                     </div>
                     <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-teal-700">
-                        Khối lượng phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
+                        KL phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
                     </div>
+                    <button 
+                        @click="compileAndDownload"
+                        :disabled="generatedTrips.length === 0 || compiling"
+                        class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <span v-if="compiling" class="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                        <span v-else class="material-symbols-outlined text-[14px]">download</span>
+                        {{ compiling ? 'Đang xử lý...' : 'Xuất Excel' }}
+                    </button>
+                </div>
+
+                <!-- Stats summary badges for Tab 3 (Generated / Theo dõi) -->
+                <div v-if="activeDataTab === 'generated'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
+                    <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-primary">
+                        Số chuyến: {{ generatedTrips.length }}
+                    </div>
+                    <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-teal-700">
+                        KL phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
+                    </div>
+                    <button 
+                        @click="compileAndDownload"
+                        :disabled="generatedTrips.length === 0 || compiling"
+                        class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <span v-if="compiling" class="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                        <span v-else class="material-symbols-outlined text-[14px]">download</span>
+                        {{ compiling ? 'Đang xử lý...' : 'Xuất Excel' }}
+                    </button>
                 </div>
             </div>
 
@@ -1780,18 +1880,7 @@ async function compileAndDownload() {
             </div>
         </div>
 
-        <!-- Action Export Section -->
-        <div class="flex items-center justify-end border-t border-gray-100 pt-6">
-            <button 
-                @click="compileAndDownload" 
-                :disabled="generatedTrips.length === 0 || compiling"
-                class="px-6 py-3 bg-primary text-white font-bold rounded-[16px] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed shadow-soft flex items-center gap-2.5"
-            >
-                <span v-if="compiling" class="material-symbols-outlined text-base animate-spin">sync</span>
-                <span v-else class="material-symbols-outlined text-base">download_for_offline</span>
-                {{ compiling ? 'Đang xử lý dữ liệu...' : (activeDataTab === 'template' ? 'Xử lý & Tải xuống SỔ PHÂN BỔ CHI TIẾT (Mẫu Ánh)' : 'Xử lý & Tải xuống SỔ THEO DÕI XẾP HÀNG HÓA') }}
-            </button>
-        </div>
+
 
         <!-- DIALOG: ADD/EDIT TICKET -->
         <div v-if="showTicketDialog" class="fixed inset-0 bg-black/50 z-[120] flex items-center justify-center p-4 animate-fade-in font-display no-print">
