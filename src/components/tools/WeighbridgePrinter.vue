@@ -1185,11 +1185,12 @@ const handleDragMove = (event: MouseEvent) => {
     newPrimaryX = Math.max(0, Math.min(CANVAS_WIDTH_MM - primaryW, newPrimaryX));
     newPrimaryY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - primaryH, newPrimaryY));
     
-    // Calculate final delta based on primary element movement
-    const actualDeltaX = newPrimaryX - Number(dragStartElX);
-    const actualDeltaY = newPrimaryY - Number(dragStartElY);
+    // Calculate raw delta based on primary element movement
+    let actualDeltaX = newPrimaryX - Number(dragStartElX);
+    let actualDeltaY = newPrimaryY - Number(dragStartElY);
     
-    // Move all selected elements
+    // Constrain delta so ALL selected elements stay within bounds
+    // Find the group's bounding box extremes from starting positions
     selectedElementIds.value.forEach(id => {
         const item = elements.find(e => e.id === id);
         if (!item) return;
@@ -1198,11 +1199,38 @@ const handleDragMove = (event: MouseEvent) => {
         
         const w = Number(item.width) || 10;
         const h = Number(item.height) || 5;
-        const startX = Number(startPos.x) || 0;
-        const startY = Number(startPos.y) || 0;
+        const sx = Number(startPos.x) || 0;
+        const sy = Number(startPos.y) || 0;
         
-        item.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - w, startX + actualDeltaX));
-        item.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - h, startY + actualDeltaY));
+        // Clamp delta so this element's new position stays within [0, CANVAS - size]
+        const maxDeltaX_pos = CANVAS_WIDTH_MM - w - sx;  // max positive delta
+        const maxDeltaX_neg = -sx;                        // max negative delta
+        const maxDeltaY_pos = CANVAS_HEIGHT_MM - h - sy;
+        const maxDeltaY_neg = -sy;
+        
+        actualDeltaX = Math.max(maxDeltaX_neg, Math.min(maxDeltaX_pos, actualDeltaX));
+        actualDeltaY = Math.max(maxDeltaY_neg, Math.min(maxDeltaY_pos, actualDeltaY));
+    });
+    
+    // Recompute primary position based on the group-constrained delta
+    newPrimaryX = Number(dragStartElX) + actualDeltaX;
+    newPrimaryY = Number(dragStartElY) + actualDeltaY;
+    primaryEl.x = newPrimaryX;
+    primaryEl.y = newPrimaryY;
+    
+    // Move all other selected elements with the group-constrained delta
+    selectedElementIds.value.forEach(id => {
+        if (id === draggingElementId.value) return; // primary already set above
+        const item = elements.find(e => e.id === id);
+        if (!item) return;
+        const startPos = dragStartPositions.get(id);
+        if (!startPos) return;
+        
+        const sx = Number(startPos.x) || 0;
+        const sy = Number(startPos.y) || 0;
+        
+        item.x = sx + actualDeltaX;
+        item.y = sy + actualDeltaY;
     });
     
     alignmentGuides.value = guides;
@@ -1305,7 +1333,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
     if (handled && (event.key.startsWith('Arrow'))) {
         event.preventDefault();
         
-        // Move all selected elements
+        // Constrain delta so ALL selected elements stay within bounds
         selectedElementIds.value.forEach(id => {
             const el = (cfgForm.printElements || []).find(e => e.id === id);
             if (!el) return;
@@ -1314,8 +1342,16 @@ const handleKeyDown = (event: KeyboardEvent) => {
             const elW = Number(el.width) || 10;
             const elH = Number(el.height) || 5;
             
-            el.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - elW, elX + deltaX));
-            el.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - elH, elY + deltaY));
+            deltaX = Math.max(-elX, Math.min(CANVAS_WIDTH_MM - elW - elX, deltaX));
+            deltaY = Math.max(-elY, Math.min(CANVAS_HEIGHT_MM - elH - elY, deltaY));
+        });
+        
+        // Apply the group-constrained delta to all selected elements
+        selectedElementIds.value.forEach(id => {
+            const el = (cfgForm.printElements || []).find(e => e.id === id);
+            if (!el) return;
+            el.x = (Number(el.x) || 0) + deltaX;
+            el.y = (Number(el.y) || 0) + deltaY;
         });
         
         saveBargeConfig();
