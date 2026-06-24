@@ -1500,7 +1500,7 @@ async function compileAndDownload() {
                     >
                     <button 
                         @click="triggerTicketFileInput"
-                        class="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 text-[11px] font-bold rounded-[10px] hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center gap-1.5"
+                        class="h-8 min-w-[95px] justify-center bg-primary/10 text-primary border border-primary/20 text-[11px] font-bold rounded-[10px] hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center gap-1.5"
                         :disabled="loadingCSV"
                     >
                         <span class="material-symbols-outlined text-[14px]">upload_file</span>
@@ -1508,14 +1508,14 @@ async function compileAndDownload() {
                     </button>
                     <button 
                         @click="openAddTicketDialog"
-                        class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                        class="h-8 min-w-[95px] justify-center bg-primary text-white border border-primary text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
                     >
                         <span class="material-symbols-outlined text-[14px]">add</span>
                         Thêm
                     </button>
                     <button 
                         @click="clearAllTickets"
-                        class="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded-[10px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5"
+                        class="h-8 min-w-[95px] justify-center bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded-[10px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5"
                     >
                         <span class="material-symbols-outlined text-[14px]">delete</span>
                         Xóa hết
@@ -1523,7 +1523,7 @@ async function compileAndDownload() {
                     <button 
                         @click="exportSourceTickets"
                         :disabled="csvRecords.length === 0 || compiling"
-                        class="px-3 py-1.5 bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold rounded-[10px] hover:bg-teal-100 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                        class="h-8 min-w-[95px] justify-center bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold rounded-[10px] hover:bg-teal-100 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <span class="material-symbols-outlined text-[14px]">download</span>
                         Xuất Excel
