@@ -1600,18 +1600,18 @@ async function compileAndDownload() {
 
                 <!-- Source Tickets Table -->
                 <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
-                    <table class="w-full text-left border-collapse text-xs font-semibold">
+                    <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
-                                <th class="p-3 w-12 text-center bg-gray-55 font-bold">STT</th>
-                                <th class="p-3 bg-gray-50 font-bold">Số phiếu</th>
-                                <th class="p-3 bg-gray-55 font-bold">Số xe</th>
-                                <th class="p-3 bg-gray-50 font-bold">Loại hàng</th>
-                                <th class="p-3 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
-                                <th class="p-3 bg-gray-50 font-bold">Thời gian vào</th>
-                                <th class="p-3 bg-gray-55 font-bold">Thời gian ra</th>
-                                <th class="p-3 bg-gray-50 font-bold">Tài xế</th>
-                                <th class="p-3 text-center w-24 bg-gray-55 font-bold">Thao tác</th>
+                                <th class="p-2 w-12 text-center bg-gray-55 font-bold">STT</th>
+                                <th class="p-2 bg-gray-50 font-bold">Số phiếu</th>
+                                <th class="p-2 bg-gray-55 font-bold">Số xe</th>
+                                <th class="p-2 bg-gray-50 font-bold">Loại hàng</th>
+                                <th class="p-2 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
+                                <th class="p-2 bg-gray-50 font-bold">Thời gian vào</th>
+                                <th class="p-2 bg-gray-55 font-bold">Thời gian ra</th>
+                                <th class="p-2 bg-gray-50 font-bold">Tài xế</th>
+                                <th class="p-2 text-center w-24 bg-gray-55 font-bold">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -1620,17 +1620,17 @@ async function compileAndDownload() {
                                 :key="ticket.id || idx"
                                 class="hover:bg-gray-50 transition-colors"
                             >
-                                <td class="p-3 text-center font-bold text-gray-400">
+                                <td class="p-2 text-center font-bold text-gray-400">
                                     {{ (sourceCurrentPage - 1) * itemsPerPage + idx + 1 }}
                                 </td>
-                                <td class="p-3 font-semibold text-gray-500">{{ ticket.ticketNo }}</td>
-                                <td class="p-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(ticket.plateNumber) }}</td>
-                                <td class="p-3 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
-                                <td class="p-3 text-right font-black text-primary">{{ ticket.weightNet.toLocaleString() }}</td>
-                                <td class="p-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeInStr }} {{ ticket.dateInStr }}</td>
-                                <td class="p-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeOutStr }} {{ ticket.dateOutStr }}</td>
-                                <td class="p-3 text-gray-500 truncate max-w-[100px]" :title="ticket.driverName">{{ ticket.driverName || '-' }}</td>
-                                <td class="p-3 text-center">
+                                <td class="p-2 font-semibold text-gray-500">{{ ticket.ticketNo }}</td>
+                                <td class="p-2 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(ticket.plateNumber) }}</td>
+                                <td class="p-2 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
+                                <td class="p-2 text-right font-black text-primary">{{ ticket.weightNet.toLocaleString() }}</td>
+                                <td class="p-2 text-[10px] text-gray-500 font-mono">{{ ticket.timeInStr }} {{ ticket.dateInStr }}</td>
+                                <td class="p-2 text-[10px] text-gray-500 font-mono">{{ ticket.timeOutStr }} {{ ticket.dateOutStr }}</td>
+                                <td class="p-2 text-gray-500 truncate max-w-[100px]" :title="ticket.driverName">{{ ticket.driverName || '-' }}</td>
+                                <td class="p-2 text-center">
                                     <div class="flex items-center justify-center gap-1.5">
                                         <button 
                                             @click="openEditTicketDialog(ticket)" 
@@ -1708,18 +1708,18 @@ async function compileAndDownload() {
 
                 <!-- Preview Data Table -->
                 <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
-                    <table class="w-full text-left border-collapse text-xs font-semibold">
+                    <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
-                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
-                                <th class="p-3 w-12 text-center bg-gray-50 font-bold">STT</th>
-                                <th class="p-3 bg-gray-50 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
-                                <th class="p-3 bg-gray-55 font-bold">Số xe</th>
-                                <th class="p-3 text-center bg-gray-50 font-bold">TTTP (tấn)</th>
-                                <th class="p-3 text-center bg-gray-55 font-bold">Trọng lượng hàng CP (tấn)</th>
-                                <th class="p-3 bg-gray-50 font-bold">Số phiếu</th>
-                                <th class="p-3 text-center w-28 bg-gray-55 font-bold">Loại hàng</th>
-                                <th class="p-3 text-right bg-gray-50 font-bold">Khối lượng (tấn)</th>
-                                <th class="p-3 text-center w-16 bg-gray-55 font-bold">Trạng thái</th>
+                            <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
+                                <th class="p-2 w-12 text-center bg-gray-50 font-bold">STT</th>
+                                <th class="p-2 bg-gray-50 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
+                                <th class="p-2 bg-gray-55 font-bold">Số xe</th>
+                                <th class="p-2 text-center bg-gray-50 font-bold">TTTP (tấn)</th>
+                                <th class="p-2 text-center bg-gray-55 font-bold">Trọng lượng hàng CP (tấn)</th>
+                                <th class="p-2 bg-gray-50 font-bold">Số phiếu</th>
+                                <th class="p-2 text-center w-28 bg-gray-55 font-bold">Loại hàng</th>
+                                <th class="p-2 text-right bg-gray-50 font-bold">Khối lượng (tấn)</th>
+                                <th class="p-2 text-center w-16 bg-gray-55 font-bold">Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -1728,14 +1728,14 @@ async function compileAndDownload() {
                                 :key="trip.stt"
                                 class="hover:bg-gray-50 transition-colors"
                             >
-                                <td class="p-3 text-center font-bold text-gray-400">
+                                <td class="p-2 text-center font-bold text-gray-400">
                                     <span class="flex items-center justify-center gap-1.5">
                                         <span class="w-1.5 h-1.5 rounded-full bg-primary" title="Chuyến sẽ thêm mới"></span>
                                         {{ trip.stt }}
                                     </span>
                                 </td>
-                                <td class="p-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
-                                <td class="p-3 font-bold text-gray-900 flex items-center gap-2">
+                                <td class="p-2 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
+                                <td class="p-2 font-bold text-gray-900 flex items-center gap-2">
                                     <span class="whitespace-nowrap">{{ trip.plateNumber }}</span>
                                     <span 
                                         class="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-black border border-primary/20 uppercase tracking-wide select-none"
@@ -1743,12 +1743,12 @@ async function compileAndDownload() {
                                         Mới
                                     </span>
                                 </td>
-                                <td class="p-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
-                                <td class="p-3 text-center">{{ trip.limit.toFixed(1) }}</td>
-                                <td class="p-3 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
-                                <td class="p-3 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
-                                <td class="p-3 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
-                                <td class="p-3 text-center">
+                                <td class="p-2 text-center">{{ trip.tttp.toFixed(1) }}</td>
+                                <td class="p-2 text-center">{{ trip.limit.toFixed(1) }}</td>
+                                <td class="p-2 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
+                                <td class="p-2 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
+                                <td class="p-2 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
+                                <td class="p-2 text-center">
                                     <span 
                                         v-if="trip.weightTons <= trip.limit" 
                                         class="size-5 rounded-full bg-teal-50 text-teal-655 border border-teal-200 flex items-center justify-center mx-auto"
