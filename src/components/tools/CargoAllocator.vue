@@ -705,15 +705,15 @@ async function compileAndDownload() {
 
 <template>
     <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
-        <!-- Banner Title -->
-        <div class="flex flex-wrap items-center justify-between bg-gradient-to-r from-teal-500/10 via-emerald-500/5 to-transparent rounded-[var(--radius-lg)] p-5 shadow-sm border border-emerald-100 dark:border-slate-800/80 gap-4 bg-bg-surface dark:bg-slate-900">
+        <!-- Header Banner -->
+        <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
             <div>
-                <div class="text-[10px] uppercase font-black tracking-widest text-teal-600 dark:text-emerald-400 mb-1">Công cụ thông minh</div>
-                <h1 class="text-base font-bold text-text-main dark:text-white flex items-center gap-2">
-                    <span class="material-symbols-outlined text-teal-600 dark:text-emerald-400">balance</span>
+                <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Công cụ thông minh</div>
+                <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-primary text-lg">balance</span>
                     Phân bổ tải trọng xếp hàng lên phương tiện
                 </h1>
-                <p class="text-xs text-text-muted dark:text-slate-400 mt-0.5">
+                <p class="text-xs text-gray-500 mt-1">
                     Tự động chia tách trọng lượng xe quá tải vượt hạn mức thành nhiều chuyến hợp lệ và kết xuất tệp theo mẫu chuẩn.
                 </p>
             </div>
@@ -722,84 +722,84 @@ async function compileAndDownload() {
         <!-- 2-Column File Upload Slots -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <!-- 1. CSV Actual weights Upload -->
-            <div class="bg-[var(--bg-surface)] dark:bg-slate-900 rounded-[var(--radius-lg)] p-5 shadow-sm border border-[var(--border-light)] dark:border-slate-800/80 flex flex-col gap-4">
+            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
                 <div class="flex items-center gap-2.5">
-                    <span class="size-8 bg-teal-500/10 text-teal-600 dark:text-emerald-400 rounded-lg flex items-center justify-center">
+                    <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
                         <span class="material-symbols-outlined text-base">csv</span>
                     </span>
                     <div>
-                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">1. Tải lên tệp Phiếu Cân Thực Tế</h4>
-                        <p class="text-[10px] text-slate-500 dark:text-slate-400">Định dạng .csv chứa thông tin xe cân & tải trọng thực tế</p>
+                        <h4 class="text-xs font-black text-[#4a2c32]">1. Tải lên tệp Phiếu Cân Thực Tế</h4>
+                        <p class="text-[10px] text-gray-500">Định dạng .csv chứa thông tin xe cân & tải trọng thực tế</p>
                     </div>
                 </div>
                 
                 <label 
-                    class="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-slate-55/50 dark:hover:bg-slate-950/40 hover:border-teal-500/50 transition-all duration-200"
+                    class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
                 >
                     <input type="file" accept=".csv" @change="handleCSVUpload" class="hidden">
-                    <span class="material-symbols-outlined text-3xl text-slate-400 dark:text-slate-600">upload_file</span>
-                    <span class="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
+                    <span class="text-xs font-bold text-[#4a2c32]">
                         {{ csvFile ? csvFile.name : 'Chọn tệp CSV phiếu cân' }}
                     </span>
-                    <span class="text-[10px] text-slate-400 dark:text-slate-505 animate-pulse" v-if="loadingCSV">Đang đọc dữ liệu...</span>
-                    <span class="text-[10px] text-slate-400 dark:text-slate-500" v-else>
+                    <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingCSV">Đang đọc dữ liệu...</span>
+                    <span class="text-[10px] text-gray-400" v-else>
                         {{ csvFile ? `${(csvFile.size / 1024).toFixed(1)} KB` : 'Nhấp để duyệt file hoặc kéo thả' }}
                     </span>
                 </label>
 
-                <div v-if="csvRecords.length > 0" class="flex items-center justify-between text-[11px] font-bold bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-850">
-                    <span class="text-slate-500">Tổng cộng bản ghi:</span>
-                    <span class="text-teal-600 dark:text-emerald-400">{{ csvRecords.length }} xe ({{ totalCsvWeightTons.toFixed(2) }} tấn)</span>
+                <div v-if="csvRecords.length > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
+                    <span class="text-gray-500">Tổng cộng bản ghi:</span>
+                    <span class="text-primary font-black">{{ csvRecords.length }} xe ({{ totalCsvWeightTons.toFixed(2) }} tấn)</span>
                 </div>
             </div>
 
             <!-- 2. Excel Workbook Upload -->
-            <div class="bg-[var(--bg-surface)] dark:bg-slate-900 rounded-[var(--radius-lg)] p-5 shadow-sm border border-[var(--border-light)] dark:border-slate-800/80 flex flex-col gap-4">
+            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
                 <div class="flex items-center gap-2.5">
-                    <span class="size-8 bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 rounded-lg flex items-center justify-center">
+                    <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
                         <span class="material-symbols-outlined text-base">table_chart</span>
                     </span>
                     <div>
-                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">2. Tải lên tệp Sổ Theo Dõi Gốc</h4>
-                        <p class="text-[10px] text-slate-500 dark:text-slate-400">Định dạng .xlsx mẫu "SỐ THEO DÕI XẾP HÀNG HÓA.xlsx"</p>
+                        <h4 class="text-xs font-black text-[#4a2c32]">2. Tải lên tệp Sổ Theo Dõi Gốc</h4>
+                        <p class="text-[10px] text-gray-500">Định dạng .xlsx mẫu "SỐ THEO DÕI XẾP HÀNG HÓA.xlsx"</p>
                     </div>
                 </div>
                 
                 <label 
-                    class="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-slate-55/50 dark:hover:bg-slate-950/40 hover:border-indigo-500/50 transition-all duration-200"
+                    class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
                 >
                     <input type="file" accept=".xlsx" @change="handleExcelUpload" class="hidden">
-                    <span class="material-symbols-outlined text-3xl text-slate-400 dark:text-slate-600">upload_file</span>
-                    <span class="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
+                    <span class="text-xs font-bold text-[#4a2c32]">
                         {{ excelFile ? excelFile.name : 'Chọn sổ theo dõi (.xlsx)' }}
                     </span>
-                    <span class="text-[10px] text-slate-400 dark:text-slate-505 animate-pulse" v-if="loadingExcel">Đang nạp file...</span>
-                    <span class="text-[10px] text-slate-400 dark:text-slate-500" v-else>
+                    <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingExcel">Đang nạp file...</span>
+                    <span class="text-[10px] text-gray-400" v-else>
                         {{ excelFile ? `${(excelFile.size / 1024).toFixed(1)} KB` : 'Nhấp để duyệt file hoặc kéo thả' }}
                     </span>
                 </label>
 
-                <div v-if="sheet1Vehicles.size > 0" class="flex items-center justify-between text-[11px] font-bold bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-850">
-                    <span class="text-slate-500">Cơ sở dữ liệu lịch sử xe:</span>
-                    <span class="text-indigo-600 dark:text-indigo-400">Đã nạp {{ sheet1Vehicles.size }} xe từ Sheet1</span>
+                <div v-if="sheet1Vehicles.size > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
+                    <span class="text-gray-500">Cơ sở dữ liệu lịch sử xe:</span>
+                    <span class="text-primary font-black">Đã nạp {{ sheet1Vehicles.size }} xe từ Sheet1</span>
                 </div>
             </div>
         </div>
 
         <!-- Warning block: New Vehicles detected -->
-        <div v-if="newVehicles.length > 0" class="bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 rounded-[var(--radius-lg)] p-5 flex flex-col gap-3 animate-fade-in">
-            <div class="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                <span class="material-symbols-outlined text-lg">warning</span>
+        <div v-if="newVehicles.length > 0" class="bg-amber-50/50 border border-amber-200 rounded-[24px] p-5 flex flex-col gap-3 animate-fade-in">
+            <div class="flex items-center gap-2 text-amber-800">
+                <span class="material-symbols-outlined text-base">warning</span>
                 <span class="text-xs font-black uppercase tracking-wide">Phát hiện {{ newVehicles.length }} biển số xe mới chưa có trong lịch sử (Sheet1)</span>
             </div>
-            <p class="text-[11px] text-slate-600 dark:text-slate-400 -mt-1 leading-relaxed">
+            <p class="text-[11px] text-gray-600 -mt-1 leading-relaxed">
                 Vui lòng cấu hình nhanh thông số tải trọng cho các phương tiện này. Hệ thống sẽ lưu trữ và áp dụng để chia tải.
             </p>
             
-            <div class="overflow-x-auto max-h-[220px] border border-amber-500/10 rounded-lg bg-bg-surface dark:bg-slate-950/40">
+            <div class="overflow-x-auto max-h-[220px] border border-amber-200/50 rounded-[16px] bg-white">
                 <table class="w-full text-left border-collapse text-[11px]">
                     <thead>
-                        <tr class="bg-amber-500/5 text-amber-800 dark:text-amber-300 font-bold border-b border-amber-550/10">
+                        <tr class="bg-amber-50/70 text-amber-850 font-bold border-b border-amber-100">
                             <th class="p-2.5 font-bold">Biển số</th>
                             <th class="p-2.5 font-bold">Mã Tải Trọng lịch sử (Khuyên dùng)</th>
                             <th class="p-2.5 font-bold text-center">Cấu hình thủ công</th>
@@ -807,14 +807,14 @@ async function compileAndDownload() {
                             <th class="p-2.5 font-bold text-center">Hạn mức hàng (tấn)</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-855 text-slate-700 dark:text-slate-350">
-                        <tr v-for="veh in newVehicles" :key="veh.plateNumber">
-                            <td class="p-2.5 font-bold text-slate-900 dark:text-white">{{ formatPlate(veh.plateNumber) }}</td>
+                    <tbody class="divide-y divide-gray-150 text-gray-700">
+                        <tr v-for="veh in newVehicles" :key="veh.plateNumber" class="hover:bg-amber-50/20">
+                            <td class="p-2.5 font-bold text-[#4a2c32]">{{ formatPlate(veh.plateNumber) }}</td>
                             <td class="p-2.5">
                                 <select 
                                     v-model="veh.capacityCode" 
                                     :disabled="veh.isCustom"
-                                    class="px-2 py-1 rounded border border-slate-200 dark:border-slate-800 bg-transparent text-xs font-semibold focus:outline-none"
+                                    class="px-3 py-1.5 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer"
                                 >
                                     <option :value="108">108 (TTTP 10.8t / Hàng 7.7t)</option>
                                     <option :value="107">107 (TTTP 10.7t / Hàng 6.7t)</option>
@@ -822,7 +822,7 @@ async function compileAndDownload() {
                                 </select>
                             </td>
                             <td class="p-2.5 text-center">
-                                <input type="checkbox" v-model="veh.isCustom" class="size-3.5 accent-teal-600">
+                                <input type="checkbox" v-model="veh.isCustom" class="size-3.5 accent-primary rounded cursor-pointer">
                             </td>
                             <td class="p-2.5 text-center">
                                 <input 
@@ -831,7 +831,7 @@ async function compileAndDownload() {
                                     :disabled="!veh.isCustom"
                                     placeholder="10.8" 
                                     step="0.1" 
-                                    class="w-16 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-transparent disabled:opacity-50 text-center"
+                                    class="w-20 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center disabled:opacity-50"
                                 >
                             </td>
                             <td class="p-2.5 text-center">
@@ -841,7 +841,7 @@ async function compileAndDownload() {
                                     :disabled="!veh.isCustom"
                                     placeholder="7.7" 
                                     step="0.1" 
-                                    class="w-16 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-transparent disabled:opacity-50 text-center"
+                                    class="w-20 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center disabled:opacity-50"
                                 >
                             </td>
                         </tr>
@@ -853,72 +853,72 @@ async function compileAndDownload() {
         <!-- 3-Column Settings & Capacities configs -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <!-- Parameters configuration -->
-            <div class="lg:col-span-2 bg-[var(--bg-surface)] dark:bg-slate-900 rounded-[var(--radius-lg)] p-5 shadow-sm border border-[var(--border-light)] dark:border-slate-800/80 flex flex-col gap-4">
-                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-teal-600 dark:text-emerald-400">tune</span>
+            <div class="lg:col-span-2 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-base">tune</span>
                     Cấu hình giải thuật & quy tắc phân bổ
                 </h4>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Distribution Strategy -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Chiến lược chia trọng lượng</label>
-                        <select v-model="distStrategy" class="filter-input w-full dark:bg-slate-800 dark:border-slate-700 text-xs focus:outline-none">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Chiến lược chia trọng lượng</label>
+                        <select v-model="distStrategy" class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
                             <option value="random">Phân bổ ngẫu nhiên (Khuyên dùng - Thực tế nhất)</option>
                             <option value="even">Chia đều (Cân đối tải trọng)</option>
                             <option value="max">Tối đa hóa công suất (Xếp đầy xe đầu)</option>
                         </select>
-                        <span class="text-[9px] text-slate-405 dark:text-slate-500 leading-tight">
+                        <span class="text-[9px] text-gray-400 leading-tight">
                             {{ distStrategy === 'random' ? 'Tự động tạo ra các số tải trọng ngẫu nhiên tự nhiên dưới hạn mức cho phép.' : distStrategy === 'even' ? 'Chia đều toàn bộ khối lượng thực tế cho số chuyến tối thiểu. Trọng lượng mỗi chuyến bằng nhau.' : 'Xếp tối đa tải trọng cho phép cho các chuyến đầu, chuyến cuối cùng chở phần khối lượng còn thừa.' }}
                         </span>
                     </div>
 
                     <!-- Spacing Strategy -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phương pháp định thời gian</label>
-                        <select v-model="spacingStrategy" class="filter-input w-full dark:bg-slate-800 dark:border-slate-700 text-xs focus:outline-none">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Phương pháp định thời gian</label>
+                        <select v-model="spacingStrategy" class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
                             <option value="even">Phân bổ đều theo chu kỳ cân</option>
                             <option value="forward">Tịnh tiến từ thời gian vào (+ Interval)</option>
                             <option value="backward">Lùi dần từ thời gian ra (- Interval)</option>
                         </select>
-                        <span class="text-[9px] text-slate-405 dark:text-slate-500 leading-tight">
+                        <span class="text-[9px] text-gray-400 leading-tight">
                             {{ spacingStrategy === 'even' ? 'Thời gian các chuyến được chia đều trong khoảng từ lúc xe vào trạm đến lúc xe ra.' : 'Mỗi chuyến xe sau được xếp cách chuyến xe trước một khoảng thời gian cố định.' }}
                         </span>
                     </div>
 
                     <!-- Time Interval (Used if forward/backward) -->
                     <div v-if="spacingStrategy !== 'even'" class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Khoảng cách giữa các chuyến (phút)</label>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Khoảng cách giữa các chuyến (phút)</label>
                         <input 
                             type="number" 
                             v-model.number="timeIntervalMinutes" 
                             min="10" 
                             max="720"
-                            class="filter-input w-full dark:bg-slate-800 dark:border-slate-700 text-xs focus:outline-none"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all"
                         >
                     </div>
                 </div>
             </div>
 
             <!-- General Capacity standards config -->
-            <div class="bg-[var(--bg-surface)] dark:bg-slate-900 rounded-[var(--radius-lg)] p-5 shadow-sm border border-[var(--border-light)] dark:border-slate-800/80 flex flex-col gap-4">
-                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-indigo-650 dark:text-indigo-400">shield</span>
+            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-base">shield</span>
                     Hạn mức tải trọng tiêu chuẩn
                 </h4>
-                <p class="text-[10px] text-slate-500 dark:text-slate-400 -mt-2">Chỉnh sửa trực tiếp hạn mức hàng hóa tối đa cho các mã xe:</p>
+                <p class="text-[10px] text-gray-500 -mt-2">Chỉnh sửa trực tiếp hạn mức hàng hóa tối đa cho các mã xe:</p>
 
                 <div class="flex flex-col gap-3">
-                    <div v-for="cfg in capacityConfigs" :key="cfg.code" class="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 text-xs">
-                        <span class="font-extrabold text-slate-700 dark:text-slate-350">Mã {{ cfg.code }}</span>
+                    <div v-for="cfg in capacityConfigs" :key="cfg.code" class="flex items-center justify-between p-2.5 rounded-[12px] border border-gray-100 bg-gray-50/50 text-xs">
+                        <span class="font-extrabold text-gray-700">Mã {{ cfg.code }}</span>
                         <div class="flex items-center gap-2">
                             <div class="flex flex-col items-center">
-                                <span class="text-[8px] text-slate-400 uppercase font-black">TTTP (t)</span>
-                                <input type="number" v-model.number="cfg.tttp" step="0.1" class="w-12 px-1 text-center bg-transparent border-b border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none">
+                                <span class="text-[8px] text-gray-400 uppercase font-black">TTTP (t)</span>
+                                <input type="number" v-model.number="cfg.tttp" step="0.1" class="w-12 px-1 text-center bg-transparent border-b border-gray-200 text-xs font-bold focus:outline-none focus:border-primary">
                             </div>
                             <div class="flex flex-col items-center">
-                                <span class="text-[8px] text-slate-400 uppercase font-black">Hàng (t)</span>
-                                <input type="number" v-model.number="cfg.limit" step="0.1" class="w-12 px-1 text-center bg-transparent border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-teal-600 dark:text-emerald-450 focus:outline-none">
+                                <span class="text-[8px] text-gray-400 uppercase font-black">Hàng (t)</span>
+                                <input type="number" v-model.number="cfg.limit" step="0.1" class="w-12 px-1 text-center bg-transparent border-b border-gray-200 text-xs font-bold text-primary focus:outline-none focus:border-primary">
                             </div>
                         </div>
                     </div>
@@ -927,25 +927,25 @@ async function compileAndDownload() {
         </div>
 
         <!-- Preview Results Table Section -->
-        <div v-if="generatedTrips.length > 0" class="bg-[var(--bg-surface)] dark:bg-slate-900 rounded-[var(--radius-lg)] p-5 shadow-sm border border-[var(--border-light)] dark:border-slate-800/80 flex flex-col gap-4 animate-fade-in">
+        <div v-if="generatedTrips.length > 0" class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-teal-650">pageview</span>
+                    <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-base">pageview</span>
                         Bản xem trước kết quả phân bổ tải trọng
                     </h4>
-                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Dưới đây là danh sách chi tiết các chuyến sẽ được thêm mới vào Sổ Theo Dõi.</p>
+                    <p class="text-[10px] text-gray-500 mt-0.5">Dưới đây là danh sách chi tiết các chuyến sẽ được thêm mới vào Sổ Theo Dõi.</p>
                 </div>
 
                 <!-- Stats summary badges -->
                 <div class="flex items-center gap-2 flex-wrap">
-                    <div v-if="existingTrips.length > 0" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-750 text-[10px] font-black text-slate-600 dark:text-slate-400">
+                    <div v-if="existingTrips.length > 0" class="px-2.5 py-1.5 bg-gray-50 rounded-[12px] border border-primary/5 text-[10px] font-black text-gray-500">
                         Dòng bắt đầu: từ dòng số {{ nextSTT }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg border border-indigo-100 dark:border-indigo-900/50 text-[10px] font-black text-indigo-700 dark:text-indigo-300">
+                    <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-[10px] font-black text-primary">
                         Số chuyến sẽ thêm: {{ generatedTrips.length }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-100 dark:border-teal-900/50 text-[10px] font-black text-teal-700 dark:text-emerald-350">
+                    <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-[10px] font-black text-teal-700">
                         Khối lượng phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
                     </div>
                 </div>
@@ -953,74 +953,81 @@ async function compileAndDownload() {
 
             <!-- Search Filter Row -->
             <div class="flex items-center justify-between gap-4">
-                <div class="relative w-full max-w-[320px]">
-                    <span class="material-symbols-outlined text-slate-400 text-base absolute left-3 top-1/2 -translate-y-1/2 select-none">search</span>
+                <div class="relative w-full max-w-[320px] flex items-center">
+                    <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
                     <input 
                         type="text" 
                         v-model="searchQuery" 
                         placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
-                        class="filter-input w-full pl-9 text-xs focus:outline-none"
+                        class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
                     >
+                    <button 
+                        v-if="searchQuery" 
+                        @click="searchQuery = ''" 
+                        class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                    >
+                        <span class="material-symbols-outlined text-xs">close</span>
+                    </button>
                 </div>
                 
-                <span class="text-[10px] font-bold text-slate-500">
+                <span class="text-[10px] font-bold text-gray-400">
                     Đang hiển thị {{ filteredTrips.length }} / {{ generatedTrips.length }} dòng kết quả
                 </span>
             </div>
 
             <!-- Preview Data Table -->
-            <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl bg-bg-surface dark:bg-slate-900">
-                <table class="w-full text-left border-collapse text-xs">
+            <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                <table class="w-full text-left border-collapse text-xs font-semibold">
                     <thead>
-                        <tr class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-250 font-bold border-b border-slate-200 dark:border-slate-800">
-                            <th class="p-3 w-12 text-center font-bold">STT</th>
-                            <th class="p-3 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
-                            <th class="p-3 font-bold">Số đăng ký xe</th>
-                            <th class="p-3 text-center font-bold">TTTP (tấn)</th>
-                            <th class="p-3 text-center font-bold">Trọng lượng hàng CP (tấn)</th>
-                            <th class="p-3 font-bold">Số phiếu</th>
-                            <th class="p-3 font-bold">Loại hàng</th>
-                            <th class="p-3 text-right font-bold">Khối lượng (tấn)</th>
-                            <th class="p-3 text-center w-16 font-bold">Trạng thái</th>
+                        <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                            <th class="p-3 w-12 text-center bg-gray-50">STT</th>
+                            <th class="p-3 bg-gray-50">Thời gian rời bến (Giờ/Ngày)</th>
+                            <th class="p-3 bg-gray-50">Số đăng ký xe</th>
+                            <th class="p-3 text-center bg-gray-50">TTTP (tấn)</th>
+                            <th class="p-3 text-center bg-gray-50">Trọng lượng hàng CP (tấn)</th>
+                            <th class="p-3 bg-gray-50">Số phiếu</th>
+                            <th class="p-3 bg-gray-55 text-center w-28 bg-gray-50">Loại hàng</th>
+                            <th class="p-3 text-right bg-gray-50">Khối lượng (tấn)</th>
+                            <th class="p-3 text-center w-16 bg-gray-50">Trạng thái</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-855 text-slate-700 dark:text-slate-350 font-medium">
+                    <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
                         <tr 
                             v-for="trip in pagedTrips" 
                             :key="trip.stt"
-                            class="hover:bg-slate-50/50 dark:hover:bg-slate-950/20 transition-colors bg-teal-500/[0.02] dark:bg-emerald-500/[0.01] border-l-4 border-l-teal-500 dark:border-l-emerald-500"
+                            class="hover:bg-gray-50 transition-colors"
                         >
-                            <td class="p-3 text-center font-bold text-slate-400">
+                            <td class="p-3 text-center font-bold text-gray-400">
                                 <span class="flex items-center justify-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-teal-500" title="Chuyến sẽ thêm mới"></span>
+                                    <span class="w-1.5 h-1.5 rounded-full bg-primary" title="Chuyến sẽ thêm mới"></span>
                                     {{ trip.stt }}
                                 </span>
                             </td>
-                            <td class="p-3 whitespace-pre-line font-mono text-[10px] leading-tight text-slate-500">{{ trip.timeStr }}</td>
-                            <td class="p-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <td class="p-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
+                            <td class="p-3 font-bold text-gray-900 flex items-center gap-2">
                                 <span>{{ trip.plateNumber }}</span>
                                 <span 
-                                    class="text-[8px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-emerald-450 font-extrabold border border-teal-500/20 uppercase tracking-wide select-none"
+                                    class="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-black border border-primary/20 uppercase tracking-wide select-none"
                                 >
                                     Mới
                                 </span>
                             </td>
                             <td class="p-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
                             <td class="p-3 text-center">{{ trip.limit.toFixed(1) }}</td>
-                            <td class="p-3 font-semibold text-slate-500">{{ trip.ticketNo }}</td>
+                            <td class="p-3 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
                             <td class="p-3 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
-                            <td class="p-3 text-right font-black text-teal-600 dark:text-emerald-450">{{ trip.weightTons.toFixed(2) }}</td>
+                            <td class="p-3 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
                             <td class="p-3 text-center">
                                 <span 
                                     v-if="trip.weightTons <= trip.limit" 
-                                    class="size-5 rounded-full bg-teal-50 dark:bg-teal-950/80 text-teal-600 dark:text-emerald-450 flex items-center justify-center mx-auto"
+                                    class="size-5 rounded-full bg-teal-50 text-teal-655 border border-teal-200 flex items-center justify-center mx-auto"
                                     title="Hợp lệ - Dưới hạn mức"
                                 >
                                     <span class="material-symbols-outlined text-[13px] font-black">check</span>
                                 </span>
                                 <span 
                                     v-else 
-                                    class="size-5 rounded-full bg-red-50 dark:bg-red-950/80 text-red-500 flex items-center justify-center mx-auto"
+                                    class="size-5 rounded-full bg-red-50 text-red-600 border border-red-200 flex items-center justify-center mx-auto"
                                     title="Quá tải!"
                                 >
                                     <span class="material-symbols-outlined text-[13px] font-black">close</span>
@@ -1028,7 +1035,7 @@ async function compileAndDownload() {
                             </td>
                         </tr>
                         <tr v-if="filteredTrips.length === 0">
-                            <td colspan="9" class="p-8 text-center text-slate-400 italic">
+                            <td colspan="9" class="p-8 text-center text-gray-400 italic">
                                 Không tìm thấy bản ghi nào khớp bộ lọc!
                             </td>
                         </tr>
@@ -1041,17 +1048,17 @@ async function compileAndDownload() {
                 <button 
                     @click="currentPage = Math.max(1, currentPage - 1)" 
                     :disabled="currentPage === 1"
-                    class="size-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 flex items-center justify-center text-slate-600 dark:text-slate-400 transition-colors"
+                    class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
                 >
                     <span class="material-symbols-outlined text-lg">chevron_left</span>
                 </button>
-                <span class="text-xs font-bold text-slate-500">
+                <span class="text-xs font-bold text-gray-500">
                     Trang {{ currentPage }} / {{ totalPages }}
                 </span>
                 <button 
                     @click="currentPage = Math.min(totalPages, currentPage + 1)" 
                     :disabled="currentPage === totalPages"
-                    class="size-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 flex items-center justify-center text-slate-600 dark:text-slate-400 transition-colors"
+                    class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
                 >
                     <span class="material-symbols-outlined text-lg">chevron_right</span>
                 </button>
@@ -1059,11 +1066,11 @@ async function compileAndDownload() {
         </div>
 
         <!-- Action Export Section -->
-        <div class="flex items-center justify-end border-t border-slate-200 dark:border-slate-800 pt-6">
+        <div class="flex items-center justify-end border-t border-gray-100 pt-6">
             <button 
                 @click="compileAndDownload" 
                 :disabled="generatedTrips.length === 0 || compiling || !excelFile"
-                class="btn btn-primary text-xs font-black shadow-md rounded-xl py-3 px-6 flex items-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed text-white bg-teal-650 hover:bg-teal-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                class="px-6 py-3 bg-primary text-white font-bold rounded-[16px] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed shadow-soft flex items-center gap-2.5"
             >
                 <span v-if="compiling" class="material-symbols-outlined text-base animate-spin">sync</span>
                 <span v-else class="material-symbols-outlined text-base">download_for_offline</span>
