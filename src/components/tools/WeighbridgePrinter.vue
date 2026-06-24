@@ -3460,8 +3460,8 @@ onUnmounted(() => {
                                                     class="absolute cursor-move select-none flex flex-col"
                                                     :class="[
                                                         selectedElementIds.includes(el.id) 
-                                                            ? (selectedElementId === el.id ? 'ring-2 ring-primary ring-offset-1 z-30 bg-primary/[0.03]' : 'ring-2 ring-teal-500 ring-offset-1 z-25 bg-teal-500/[0.03]') 
-                                                            : 'hover:ring-1 hover:ring-primary/50 z-20'
+                                                            ? (selectedElementId === el.id ? 'ring-2 ring-inset ring-primary z-30 bg-primary/[0.03]' : 'ring-2 ring-inset ring-teal-500 z-25 bg-teal-500/[0.03]') 
+                                                            : 'hover:ring-1 hover:ring-inset hover:ring-primary/50 z-20'
                                                     ]"
                                                     :style="{
                                                         left: (el.x * MM_TO_PX) + 'px',
