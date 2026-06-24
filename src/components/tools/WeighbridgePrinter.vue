@@ -1089,8 +1089,8 @@ const handleDragMove = (event: MouseEvent) => {
     const deltaY_mm = deltaY_px / MM_TO_PX;
     
     // Tentative position of primary element (rounded to 0.5mm)
-    let newPrimaryX = Math.round((dragStartElX + deltaX_mm) * 2) / 2;
-    let newPrimaryY = Math.round((dragStartElY + deltaY_mm) * 2) / 2;
+    let newPrimaryX = Math.round((Number(dragStartElX) + deltaX_mm) * 2) / 2;
+    let newPrimaryY = Math.round((Number(dragStartElY) + deltaY_mm) * 2) / 2;
     
     // Snapping logic for primary element
     const SNAP_THRESHOLD_MM = 1.0; // 1mm threshold
@@ -1100,81 +1100,83 @@ const handleDragMove = (event: MouseEvent) => {
     let snappedX = false;
     let snappedY = false;
     
-    const primaryW = primaryEl.width || 10;
-    const primaryH = primaryEl.height || 5;
+    const primaryW = Number(primaryEl.width) || 10;
+    const primaryH = Number(primaryEl.height) || 5;
     
     for (const other of elements) {
         // Do not snap to any element that is currently selected/dragged together
         if (selectedElementIds.value.includes(other.id)) continue;
         
-        const otherW = other.width || 10;
-        const otherH = other.height || 5;
+        const otherW = Number(other.width) || 10;
+        const otherH = Number(other.height) || 5;
+        const otherX = Number(other.x) || 0;
+        const otherY = Number(other.y) || 0;
         
         // 1. Vertical snapping (X-axis)
         if (!snappedX) {
             // Left edge to Left edge
-            if (Math.abs(newPrimaryX - other.x) < SNAP_THRESHOLD_MM) {
-                newPrimaryX = other.x;
+            if (Math.abs(newPrimaryX - otherX) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = otherX;
                 snappedX = true;
-                guides.push({ type: 'v', pos: other.x * MM_TO_PX });
+                guides.push({ type: 'v', pos: otherX * MM_TO_PX });
             }
             // Right edge to Right edge
-            else if (Math.abs((newPrimaryX + primaryW) - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
-                newPrimaryX = other.x + otherW - primaryW;
+            else if (Math.abs((newPrimaryX + primaryW) - (otherX + otherW)) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = otherX + otherW - primaryW;
                 snappedX = true;
-                guides.push({ type: 'v', pos: (other.x + otherW) * MM_TO_PX });
+                guides.push({ type: 'v', pos: (otherX + otherW) * MM_TO_PX });
             }
             // Left edge to Right edge
-            else if (Math.abs(newPrimaryX - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
-                newPrimaryX = other.x + otherW;
+            else if (Math.abs(newPrimaryX - (otherX + otherW)) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = otherX + otherW;
                 snappedX = true;
-                guides.push({ type: 'v', pos: (other.x + otherW) * MM_TO_PX });
+                guides.push({ type: 'v', pos: (otherX + otherW) * MM_TO_PX });
             }
             // Right edge to Left edge
-            else if (Math.abs((newPrimaryX + primaryW) - other.x) < SNAP_THRESHOLD_MM) {
-                newPrimaryX = other.x - primaryW;
+            else if (Math.abs((newPrimaryX + primaryW) - otherX) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = otherX - primaryW;
                 snappedX = true;
-                guides.push({ type: 'v', pos: other.x * MM_TO_PX });
+                guides.push({ type: 'v', pos: otherX * MM_TO_PX });
             }
             // Center to Center
-            else if (Math.abs((newPrimaryX + primaryW / 2) - (other.x + otherW / 2)) < SNAP_THRESHOLD_MM) {
-                newPrimaryX = other.x + otherW / 2 - primaryW / 2;
+            else if (Math.abs((newPrimaryX + primaryW / 2) - (otherX + otherW / 2)) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = otherX + otherW / 2 - primaryW / 2;
                 snappedX = true;
-                guides.push({ type: 'v', pos: (other.x + otherW / 2) * MM_TO_PX });
+                guides.push({ type: 'v', pos: (otherX + otherW / 2) * MM_TO_PX });
             }
         }
         
         // 2. Horizontal snapping (Y-axis)
         if (!snappedY) {
             // Top edge to Top edge
-            if (Math.abs(newPrimaryY - other.y) < SNAP_THRESHOLD_MM) {
-                newPrimaryY = other.y;
+            if (Math.abs(newPrimaryY - otherY) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = otherY;
                 snappedY = true;
-                guides.push({ type: 'h', pos: other.y * MM_TO_PX });
+                guides.push({ type: 'h', pos: otherY * MM_TO_PX });
             }
             // Bottom edge to Bottom edge
-            else if (Math.abs((newPrimaryY + primaryH) - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
-                newPrimaryY = other.y + otherH - primaryH;
+            else if (Math.abs((newPrimaryY + primaryH) - (otherY + otherH)) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = otherY + otherH - primaryH;
                 snappedY = true;
-                guides.push({ type: 'h', pos: (other.y + otherH) * MM_TO_PX });
+                guides.push({ type: 'h', pos: (otherY + otherH) * MM_TO_PX });
             }
             // Top edge to Bottom edge
-            else if (Math.abs(newPrimaryY - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
-                newPrimaryY = other.y + otherH;
+            else if (Math.abs(newPrimaryY - (otherY + otherH)) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = otherY + otherH;
                 snappedY = true;
-                guides.push({ type: 'h', pos: (other.y + otherH) * MM_TO_PX });
+                guides.push({ type: 'h', pos: (otherY + otherH) * MM_TO_PX });
             }
             // Bottom edge to Top edge
-            else if (Math.abs((newPrimaryY + primaryH) - other.y) < SNAP_THRESHOLD_MM) {
-                newPrimaryY = other.y - primaryH;
+            else if (Math.abs((newPrimaryY + primaryH) - otherY) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = otherY - primaryH;
                 snappedY = true;
-                guides.push({ type: 'h', pos: other.y * MM_TO_PX });
+                guides.push({ type: 'h', pos: otherY * MM_TO_PX });
             }
             // Center to Center
-            else if (Math.abs((newPrimaryY + primaryH / 2) - (other.y + otherH / 2)) < SNAP_THRESHOLD_MM) {
-                newPrimaryY = other.y + otherH / 2 - primaryH / 2;
+            else if (Math.abs((newPrimaryY + primaryH / 2) - (otherY + otherH / 2)) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = otherY + otherH / 2 - primaryH / 2;
                 snappedY = true;
-                guides.push({ type: 'h', pos: (other.y + otherH / 2) * MM_TO_PX });
+                guides.push({ type: 'h', pos: (otherY + otherH / 2) * MM_TO_PX });
             }
         }
     }
@@ -1184,8 +1186,8 @@ const handleDragMove = (event: MouseEvent) => {
     newPrimaryY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - primaryH, newPrimaryY));
     
     // Calculate final delta based on primary element movement
-    const actualDeltaX = newPrimaryX - dragStartElX;
-    const actualDeltaY = newPrimaryY - dragStartElY;
+    const actualDeltaX = newPrimaryX - Number(dragStartElX);
+    const actualDeltaY = newPrimaryY - Number(dragStartElY);
     
     // Move all selected elements
     selectedElementIds.value.forEach(id => {
@@ -1194,11 +1196,13 @@ const handleDragMove = (event: MouseEvent) => {
         const startPos = dragStartPositions.get(id);
         if (!startPos) return;
         
-        const w = item.width || 10;
-        const h = item.height || 5;
+        const w = Number(item.width) || 10;
+        const h = Number(item.height) || 5;
+        const startX = Number(startPos.x) || 0;
+        const startY = Number(startPos.y) || 0;
         
-        item.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - w, startPos.x + actualDeltaX));
-        item.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - h, startPos.y + actualDeltaY));
+        item.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - w, startX + actualDeltaX));
+        item.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - h, startY + actualDeltaY));
     });
     
     alignmentGuides.value = guides;
@@ -1240,15 +1244,15 @@ const startDrag = (event: MouseEvent, el: PrintElement) => {
     draggingElementId.value = el.id;
     dragStartMouseX = event.clientX;
     dragStartMouseY = event.clientY;
-    dragStartElX = el.x;
-    dragStartElY = el.y;
+    dragStartElX = Number(el.x) || 0;
+    dragStartElY = Number(el.y) || 0;
     
     // Save starting positions for all selected elements
     dragStartPositions.clear();
     selectedElementIds.value.forEach(id => {
         const item = (cfgForm.printElements || []).find(e => e.id === id);
         if (item) {
-            dragStartPositions.set(id, { x: item.x, y: item.y });
+            dragStartPositions.set(id, { x: Number(item.x) || 0, y: Number(item.y) || 0 });
         }
     });
     
