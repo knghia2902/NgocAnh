@@ -64,9 +64,9 @@ const compiling = ref(false);
 
 // Capacity configuration standards
 const capacityConfigs = ref<Record<number, CapacityConfig>>({
-    108: { code: 108, tttp: 10.8, limit: 7.7 },
-    107: { code: 107, tttp: 10.7, limit: 6.7 },
-    97: { code: 97, tttp: 9.7, limit: 5.7 }
+    108: { code: 108, tttp: 10.8, limit: 10.0 },
+    107: { code: 107, tttp: 10.7, limit: 10.0 },
+    97: { code: 97, tttp: 9.7, limit: 10.0 }
 });
 
 // Configs for new vehicles not found in DB
@@ -372,7 +372,7 @@ function detectNewVehicles() {
 // Get the capacity info for a vehicle (checks new vehicle settings or Sheet1 db)
 function getVehicleCapacity(plate: string): CapacityConfig {
     const norm = normalizePlate(plate);
-    const fallback: CapacityConfig = { code: 108, tttp: 10.8, limit: 7.7 };
+    const fallback: CapacityConfig = { code: 108, tttp: 10.8, limit: 10.0 };
     
     // Check if it's one of the configured new vehicles
     const newVeh = newVehicles.value.find(v => normalizePlate(v.plateNumber) === norm);
@@ -381,7 +381,7 @@ function getVehicleCapacity(plate: string): CapacityConfig {
             return {
                 code: 0,
                 tttp: newVeh.customTTTP || 10.8,
-                limit: newVeh.customLimit || 7.7
+                limit: newVeh.customLimit || 10.0
             };
         }
         return capacityConfigs.value[newVeh.capacityCode] || capacityConfigs.value[108] || fallback;
@@ -816,9 +816,9 @@ async function compileAndDownload() {
                                     :disabled="veh.isCustom"
                                     class="px-3 py-1.5 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer"
                                 >
-                                    <option :value="108">108 (TTTP 10.8t / Hàng 7.7t)</option>
-                                    <option :value="107">107 (TTTP 10.7t / Hàng 6.7t)</option>
-                                    <option :value="97">97 (TTTP 9.7t / Hàng 5.7t)</option>
+                                    <option :value="108">108 (TTTP 10.8t / Hàng 10.0t)</option>
+                                    <option :value="107">107 (TTTP 10.7t / Hàng 10.0t)</option>
+                                    <option :value="97">97 (TTTP 9.7t / Hàng 10.0t)</option>
                                 </select>
                             </td>
                             <td class="p-2.5 text-center">
@@ -839,7 +839,7 @@ async function compileAndDownload() {
                                     type="number" 
                                     v-model.number="veh.customLimit" 
                                     :disabled="!veh.isCustom"
-                                    placeholder="7.7" 
+                                    placeholder="10.0" 
                                     step="0.1" 
                                     class="w-20 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center disabled:opacity-50"
                                 >
