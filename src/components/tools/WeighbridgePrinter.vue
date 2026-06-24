@@ -1080,7 +1080,12 @@ let dragStartMouseY = 0;
 let dragStartElX = 0;
 let dragStartElY = 0;
 
-const MM_TO_PX = 4; // 1mm = 4px (A5: 210x148mm = 840x592px)
+const canvasContainerRef = ref<HTMLDivElement | null>(null);
+const canvasWidthPx = ref(840);
+const canvasHeightPx = ref(592);
+const currentMmToPx = computed(() => canvasWidthPx.value / 210);
+let resizeObserver: ResizeObserver | null = null;
+
 const CANVAS_WIDTH_MM = 210;
 const CANVAS_HEIGHT_MM = 148;
 
@@ -1100,8 +1105,8 @@ const handleDragMove = (event: MouseEvent) => {
     
     const deltaX_px = event.clientX - dragStartMouseX;
     const deltaY_px = event.clientY - dragStartMouseY;
-    const deltaX_mm = deltaX_px / MM_TO_PX;
-    const deltaY_mm = deltaY_px / MM_TO_PX;
+    const deltaX_mm = deltaX_px / currentMmToPx.value;
+    const deltaY_mm = deltaY_px / currentMmToPx.value;
     
     // Tentative position of primary element (rounded to 0.5mm)
     let newPrimaryX = Math.round((Number(dragStartElX) + deltaX_mm) * 2) / 2;
@@ -1133,31 +1138,31 @@ const handleDragMove = (event: MouseEvent) => {
             if (Math.abs(newPrimaryX - otherX) < SNAP_THRESHOLD_MM) {
                 newPrimaryX = otherX;
                 snappedX = true;
-                guides.push({ type: 'v', pos: otherX * MM_TO_PX });
+                guides.push({ type: 'v', pos: otherX * currentMmToPx.value });
             }
             // Right edge to Right edge
             else if (Math.abs((newPrimaryX + primaryW) - (otherX + otherW)) < SNAP_THRESHOLD_MM) {
                 newPrimaryX = otherX + otherW - primaryW;
                 snappedX = true;
-                guides.push({ type: 'v', pos: (otherX + otherW) * MM_TO_PX });
+                guides.push({ type: 'v', pos: (otherX + otherW) * currentMmToPx.value });
             }
             // Left edge to Right edge
             else if (Math.abs(newPrimaryX - (otherX + otherW)) < SNAP_THRESHOLD_MM) {
                 newPrimaryX = otherX + otherW;
                 snappedX = true;
-                guides.push({ type: 'v', pos: (otherX + otherW) * MM_TO_PX });
+                guides.push({ type: 'v', pos: (otherX + otherW) * currentMmToPx.value });
             }
             // Right edge to Left edge
             else if (Math.abs((newPrimaryX + primaryW) - otherX) < SNAP_THRESHOLD_MM) {
                 newPrimaryX = otherX - primaryW;
                 snappedX = true;
-                guides.push({ type: 'v', pos: otherX * MM_TO_PX });
+                guides.push({ type: 'v', pos: otherX * currentMmToPx.value });
             }
             // Center to Center
             else if (Math.abs((newPrimaryX + primaryW / 2) - (otherX + otherW / 2)) < SNAP_THRESHOLD_MM) {
                 newPrimaryX = otherX + otherW / 2 - primaryW / 2;
                 snappedX = true;
-                guides.push({ type: 'v', pos: (otherX + otherW / 2) * MM_TO_PX });
+                guides.push({ type: 'v', pos: (otherX + otherW / 2) * currentMmToPx.value });
             }
         }
         
@@ -1167,31 +1172,31 @@ const handleDragMove = (event: MouseEvent) => {
             if (Math.abs(newPrimaryY - otherY) < SNAP_THRESHOLD_MM) {
                 newPrimaryY = otherY;
                 snappedY = true;
-                guides.push({ type: 'h', pos: otherY * MM_TO_PX });
+                guides.push({ type: 'h', pos: otherY * currentMmToPx.value });
             }
             // Bottom edge to Bottom edge
             else if (Math.abs((newPrimaryY + primaryH) - (otherY + otherH)) < SNAP_THRESHOLD_MM) {
                 newPrimaryY = otherY + otherH - primaryH;
                 snappedY = true;
-                guides.push({ type: 'h', pos: (otherY + otherH) * MM_TO_PX });
+                guides.push({ type: 'h', pos: (otherY + otherH) * currentMmToPx.value });
             }
             // Top edge to Bottom edge
             else if (Math.abs(newPrimaryY - (otherY + otherH)) < SNAP_THRESHOLD_MM) {
                 newPrimaryY = otherY + otherH;
                 snappedY = true;
-                guides.push({ type: 'h', pos: (otherY + otherH) * MM_TO_PX });
+                guides.push({ type: 'h', pos: (otherY + otherH) * currentMmToPx.value });
             }
             // Bottom edge to Top edge
             else if (Math.abs((newPrimaryY + primaryH) - otherY) < SNAP_THRESHOLD_MM) {
                 newPrimaryY = otherY - primaryH;
                 snappedY = true;
-                guides.push({ type: 'h', pos: otherY * MM_TO_PX });
+                guides.push({ type: 'h', pos: otherY * currentMmToPx.value });
             }
             // Center to Center
             else if (Math.abs((newPrimaryY + primaryH / 2) - (otherY + otherH / 2)) < SNAP_THRESHOLD_MM) {
                 newPrimaryY = otherY + otherH / 2 - primaryH / 2;
                 snappedY = true;
-                guides.push({ type: 'h', pos: (otherY + otherH / 2) * MM_TO_PX });
+                guides.push({ type: 'h', pos: (otherY + otherH / 2) * currentMmToPx.value });
             }
         }
     }
@@ -2387,10 +2392,29 @@ const triggerPrint = (singleTruck?: Truck) => {
 onMounted(() => {
     loadVessels();
     document.addEventListener('keydown', handleKeyDown);
+    
+    // Resize observer for responsive canvas scaling without scrollbars
+    if (canvasContainerRef.value) {
+        resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                // Get width of parent container minus padding (p-4 is 16px padding on each side, total 32px)
+                const parentWidth = entry.contentRect.width;
+                const targetWidth = Math.min(840, parentWidth - 32);
+                if (targetWidth > 100) {
+                    canvasWidthPx.value = targetWidth;
+                    canvasHeightPx.value = targetWidth * 148 / 210;
+                }
+            }
+        });
+        resizeObserver.observe(canvasContainerRef.value);
+    }
 });
 
 onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyDown);
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+    }
 });
 </script>
 
@@ -3477,11 +3501,11 @@ onUnmounted(() => {
                                                     <div class="flex items-center gap-1">
                                                         <label class="select-none">Căn lề:</label>
                                                         <select 
-                                                            v-model="selectedElement.align" 
-                                                            @change="applyToAllSelected('align')"
-                                                            class="px-1.5 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary cursor-pointer font-bold"
-                                                        >
-                                                            <option value="left">Trái</option>
+                                                             v-model="selectedElement.align" 
+                                                             @change="applyToAllSelected('align')"
+                                                             class="px-1.5 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary cursor-pointer font-bold"
+                                                         > 
+<option value="left">Trái</option>
                                                             <option value="center">Giữa</option>
                                                             <option value="right">Phải</option>
                                                         </select>
@@ -3514,10 +3538,16 @@ onUnmounted(() => {
                                         </div>
                                         
                                         <!-- Canvas Container -->
-                                        <div class="w-full overflow-auto bg-gray-50 border border-gray-200 rounded-2xl p-4 flex justify-center items-center shadow-inner relative group">
+                                        <div ref="canvasContainerRef" class="w-full overflow-hidden bg-gray-50 border border-gray-200 rounded-2xl p-4 flex justify-center items-center shadow-inner relative group">
                                             <div 
                                                 class="relative bg-white border border-dashed border-gray-300 shadow-lg select-none overflow-hidden shrink-0"
-                                                style="width: 840px; height: 592px; box-sizing: content-box; background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px;"
+                                                :style="{
+                                                    width: canvasWidthPx + 'px',
+                                                    height: canvasHeightPx + 'px',
+                                                    boxSizing: 'content-box',
+                                                    backgroundImage: 'radial-gradient(circle, #e5e7eb 1px, transparent 1px)',
+                                                    backgroundSize: (20 * (canvasWidthPx / 840)) + 'px ' + (20 * (canvasWidthPx / 840)) + 'px'
+                                                }"
                                                 @mousedown="selectedElementId = null; selectedElementIds = []"
                                             >
                                                 <!-- Alignment Snap Guides -->
@@ -3540,11 +3570,11 @@ onUnmounted(() => {
                                                             : 'hover:ring-1 hover:ring-inset hover:ring-primary/50 z-20'
                                                     ]"
                                                     :style="{
-                                                        left: (el.x * MM_TO_PX) + 'px',
-                                                        top: (el.y * MM_TO_PX) + 'px',
-                                                        width: (el.width * MM_TO_PX) + 'px',
-                                                        height: (el.height * MM_TO_PX) + 'px',
-                                                        fontSize: (el.fontSize || 8.5) * 1.35 + 'px',
+                                                        left: (el.x * currentMmToPx) + 'px',
+                                                        top: (el.y * currentMmToPx) + 'px',
+                                                        width: (el.width * currentMmToPx) + 'px',
+                                                        height: (el.height * currentMmToPx) + 'px',
+                                                        fontSize: (el.fontSize || 8.5) * 1.35 * (currentMmToPx / 4) + 'px',
                                                         fontWeight: el.fontWeight || 'bold',
                                                         fontStyle: el.fontStyle || 'normal',
                                                         textAlign: el.align || 'left',
@@ -3559,7 +3589,7 @@ onUnmounted(() => {
                                                         <span 
                                                             class="text-gray-500 shrink-0 font-sans" 
                                                             style="font-weight: inherit;"
-                                                            :style="{ width: ((el.labelWidth || 20) * MM_TO_PX) + 'px' }"
+                                                            :style="{ width: ((el.labelWidth || 20) * currentMmToPx) + 'px' }"
                                                         >
                                                             {{ el.label }}
                                                         </span>
