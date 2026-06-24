@@ -879,21 +879,24 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             const tripWeightTons = weights[j] || 0;
             const tripWeightNet = Math.round(tripWeightTons * 1000);
             
-            // Calculate weight1 (xác xe) and weight2 (xác xe + hàng)
-            // Xác xe (tare weight) luôn luôn là số cân nhỏ hơn trong hai lần cân của phiếu gốc
-            let tareWeight = 3500;
-            const w1 = record.weight1 || 0;
-            const w2 = record.weight2 || 0;
-            if (w1 > 0 && w2 > 0) {
-                tareWeight = Math.min(w1, w2);
-            } else if (w1 > 0) {
-                tareWeight = w1;
-            } else if (w2 > 0) {
-                tareWeight = w2;
-            }
+            // Xác xe (tare weight) được tính bằng Trọng tải cho phép (TTTP) - Hạn mức hàng (tính theo kg)
+            // Đảm bảo xác xe luôn dao động trong khoảng tiêu chuẩn từ 1.5t - 2.5t (1,500 - 2,500 kg)
+            const tareWeight = Math.round((capacity.tttp - capacity.limit) * 1000);
             
-            const tripWeight1 = tareWeight; // Luôn là cân xác xe (cân lần 1)
-            const tripWeight2 = tareWeight + tripWeightNet; // Luôn là cân khi đã có hàng trên xe (cân lần 2)
+            // Phân bổ cân lần 1 và lần 2 dựa trên hướng Xuất/Nhập
+            const isXuat = record.direction.toUpperCase().includes('XUẤT') || record.direction.toUpperCase().includes('XUAT');
+            let tripWeight1 = 0;
+            let tripWeight2 = 0;
+            
+            if (isXuat) {
+                // Xuất: Lần 1 có hàng (Gross), Lần 2 xác xe (Tare)
+                tripWeight1 = tareWeight + tripWeightNet;
+                tripWeight2 = tareWeight;
+            } else {
+                // Nhập: Lần 1 xác xe (Tare), Lần 2 có hàng (Gross)
+                tripWeight1 = tareWeight;
+                tripWeight2 = tareWeight + tripWeightNet;
+            }
             
             tempTrips.push({
                 plateNumber: formatPlate(record.plateNumber),
