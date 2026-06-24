@@ -54,7 +54,12 @@ interface SplitTrip {
 
 // Local State
 const csvFile = ref<File | null>(null);
+const ticketFileInput = ref<HTMLInputElement | null>(null);
 const excelFile = ref<File | null>(null);
+
+function triggerTicketFileInput() {
+    ticketFileInput.value?.click();
+}
 const csvRecords = ref<CSVRecord[]>([]);
 const excelWorkbook = ref<any>(null); // ExcelJS Workbook
 const sheet1Vehicles = ref<Map<string, number>>(new Map()); // Normalized plate -> Capacity code
@@ -1077,70 +1082,35 @@ async function compileAndDownload() {
             </div>
         </div>
 
-        <!-- 2-Column File Upload Slots -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <!-- 1. CSV Actual weights Upload -->
-            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
-                <div class="flex items-center gap-2.5">
-                    <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-                        <span class="material-symbols-outlined text-base">receipt_long</span>
-                    </span>
-                    <div>
-                        <h4 class="text-xs font-black text-[#4a2c32]">1. Tải lên tệp Phiếu Cân Thực Tế</h4>
-                        <p class="text-[10px] text-gray-500">Định dạng .csv hoặc .xlsx chứa thông tin xe cân & tải trọng thực tế</p>
-                    </div>
-                </div>
-                
-                <label 
-                    class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
-                >
-                    <input type="file" accept=".csv,.xlsx" @change="handleTicketImport" class="hidden">
-                    <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
-                    <span class="text-xs font-bold text-[#4a2c32]">
-                        {{ csvFile ? csvFile.name : 'Chọn tệp phiếu cân (CSV hoặc Excel)' }}
-                    </span>
-                    <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingCSV">Đang đọc dữ liệu...</span>
-                    <span class="text-[10px] text-gray-400" v-else>
-                        {{ csvFile ? `${(csvFile.size / 1024).toFixed(1)} KB` : 'Nhấp để duyệt file hoặc kéo thả' }}
-                    </span>
-                </label>
-
-                <div v-if="csvRecords.length > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
-                    <span class="text-gray-500">Tổng cộng bản ghi hiện tại:</span>
-                    <span class="text-primary font-black">{{ csvRecords.length }} xe ({{ totalCsvWeightTons.toFixed(2) }} tấn)</span>
+        <!-- File Upload Slot (Sổ theo dõi gốc) -->
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+            <div class="flex items-center gap-2.5">
+                <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
+                    <span class="material-symbols-outlined text-base">table_chart</span>
+                </span>
+                <div>
+                    <h4 class="text-xs font-black text-[#4a2c32]">Tải lên tệp Sổ Theo Dõi Gốc</h4>
+                    <p class="text-[10px] text-gray-500">Định dạng .xlsx mẫu "SỐ THEO DÕI XẾP HÀNG HÓA.xlsx" để nạp cơ sở dữ liệu lịch sử xe</p>
                 </div>
             </div>
+            
+            <label 
+                class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
+            >
+                <input type="file" accept=".xlsx" @change="handleExcelUpload" class="hidden">
+                <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
+                <span class="text-xs font-bold text-[#4a2c32]">
+                    {{ excelFile ? excelFile.name : 'Chọn sổ theo dõi (.xlsx)' }}
+                </span>
+                <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingExcel">Đang nạp file...</span>
+                <span class="text-[10px] text-gray-400" v-else>
+                    {{ excelFile ? `${(excelFile.size / 1024).toFixed(1)} KB` : 'Nhấp để duyệt file hoặc kéo thả' }}
+                </span>
+            </label>
 
-            <!-- 2. Excel Workbook Upload -->
-            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
-                <div class="flex items-center gap-2.5">
-                    <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-                        <span class="material-symbols-outlined text-base">table_chart</span>
-                    </span>
-                    <div>
-                        <h4 class="text-xs font-black text-[#4a2c32]">2. Tải lên tệp Sổ Theo Dõi Gốc</h4>
-                        <p class="text-[10px] text-gray-500">Định dạng .xlsx mẫu "SỐ THEO DÕI XẾP HÀNG HÓA.xlsx"</p>
-                    </div>
-                </div>
-                
-                <label 
-                    class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
-                >
-                    <input type="file" accept=".xlsx" @change="handleExcelUpload" class="hidden">
-                    <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
-                    <span class="text-xs font-bold text-[#4a2c32]">
-                        {{ excelFile ? excelFile.name : 'Chọn sổ theo dõi (.xlsx)' }}
-                    </span>
-                    <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingExcel">Đang nạp file...</span>
-                    <span class="text-[10px] text-gray-400" v-else>
-                        {{ excelFile ? `${(excelFile.size / 1024).toFixed(1)} KB` : 'Nhấp để duyệt file hoặc kéo thả' }}
-                    </span>
-                </label>
-
-                <div v-if="sheet1Vehicles.size > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
-                    <span class="text-gray-500">Cơ sở dữ liệu lịch sử xe:</span>
-                    <span class="text-primary font-black">Đã nạp {{ sheet1Vehicles.size }} xe từ Sheet1</span>
-                </div>
+            <div v-if="sheet1Vehicles.size > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
+                <span class="text-gray-500">Cơ sở dữ liệu lịch sử xe:</span>
+                <span class="text-primary font-black">Đã nạp {{ sheet1Vehicles.size }} xe từ Sheet1</span>
             </div>
         </div>
 
@@ -1272,7 +1242,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div v-if="csvRecords.length > 0 || generatedTrips.length > 0" class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2">
@@ -1302,6 +1272,22 @@ async function compileAndDownload() {
 
                 <!-- Action buttons for Tab 1 (Source) -->
                 <div v-if="activeDataTab === 'source'" class="flex items-center gap-2">
+                    <!-- Hidden File Input for tickets -->
+                    <input 
+                        type="file" 
+                        ref="ticketFileInput" 
+                        accept=".csv,.xlsx" 
+                        @change="handleTicketImport" 
+                        class="hidden"
+                    >
+                    <button 
+                        @click="triggerTicketFileInput"
+                        class="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 text-[11px] font-bold rounded-[10px] hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center gap-1.5"
+                        :disabled="loadingCSV"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">upload_file</span>
+                        {{ loadingCSV ? 'Đang đọc...' : 'Import phiếu cân' }}
+                    </button>
                     <button 
                         @click="openAddTicketDialog"
                         class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
@@ -1354,7 +1340,7 @@ async function compileAndDownload() {
                     </div>
                     
                     <span class="text-[10px] font-bold text-gray-400">
-                        Đang hiển thị {{ filteredSourceTickets.length }} / {{ csvRecords.length }} phiếu cân
+                        Đang hiển thị {{ filteredSourceTickets.length }} / {{ csvRecords.length }} phiếu cân (Tổng: {{ totalCsvWeightTons.toFixed(2) }} tấn)
                     </span>
                 </div>
 
@@ -1411,7 +1397,7 @@ async function compileAndDownload() {
                             </tr>
                             <tr v-if="filteredSourceTickets.length === 0">
                                 <td colspan="9" class="p-8 text-center text-gray-400 italic">
-                                    Không tìm thấy phiếu cân nào khớp bộ lọc!
+                                    {{ csvRecords.length === 0 ? 'Chưa có phiếu cân nào. Vui lòng bấm "Import phiếu cân" hoặc "Thêm phiếu cân" để bắt đầu.' : 'Không tìm thấy phiếu cân nào khớp bộ lọc!' }}
                                 </td>
                             </tr>
                         </tbody>
