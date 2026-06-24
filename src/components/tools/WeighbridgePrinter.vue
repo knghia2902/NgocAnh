@@ -1505,7 +1505,15 @@ const addRectElement = () => {
     saveBargeConfig();
 };
 
-
+const isFieldEmpty = (fieldId?: string) => {
+    if (!fieldId) return false;
+    if (fieldId === 'goods') return !cfgForm.goods;
+    if (fieldId === 'goodsCode') return !cfgForm.goodsCode;
+    if (fieldId === 'owner') return !cfgForm.owner;
+    if (fieldId === 'operator') return !cfgForm.operator;
+    if (fieldId === 'xn') return !cfgForm.xn;
+    return false;
+};
 
 const getFieldValue = (fieldId: string, truck?: Truck) => {
     const sampleTruck = {
@@ -1537,6 +1545,7 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
         case 'note': return t.note || '-';
         case 'driver': return t.driver || '-';
         case 'goodsCode': return cfgForm.goodsCode || '-';
+        case 'operator': return cfgForm.operator || '-';
         case 'xn': {
             const val = cfgForm.xn || '';
             if (val.toUpperCase() === 'XUẤT KHẨU') return 'XUẤT';
@@ -3818,6 +3827,7 @@ onUnmounted(() => {
                                     <div 
                                         v-for="el in (cfgForm.printElements || [])" 
                                         :key="el.id"
+                                        v-show="el.type !== 'field' || !isFieldEmpty(el.fieldId)"
                                         class="print-element"
                                         :style="{
                                             position: 'absolute',
