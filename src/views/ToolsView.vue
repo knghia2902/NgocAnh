@@ -4,6 +4,7 @@ import FormatConverter from '../components/tools/FormatConverter.vue';
 import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
 import WeighbridgePrinter from '../components/tools/WeighbridgePrinter.vue';
+import CargoAllocator from '../components/tools/CargoAllocator.vue';
 
 const activeToolId = ref<string | null>(null);
 const weighbridgeRef = ref<any>(null);
@@ -32,6 +33,14 @@ const toolsList = [
     icon: 'print',
     bgIcon: 'bg-primary/10 text-primary',
     tags: ['Supabase Cloud', 'In A5', 'Excel Match']
+  },
+  {
+    id: 'allocator',
+    name: 'Phân Bổ Tải Trọng 🚛',
+    desc: 'Hỗ trợ phân rã tải trọng tổng hợp của phiếu cân gốc thành các chuyến xe ngẫu nhiên tự nhiên và xáo trộn giờ xuất bến khoa học.',
+    icon: 'shuffle',
+    bgIcon: 'bg-emerald-500/10 text-emerald-600',
+    tags: ['Excel', 'Thuật toán', 'Local Only']
   },
   {
     id: 'ocr',
@@ -212,6 +221,7 @@ const handleSidebarSwitch = (id: string) => {
             <FormatConverter v-if="activeToolId === 'converter'" />
             <ExcelMerger v-else-if="activeToolId === 'merger'" />
             <PdfOcrTools v-else-if="activeToolId === 'ocr'" />
+            <CargoAllocator v-else-if="activeToolId === 'allocator'" />
           </div>
         </main>
       </div>
