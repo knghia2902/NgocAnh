@@ -970,28 +970,72 @@ const selectedElement = computed(() => {
     return (cfgForm.printElements || []).find(el => el.id === selectedElementId.value) || null;
 });
 
+// Helper to clamp a single element
+const clampElement = (el: PrintElement) => {
+    let x = Number(el.x);
+    if (isNaN(x)) x = 0;
+    let y = Number(el.y);
+    if (isNaN(y)) y = 0;
+    let w = Number(el.width);
+    if (isNaN(w) || w <= 0) w = 10;
+    let h = Number(el.height);
+    if (isNaN(h) || h <= 0) h = 5;
+
+    // Clamp width/height to canvas dimensions
+    if (w > CANVAS_WIDTH_MM) w = CANVAS_WIDTH_MM;
+    if (h > CANVAS_HEIGHT_MM) h = CANVAS_HEIGHT_MM;
+
+    // Clamp X and Y to be within [0, CANVAS_WIDTH_MM - w]
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x + w > CANVAS_WIDTH_MM) {
+        x = CANVAS_WIDTH_MM - w;
+    }
+    if (y + h > CANVAS_HEIGHT_MM) {
+        y = CANVAS_HEIGHT_MM - h;
+    }
+
+    // Clamp labelWidth for fields
+    let lw = Number(el.labelWidth);
+    if (!isNaN(lw) && lw > w) {
+        el.labelWidth = w;
+    }
+
+    // Assign back
+    if (el.x !== x) el.x = x;
+    if (el.y !== y) el.y = y;
+    if (el.width !== w) el.width = w;
+    if (el.height !== h) el.height = h;
+};
+
+// Clamp active selected element (called on input events)
+const clampSelectedElement = (el: PrintElement | null) => {
+    if (!el) return;
+    clampElement(el);
+    saveBargeConfig();
+};
+
 // Watch and clamp all elements to stay within A5 paper bounds (210mm x 148mm)
-watch(() => cfgForm.printElements, (newElements) => {
-    if (!newElements) return;
-    newElements.forEach(el => {
-        const elW = el.width || 10;
-        const elH = el.height || 5;
-        
-        // Clamp width and height
-        if (el.width > CANVAS_WIDTH_MM) el.width = CANVAS_WIDTH_MM;
-        if (el.height > CANVAS_HEIGHT_MM) el.height = CANVAS_HEIGHT_MM;
-        
-        // Clamp positions to stay inside
-        if (el.x < 0) el.x = 0;
-        if (el.y < 0) el.y = 0;
-        if (el.x + elW > CANVAS_WIDTH_MM) {
-            el.x = CANVAS_WIDTH_MM - elW;
-        }
-        if (el.y + elH > CANVAS_HEIGHT_MM) {
-            el.y = CANVAS_HEIGHT_MM - elH;
+watch(() => JSON.stringify(cfgForm.printElements), () => {
+    if (!cfgForm.printElements) return;
+    let modified = false;
+    cfgForm.printElements.forEach(el => {
+        const oldX = el.x;
+        const oldY = el.y;
+        const oldW = el.width;
+        const oldH = el.height;
+        const oldLw = el.labelWidth;
+
+        clampElement(el);
+
+        if (el.x !== oldX || el.y !== oldY || el.width !== oldW || el.height !== oldH || el.labelWidth !== oldLw) {
+            modified = true;
         }
     });
-}, { deep: true });
+    if (modified) {
+        saveBargeConfig();
+    }
+});
 
 const availableFields = [
     { id: 'ticketNo', label: 'Số phiếu' },
@@ -3206,6 +3250,7 @@ onUnmounted(() => {
                                                         step="0.5" 
                                                         min="0" 
                                                         max="210" 
+                                                        @input="clampSelectedElement(selectedElement)"
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3220,6 +3265,7 @@ onUnmounted(() => {
                                                         step="0.5" 
                                                         min="0" 
                                                         max="148" 
+                                                        @input="clampSelectedElement(selectedElement)"
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3233,6 +3279,7 @@ onUnmounted(() => {
                                                         type="number" 
                                                         step="0.5" 
                                                         min="0.5" 
+                                                        @input="clampSelectedElement(selectedElement)"
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3243,6 +3290,7 @@ onUnmounted(() => {
                                                         type="number" 
                                                         step="0.5" 
                                                         min="0.5" 
+                                                        @input="clampSelectedElement(selectedElement)"
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3274,6 +3322,7 @@ onUnmounted(() => {
                                                             type="number" 
                                                             step="0.5" 
                                                             min="1" 
+                                                            @input="clampSelectedElement(selectedElement)"
                                                             class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                         />
                                                     </div>
@@ -3376,7 +3425,7 @@ onUnmounted(() => {
                                         <div class="flex items-center justify-between">
                                             <span class="text-xs font-bold text-[#4a2c32] flex items-center gap-1 select-none">
                                                 <span class="material-symbols-outlined text-sm">square_foot</span>
-                                                Khổ giấy in A5 (200mm x 138mm) - Kéo thả để bố trí layout
+                                                Khổ giấy in A5 (210mm x 148mm) - Kéo thả để bố trí layout
                                             </span>
                                             <span class="text-[9px] font-bold text-gray-400 select-none">Tỉ lệ 1mm = 4px | Dùng phím mũi tên để căn chỉnh mịn</span>
                                         </div>
