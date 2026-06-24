@@ -1532,19 +1532,19 @@ async function compileAndDownload() {
 
                 <!-- Stats summary badges for Tab 2 (Template / Phân bổ) -->
                 <div v-if="activeDataTab === 'template'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
-                    <div v-if="existingTrips.length > 0" class="px-2.5 py-1.5 bg-gray-50 rounded-[12px] border border-primary/5">
+                    <div v-if="existingTrips.length > 0" class="h-7 px-2.5 bg-gray-50 rounded-[8px] border border-primary/5 flex items-center">
                         Dòng bắt đầu: từ dòng số {{ nextSTT }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-primary">
+                    <div class="h-7 px-2.5 bg-primary/10 rounded-[8px] border border-transparent text-primary flex items-center">
                         Số chuyến: {{ generatedTrips.length }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-teal-700">
+                    <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center">
                         KL phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
                     </div>
                     <button 
                         @click="compileAndDownload"
                         :disabled="generatedTrips.length === 0 || compiling"
-                        class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                        class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <span v-if="compiling" class="material-symbols-outlined text-[14px] animate-spin">sync</span>
                         <span v-else class="material-symbols-outlined text-[14px]">download</span>
@@ -1554,16 +1554,16 @@ async function compileAndDownload() {
 
                 <!-- Stats summary badges for Tab 3 (Generated / Theo dõi) -->
                 <div v-if="activeDataTab === 'generated'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
-                    <div class="px-2.5 py-1.5 bg-primary/10 rounded-[12px] text-primary">
+                    <div class="h-7 px-2.5 bg-primary/10 rounded-[8px] border border-transparent text-primary flex items-center">
                         Số chuyến: {{ generatedTrips.length }}
                     </div>
-                    <div class="px-2.5 py-1.5 bg-teal-50 rounded-[12px] border border-teal-200 text-teal-700">
+                    <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center">
                         KL phân bổ: {{ totalSplitWeightTons.toFixed(2) }}t
                     </div>
                     <button 
                         @click="compileAndDownload"
                         :disabled="generatedTrips.length === 0 || compiling"
-                        class="px-3 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[10px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                        class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <span v-if="compiling" class="material-symbols-outlined text-[14px] animate-spin">sync</span>
                         <span v-else class="material-symbols-outlined text-[14px]">download</span>
