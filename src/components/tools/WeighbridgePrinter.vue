@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { authStore } from '@/stores/auth';
 import { excelService } from '@/services/excel/ExcelService';
 import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig, type PrintElement } from '@/services/excel/WeighbridgeService';
@@ -2392,23 +2392,33 @@ const triggerPrint = (singleTruck?: Truck) => {
 onMounted(() => {
     loadVessels();
     document.addEventListener('keydown', handleKeyDown);
-    
-    // Resize observer for responsive canvas scaling without scrollbars
-    if (canvasContainerRef.value) {
-        resizeObserver = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                // Get width of parent container minus padding (p-4 is 16px padding on each side, total 32px)
-                const parentWidth = entry.contentRect.width;
-                const targetWidth = Math.min(840, parentWidth - 32);
-                if (targetWidth > 100) {
-                    canvasWidthPx.value = targetWidth;
-                    canvasHeightPx.value = targetWidth * 148 / 210;
-                }
-            }
-        });
-        resizeObserver.observe(canvasContainerRef.value);
-    }
 });
+
+// Watch activeTab to dynamically register/deregister ResizeObserver when entering/leaving config tab
+watch(activeTab, async (newTab) => {
+    if (newTab === 'config') {
+        await nextTick();
+        if (canvasContainerRef.value && !resizeObserver) {
+            resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    // Get width of parent container minus padding (p-4 is 16px padding on each side, total 32px)
+                    const parentWidth = entry.contentRect.width;
+                    const targetWidth = Math.min(840, parentWidth - 32);
+                    if (targetWidth > 100) {
+                        canvasWidthPx.value = targetWidth;
+                        canvasHeightPx.value = targetWidth * 148 / 210;
+                    }
+                }
+            });
+            resizeObserver.observe(canvasContainerRef.value);
+        }
+    } else {
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+            resizeObserver = null;
+        }
+    }
+}, { immediate: true });
 
 onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyDown);
