@@ -1624,7 +1624,7 @@ async function compileAndDownload() {
                                     {{ (sourceCurrentPage - 1) * itemsPerPage + idx + 1 }}
                                 </td>
                                 <td class="p-3 font-semibold text-gray-500">{{ ticket.ticketNo }}</td>
-                                <td class="p-3 font-bold text-gray-900">{{ formatPlate(ticket.plateNumber) }}</td>
+                                <td class="p-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(ticket.plateNumber) }}</td>
                                 <td class="p-3 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
                                 <td class="p-3 text-right font-black text-primary">{{ ticket.weightNet.toLocaleString() }}</td>
                                 <td class="p-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeInStr }} {{ ticket.dateInStr }}</td>
@@ -1736,7 +1736,7 @@ async function compileAndDownload() {
                                 </td>
                                 <td class="p-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
                                 <td class="p-3 font-bold text-gray-900 flex items-center gap-2">
-                                    <span>{{ trip.plateNumber }}</span>
+                                    <span class="whitespace-nowrap">{{ trip.plateNumber }}</span>
                                     <span 
                                         class="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-black border border-primary/20 uppercase tracking-wide select-none"
                                     >
@@ -1851,7 +1851,7 @@ async function compileAndDownload() {
                                 class="hover:bg-gray-50 transition-colors"
                             >
                                 <td class="p-2 font-bold text-gray-800">{{ trip.ticketNo }}</td>
-                                <td class="p-2 font-bold text-gray-900">{{ trip.plateNumber }}</td>
+                                <td class="p-2 font-bold text-gray-900 whitespace-nowrap">{{ trip.plateNumber }}</td>
                                 <td class="p-2 max-w-[150px] truncate text-gray-500" :title="trip.customer">{{ trip.customer }}</td>
                                 <td class="p-2 text-right font-mono text-gray-600">{{ trip.weight1.toLocaleString() }}</td>
                                 <td class="p-2 text-right font-mono text-gray-600">{{ trip.weight2.toLocaleString() }}</td>
