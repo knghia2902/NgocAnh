@@ -63,11 +63,26 @@ const loadingCSV = ref(false);
 const compiling = ref(false);
 
 // Capacity configuration standards
+const standardCapacityLimit = ref(10.0);
+const standardTTTPLimit = ref(10.8);
+
 const capacityConfigs = ref<Record<number, CapacityConfig>>({
     108: { code: 108, tttp: 10.8, limit: 10.0 },
     107: { code: 107, tttp: 10.7, limit: 10.0 },
     97: { code: 97, tttp: 9.7, limit: 10.0 }
 });
+
+watch(standardCapacityLimit, (newVal) => {
+    if (capacityConfigs.value[108]) capacityConfigs.value[108]!.limit = newVal || 10.0;
+    if (capacityConfigs.value[107]) capacityConfigs.value[107]!.limit = newVal || 10.0;
+    if (capacityConfigs.value[97]) capacityConfigs.value[97]!.limit = newVal || 10.0;
+}, { immediate: true });
+
+watch(standardTTTPLimit, (newVal) => {
+    if (capacityConfigs.value[108]) capacityConfigs.value[108]!.tttp = newVal || 10.8;
+    if (capacityConfigs.value[107]) capacityConfigs.value[107]!.tttp = newVal || 10.8;
+    if (capacityConfigs.value[97]) capacityConfigs.value[97]!.tttp = newVal || 10.8;
+}, { immediate: true });
 
 // Configs for new vehicles not found in DB
 const newVehicles = ref<NewVehicleConfig[]>([]);
@@ -801,8 +816,6 @@ async function compileAndDownload() {
                     <thead>
                         <tr class="bg-amber-50/70 text-amber-850 font-bold border-b border-amber-100">
                             <th class="p-2.5 font-bold">Biển số</th>
-                            <th class="p-2.5 font-bold">Mã Tải Trọng lịch sử (Khuyên dùng)</th>
-                            <th class="p-2.5 font-bold text-center">Cấu hình thủ công</th>
                             <th class="p-2.5 font-bold text-center">TTTP (tấn)</th>
                             <th class="p-2.5 font-bold text-center">Hạn mức hàng (tấn)</th>
                         </tr>
@@ -810,38 +823,22 @@ async function compileAndDownload() {
                     <tbody class="divide-y divide-gray-150 text-gray-700">
                         <tr v-for="veh in newVehicles" :key="veh.plateNumber" class="hover:bg-amber-50/20">
                             <td class="p-2.5 font-bold text-[#4a2c32]">{{ formatPlate(veh.plateNumber) }}</td>
-                            <td class="p-2.5">
-                                <select 
-                                    v-model="veh.capacityCode" 
-                                    :disabled="veh.isCustom"
-                                    class="px-3 py-1.5 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer"
-                                >
-                                    <option :value="108">108 (TTTP 10.8t / Hàng 10.0t)</option>
-                                    <option :value="107">107 (TTTP 10.7t / Hàng 10.0t)</option>
-                                    <option :value="97">97 (TTTP 9.7t / Hàng 10.0t)</option>
-                                </select>
-                            </td>
-                            <td class="p-2.5 text-center">
-                                <input type="checkbox" v-model="veh.isCustom" class="size-3.5 accent-primary rounded cursor-pointer">
-                            </td>
                             <td class="p-2.5 text-center">
                                 <input 
                                     type="number" 
                                     v-model.number="veh.customTTTP" 
-                                    :disabled="!veh.isCustom"
                                     placeholder="10.8" 
                                     step="0.1" 
-                                    class="w-20 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center disabled:opacity-50"
+                                    class="w-24 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center"
                                 >
                             </td>
                             <td class="p-2.5 text-center">
                                 <input 
                                     type="number" 
                                     v-model.number="veh.customLimit" 
-                                    :disabled="!veh.isCustom"
                                     placeholder="10.0" 
                                     step="0.1" 
-                                    class="w-20 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center disabled:opacity-50"
+                                    class="w-24 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center"
                                 >
                             </td>
                         </tr>
@@ -906,21 +903,26 @@ async function compileAndDownload() {
                     <span class="material-symbols-outlined text-base">shield</span>
                     Hạn mức tải trọng tiêu chuẩn
                 </h4>
-                <p class="text-[10px] text-gray-500 -mt-2">Chỉnh sửa trực tiếp hạn mức hàng hóa tối đa cho các mã xe:</p>
+                <p class="text-[10px] text-gray-500 -mt-2">Cấu hình tải trọng tiêu chuẩn áp dụng khi chia tải:</p>
 
                 <div class="flex flex-col gap-3">
-                    <div v-for="cfg in capacityConfigs" :key="cfg.code" class="flex items-center justify-between p-2.5 rounded-[12px] border border-gray-100 bg-gray-50/50 text-xs">
-                        <span class="font-extrabold text-gray-700">Mã {{ cfg.code }}</span>
-                        <div class="flex items-center gap-2">
-                            <div class="flex flex-col items-center">
-                                <span class="text-[8px] text-gray-400 uppercase font-black">TTTP (t)</span>
-                                <input type="number" v-model.number="cfg.tttp" step="0.1" class="w-12 px-1 text-center bg-transparent border-b border-gray-200 text-xs font-bold focus:outline-none focus:border-primary">
-                            </div>
-                            <div class="flex flex-col items-center">
-                                <span class="text-[8px] text-gray-400 uppercase font-black">Hàng (t)</span>
-                                <input type="number" v-model.number="cfg.limit" step="0.1" class="w-12 px-1 text-center bg-transparent border-b border-gray-200 text-xs font-bold text-primary focus:outline-none focus:border-primary">
-                            </div>
-                        </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn mức hàng tiêu chuẩn (tấn)</label>
+                        <input 
+                            type="number" 
+                            v-model.number="standardCapacityLimit" 
+                            step="0.1"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép tiêu chuẩn (tấn)</label>
+                        <input 
+                            type="number" 
+                            v-model.number="standardTTTPLimit" 
+                            step="0.1"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
                     </div>
                 </div>
             </div>
