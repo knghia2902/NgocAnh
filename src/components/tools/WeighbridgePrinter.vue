@@ -3606,7 +3606,7 @@ onUnmounted(() => {
                                                         <span class="mr-1 shrink-0 font-sans">:</span>
                                                         <span 
                                                             class="grow font-sans truncate"
-                                                            :style="{ fontWeight: el.fontWeight === 'bold' || el.fontWeight === 'black' ? 'inherit' : 'bold' }"
+                                                            style="font-weight: inherit;"
                                                         >
                                                             [{{ el.fieldId }}]
                                                         </span>
@@ -3817,7 +3817,7 @@ onUnmounted(() => {
                         <div v-if="el.type === 'field'" style="display: flex; align-items: baseline; width: 100%; height: 100%; overflow: hidden;">
                             <span style="flex-shrink: 0; font-weight: inherit;" :style="{ width: (el.labelWidth || 20) + 'mm' }">{{ el.label }}</span>
                             <span style="flex-shrink: 0; margin-right: 1mm;">:</span>
-                            <span style="flex-grow: 1;" :style="{ fontWeight: el.fontWeight === 'bold' || el.fontWeight === 'black' ? 'inherit' : 'bold' }">
+                            <span style="flex-grow: 1; font-weight: inherit;">
                                 {{ getFieldValue(el.fieldId!, truck) }}
                             </span>
                         </div>
