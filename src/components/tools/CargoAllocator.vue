@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
+import { supabase } from '@/supabase';
 
 const { addToast } = useToast();
 
@@ -468,6 +469,7 @@ function mergeTickets(newRecords: CSVRecord[]) {
     });
     
     csvRecords.value = currentList;
+    saveTicketsToSupabase();
 }
 
 // CRUD State & Functions
@@ -561,12 +563,14 @@ function saveTicket() {
     
     csvRecords.value = currentList;
     showTicketDialog.value = false;
+    saveTicketsToSupabase();
 }
 
 function deleteTicket(ticket: CSVRecord) {
     if (confirm(`Bạn có chắc chắn muốn xóa phiếu cân ${ticket.ticketNo || ticket.plateNumber} không?`)) {
         csvRecords.value = csvRecords.value.filter(t => t.id !== ticket.id);
         addToast('Đã xóa phiếu cân!', 'info');
+        saveTicketsToSupabase();
     }
 }
 
@@ -576,6 +580,7 @@ function clearAllTickets() {
         csvRecords.value = [];
         csvFile.value = null;
         addToast('Đã xóa sạch danh sách phiếu cân!', 'info');
+        saveTicketsToSupabase();
     }
 }
 
@@ -607,6 +612,67 @@ watch(sourceSearchQuery, () => {
     sourceCurrentPage.value = 1;
 });
 
+const syncStatus = ref<'synced' | 'saving' | 'error'>('synced');
+
+async function loadTicketsFromSupabase() {
+    try {
+        const { data, error } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+        if (error) throw error;
+        
+        if (data?.settings && data.settings.allocator_tickets) {
+            const remoteTickets = data.settings.allocator_tickets;
+            if (Array.isArray(remoteTickets)) {
+                const localJSON = JSON.stringify(csvRecords.value);
+                const remoteJSON = JSON.stringify(remoteTickets);
+                if (localJSON !== remoteJSON) {
+                    csvRecords.value = remoteTickets;
+                    await dbContext.set('allocator_tickets', remoteTickets);
+                }
+                syncStatus.value = 'synced';
+            }
+        }
+    } catch (e) {
+        console.warn('Lỗi khi tải danh sách phiếu cân từ Supabase:', e);
+        syncStatus.value = 'error';
+    }
+}
+
+async function saveTicketsToSupabase() {
+    syncStatus.value = 'saving';
+    try {
+        const { data: current, error: fetchError } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+        
+        if (fetchError) throw fetchError;
+        
+        const currentSettings = current?.settings || {};
+        const updatedSettings = {
+            ...currentSettings,
+            allocator_tickets: csvRecords.value
+        };
+
+        const { error: updateError } = await supabase
+            .from('content')
+            .update({ settings: updatedSettings })
+            .eq('id', 'main');
+
+        if (updateError) throw updateError;
+        
+        syncStatus.value = 'synced';
+    } catch (e) {
+        console.error('Lỗi khi lưu danh sách phiếu cân lên Supabase:', e);
+        syncStatus.value = 'error';
+        addToast('Lỗi đồng bộ dữ liệu đám mây!', 'error');
+    }
+}
+
 // Mounted hook to load settings and tickets from IndexedDB
 onMounted(async () => {
     try {
@@ -628,6 +694,9 @@ onMounted(async () => {
         if (saved && Array.isArray(saved)) {
             csvRecords.value = saved;
         }
+
+        // Đồng bộ dữ liệu từ đám mây
+        await loadTicketsFromSupabase();
     } catch (e) {
         console.error('Lỗi khi nạp dữ liệu từ IndexedDB:', e);
     }
@@ -1137,7 +1206,7 @@ async function compileAndDownload() {
         <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <button 
                         @click="activeDataTab = 'source'"
                         :class="[
@@ -1160,6 +1229,19 @@ async function compileAndDownload() {
                     >
                         2. Kết quả phân bổ tải trọng ({{ generatedTrips.length }})
                     </button>
+
+                    <!-- Cloud Sync Indicator -->
+                    <div class="flex items-center gap-1.5 ml-2 border-l border-gray-200 pl-3">
+                        <span v-if="syncStatus === 'saving'" class="text-[10px] font-medium text-gray-400 flex items-center gap-0.5 select-none">
+                            <span class="material-symbols-outlined text-xs animate-spin">sync</span> Đang đồng bộ...
+                        </span>
+                        <span v-else-if="syncStatus === 'synced'" class="text-[10px] font-medium text-teal-500 flex items-center gap-0.5 select-none" title="Đã lưu đồng bộ lên đám mây">
+                            <span class="material-symbols-outlined text-xs">cloud_done</span> Đã đồng bộ đám mây
+                        </span>
+                        <span v-else-if="syncStatus === 'error'" class="text-[10px] font-medium text-red-500 flex items-center gap-0.5 cursor-pointer hover:underline select-none" @click="saveTicketsToSupabase" title="Lỗi đồng bộ. Bấm để thử lại.">
+                            <span class="material-symbols-outlined text-xs">cloud_off</span> Lỗi đồng bộ (Thử lại)
+                        </span>
+                    </div>
                 </div>
 
                 <!-- Action buttons for Tab 1 (Source) -->
