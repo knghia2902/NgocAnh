@@ -538,6 +538,23 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
     // Load config of active barge
     if (activeBarge.value) {
         const cfg = activeBarge.value.config || {};
+
+        // Load default layout or company details if not set in config
+        let savedDefaultElements: PrintElement[] | null = null;
+        let savedCompanyDetails: any = null;
+        try {
+            const savedStr = localStorage.getItem('weighbridge_default_layout');
+            if (savedStr) {
+                savedDefaultElements = JSON.parse(savedStr);
+            }
+            const savedDetailsStr = localStorage.getItem('weighbridge_default_company_details');
+            if (savedDetailsStr) {
+                savedCompanyDetails = JSON.parse(savedDetailsStr);
+            }
+        } catch (e) {
+            console.error('Error reading default print layout from localStorage:', e);
+        }
+
         cfgForm.goods = cfg.goods || '';
         cfgForm.goodsCode = cfg.goodsCode || '';
         cfgForm.owner = cfg.owner || '';
@@ -550,12 +567,12 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.ketluan = cfg.ketluan || 'Chính phẩm đạt tiêu chuẩn';
         cfgForm.locked = cfg.locked || false;
         cfgForm.printFields = cfg.printFields || getDefaultPrintFields();
-        cfgForm.printElements = (cfg.printElements || getDefaultPrintElements()).filter(el => !['lineHeader', 'lineTitle', 'lineFooter'].includes(el.id));
-        cfgForm.companyName = cfg.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
-        cfgForm.companyAddress = cfg.companyAddress || 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam';
-        cfgForm.companyPhone = cfg.companyPhone || 'ĐT: 0964 258 671 / Fax:';
-        cfgForm.ticketTitle = cfg.ticketTitle || 'PHIẾU CÂN XE';
-        cfgForm.signatures = cfg.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'];
+        cfgForm.printElements = (cfg.printElements || savedDefaultElements || getDefaultPrintElements()).filter(el => !['lineHeader', 'lineTitle', 'lineFooter'].includes(el.id));
+        cfgForm.companyName = cfg.companyName || savedCompanyDetails?.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
+        cfgForm.companyAddress = cfg.companyAddress || savedCompanyDetails?.companyAddress || 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam';
+        cfgForm.companyPhone = cfg.companyPhone || savedCompanyDetails?.companyPhone || 'ĐT: 0964 258 671 / Fax:';
+        cfgForm.ticketTitle = cfg.ticketTitle || savedCompanyDetails?.ticketTitle || 'PHIẾU CÂN XE';
+        cfgForm.signatures = cfg.signatures || savedCompanyDetails?.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'];
 
         // Fetch trucks
         loading.value = true;
@@ -727,6 +744,18 @@ const saveBargeConfig = () => {
     if (!bargeId) return;
     if (cfgForm.locked) return; // Prevent auto-saving when locked
     
+    // Save to local backup immediately
+    try {
+        localStorage.setItem('weighbridge_default_layout', JSON.stringify(cfgForm.printElements));
+        localStorage.setItem('weighbridge_default_company_details', JSON.stringify({
+            companyName: cfgForm.companyName,
+            companyAddress: cfgForm.companyAddress,
+            companyPhone: cfgForm.companyPhone,
+            ticketTitle: cfgForm.ticketTitle,
+            signatures: cfgForm.signatures
+        }));
+    } catch (e) {}
+
     if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
         saving.value = true;
@@ -735,7 +764,7 @@ const saveBargeConfig = () => {
             if (success) {
                 // Update local model
                 if (activeBarge.value) {
-                    activeBarge.value.config = { ...cfgForm };
+                    activeBarge.value.config = { ...cfgForm, updatedAt: Date.now() };
                 }
             }
         } catch (e) {
@@ -759,10 +788,22 @@ const saveBargeConfigImmediately = async () => {
     
     saving.value = true;
     try {
+        // Save to local backup
+        try {
+            localStorage.setItem('weighbridge_default_layout', JSON.stringify(cfgForm.printElements));
+            localStorage.setItem('weighbridge_default_company_details', JSON.stringify({
+                companyName: cfgForm.companyName,
+                companyAddress: cfgForm.companyAddress,
+                companyPhone: cfgForm.companyPhone,
+                ticketTitle: cfgForm.ticketTitle,
+                signatures: cfgForm.signatures
+            }));
+        } catch (e) {}
+
         const success = await WeighbridgeService.updateBargeConfig(bargeId, { ...cfgForm });
         if (success) {
             if (activeBarge.value) {
-                activeBarge.value.config = { ...cfgForm };
+                activeBarge.value.config = { ...cfgForm, updatedAt: Date.now() };
             }
             showToast('Đã lưu cấu hình mẫu phiếu thành công!');
         } else {
@@ -787,13 +828,13 @@ const toggleBargeLock = async () => {
         if (success) {
             cfgForm.locked = newLockState;
             if (activeBarge.value) {
-                activeBarge.value.config = { ...cfgForm };
+                activeBarge.value.config = { ...cfgForm, locked: newLockState, updatedAt: Date.now() };
             }
             // Update in local vessels list
             vessels.value.forEach(v => {
                 const b = v.barges?.find(barge => barge.id === bargeId);
                 if (b) {
-                    b.config = { ...cfgForm };
+                    b.config = { ...cfgForm, locked: newLockState, updatedAt: Date.now() };
                 }
             });
             showToast(cfgForm.locked ? 'Đã khóa sà lan thành công! 🔒' : 'Đã mở khóa sà lan thành công! 🔓');
@@ -806,6 +847,116 @@ const toggleBargeLock = async () => {
     } finally {
         saving.value = false;
     }
+};
+
+const otherBargesWithConfig = computed(() => {
+    const list: { id: number; name: string; vesselName: string }[] = [];
+    vessels.value.forEach(v => {
+        v.barges?.forEach(b => {
+            if (b.id !== activeBargeId.value && b.config?.printElements && b.config.printElements.length > 0) {
+                list.push({
+                    id: b.id,
+                    name: b.name,
+                    vesselName: v.name
+                });
+            }
+        });
+    });
+    return list;
+});
+
+const saveAsGlobalDefaultLayout = () => {
+    try {
+        localStorage.setItem('weighbridge_default_layout', JSON.stringify(cfgForm.printElements));
+        localStorage.setItem('weighbridge_default_company_details', JSON.stringify({
+            companyName: cfgForm.companyName,
+            companyAddress: cfgForm.companyAddress,
+            companyPhone: cfgForm.companyPhone,
+            ticketTitle: cfgForm.ticketTitle,
+            signatures: cfgForm.signatures
+        }));
+        showToast('Đã lưu thiết kế hiện tại làm mẫu mặc định thành công! ⭐');
+    } catch (e) {
+        console.error(e);
+        showToast('Lỗi lưu mẫu in mặc định!', 'error');
+    }
+};
+
+const applyLayoutToAllBarges = async () => {
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể thực hiện thao tác này.', 'error');
+        return;
+    }
+
+    const confirmApply = confirm('Bạn có chắc chắn muốn áp dụng thiết kế mẫu in hiện tại cho TẤT CẢ sà lan khác trên hệ thống? Thiết kế cũ của các sà lan khác sẽ bị ghi đè.');
+    if (!confirmApply) return;
+
+    saving.value = true;
+    try {
+        saveAsGlobalDefaultLayout();
+
+        const updatePromises: Promise<boolean>[] = [];
+        vessels.value.forEach(v => {
+            if (v.barges) {
+                v.barges.forEach(b => {
+                    const updatedConfig = {
+                        ...b.config,
+                        printElements: JSON.parse(JSON.stringify(cfgForm.printElements)),
+                        companyName: cfgForm.companyName,
+                        companyAddress: cfgForm.companyAddress,
+                        companyPhone: cfgForm.companyPhone,
+                        ticketTitle: cfgForm.ticketTitle,
+                        signatures: [...(cfgForm.signatures || [])],
+                        updatedAt: Date.now()
+                    };
+                    b.config = updatedConfig;
+                    updatePromises.push(WeighbridgeService.updateBargeConfig(b.id, updatedConfig));
+                });
+            }
+        });
+
+        const results = await Promise.all(updatePromises);
+        const successCount = results.filter(r => r).length;
+        showToast(`Đã áp dụng mẫu in cho ${successCount} sà lan thành công! 🚢`);
+    } catch (e) {
+        console.error('Error applying layout to all barges:', e);
+        showToast('Lỗi khi áp dụng mẫu in cho tất cả sà lan!', 'error');
+    } finally {
+        saving.value = false;
+    }
+};
+
+const copyLayoutFromBarge = (fromBargeId: number) => {
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể thay đổi thiết kế.', 'error');
+        return;
+    }
+
+    let sourceBarge: Barge | null = null;
+    for (const v of vessels.value) {
+        const b = v.barges?.find(b => b.id === fromBargeId);
+        if (b) {
+            sourceBarge = b;
+            break;
+        }
+    }
+
+    if (!sourceBarge || !sourceBarge.config) {
+        showToast('Không tìm thấy dữ liệu sà lan nguồn!', 'error');
+        return;
+    }
+
+    const cfg = sourceBarge.config;
+    cfgForm.printElements = JSON.parse(JSON.stringify(cfg.printElements || getDefaultPrintElements()));
+    cfgForm.printFields = JSON.parse(JSON.stringify(cfg.printFields || getDefaultPrintFields()));
+    cfgForm.companyName = cfg.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
+    cfgForm.companyAddress = cfg.companyAddress || 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam';
+    cfgForm.companyPhone = cfg.companyPhone || 'ĐT: 0964 258 671 / Fax:';
+    cfgForm.ticketTitle = cfg.ticketTitle || 'PHIẾU CÂN XE';
+    cfgForm.signatures = cfg.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'];
+
+    showToast(`Đã sao chép thiết kế từ sà lan "${sourceBarge.name}"! Nhớ nhấn Lưu để áp dụng.`);
+    saveBargeConfig();
 };
 
 // Visual Page Designer State
@@ -2886,6 +3037,26 @@ onUnmounted(() => {
                                                     </option>
                                                 </select>
                                             </div>
+
+                                            <div v-if="otherBargesWithConfig.length > 0" class="flex flex-col gap-1 mt-2.5">
+                                                <label class="text-[10px] font-bold text-gray-500 select-none">Sao chép thiết kế từ sà lan khác:</label>
+                                                <select 
+                                                    @change="(e) => {
+                                                        const target = e.target as HTMLSelectElement;
+                                                        if (target.value) {
+                                                            copyLayoutFromBarge(Number(target.value));
+                                                            target.value = '';
+                                                        }
+                                                    }"
+                                                    :disabled="cfgForm.locked"
+                                                    class="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] font-bold focus:outline-none focus:border-primary cursor-pointer w-full"
+                                                >
+                                                    <option value="">-- Chọn sà lan để sao chép --</option>
+                                                    <option v-for="b in otherBargesWithConfig" :key="b.id" :value="b.id">
+                                                        {{ b.vesselName }} - {{ b.name }}
+                                                    </option>
+                                                </select>
+                                            </div>
                                         </div>
 
                                         <!-- Selected Element Config Panel -->
@@ -3186,15 +3357,37 @@ onUnmounted(() => {
                                 </div>
                             </div>
                             
-                            <div class="flex justify-end pt-2">
-                                <button 
-                                    @click="saveBargeConfigImmediately" 
-                                    :disabled="cfgForm.locked"
-                                    class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-[8px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
-                                >
-                                    <span class="material-symbols-outlined text-sm">save</span>
-                                    Lưu cấu hình mẫu phiếu
-                                </button>
+                            <div class="flex flex-col gap-2 pt-2 border-t border-primary/5 mt-2">
+                                <div class="flex flex-wrap gap-2 justify-end">
+                                    <button 
+                                        @click="saveAsGlobalDefaultLayout"
+                                        title="Lưu mẫu thiết kế hiện tại làm mẫu mặc định cho các sà lan khác"
+                                        class="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-[10px] rounded-[8px] transition-all flex items-center gap-1"
+                                    >
+                                        <span class="material-symbols-outlined text-xs">star</span>
+                                        Đặt làm mẫu mặc định
+                                    </button>
+                                    <button 
+                                        @click="applyLayoutToAllBarges"
+                                        :disabled="cfgForm.locked"
+                                        title="Áp dụng thiết kế hiện tại cho tất cả sà lan trên toàn hệ thống"
+                                        class="px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] rounded-[8px] transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span class="material-symbols-outlined text-xs">done_all</span>
+                                        Áp dụng cho TẤT CẢ sà lan
+                                    </button>
+                                </div>
+                                
+                                <div class="flex justify-end mt-1">
+                                    <button 
+                                        @click="saveBargeConfigImmediately" 
+                                        :disabled="cfgForm.locked"
+                                        class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-[8px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                                    >
+                                        <span class="material-symbols-outlined text-sm">save</span>
+                                        Lưu cấu hình mẫu phiếu
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

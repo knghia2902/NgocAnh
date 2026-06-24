@@ -54,6 +54,7 @@ export interface BargeConfig {
     companyPhone?: string;
     ticketTitle?: string;
     signatures?: string[];
+    updatedAt?: number;
 }
 
 export interface Barge {
@@ -94,6 +95,7 @@ export const WeighbridgeService = {
      * Fetch all vessels along with their barges
      */
     async getVessels(): Promise<Vessel[]> {
+        const local = await getLocalVessels();
         try {
             const { data, error } = await supabase
                 .from('weighbridge_vessels')
@@ -102,11 +104,31 @@ export const WeighbridgeService = {
 
             if (error) {
                 console.warn('Supabase fetch failed, loading local vessels:', error);
-                return await getLocalVessels();
+                return local;
             }
 
             const formatted = (data || []).map((vessel: any) => {
-                const barges = (vessel.barges || []).sort((a: any, b: any) => {
+                const barges = (vessel.barges || []).map((remoteBarge: any) => {
+                    // Search if local has a newer config
+                    const localVessel = local.find(v => v.id === vessel.id);
+                    const localBarge = localVessel?.barges?.find(b => b.id === remoteBarge.id);
+                    if (localBarge && localBarge.config) {
+                        const localTime = localBarge.config.updatedAt || 0;
+                        const remoteTime = remoteBarge.config?.updatedAt || 0;
+                        if (localTime > remoteTime) {
+                            console.log(`Preserving newer local config for barge ${remoteBarge.name} (${remoteBarge.id})`);
+                            // Sync local config back to Supabase in the background
+                            WeighbridgeService.updateBargeConfig(remoteBarge.id, localBarge.config).catch(err => {
+                                console.warn('Background sync config failed:', err);
+                            });
+                            return {
+                                ...remoteBarge,
+                                config: localBarge.config
+                            };
+                        }
+                    }
+                    return remoteBarge;
+                }).sort((a: any, b: any) => {
                     const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
                     const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
                     return dateA - dateB;
@@ -238,7 +260,8 @@ export const WeighbridgeService = {
             ticketSeed: 1,
             chinhpham: 100,
             phupham: 0,
-            ketluan: 'Chính phẩm đạt tiêu chuẩn'
+            ketluan: 'Chính phẩm đạt tiêu chuẩn',
+            updatedAt: Date.now()
         };
         const newBarge: Barge = {
             id: Date.now(),
@@ -321,10 +344,11 @@ export const WeighbridgeService = {
     async updateBargeConfig(id: number, config: BargeConfig): Promise<boolean> {
         const local = await getLocalVessels();
         let found = false;
+        const configWithTime = { ...config, updatedAt: Date.now() };
         for (const vessel of local) {
             const barge = vessel.barges?.find(b => b.id === id);
             if (barge) {
-                barge.config = { ...config };
+                barge.config = configWithTime;
                 found = true;
                 break;
             }
@@ -336,7 +360,7 @@ export const WeighbridgeService = {
         try {
             const { error } = await supabase
                 .from('weighbridge_barges')
-                .update({ config })
+                .update({ config: configWithTime })
                 .eq('id', id);
 
             if (error) {
