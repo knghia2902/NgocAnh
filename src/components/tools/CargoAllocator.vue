@@ -63,26 +63,41 @@ const loadingCSV = ref(false);
 const compiling = ref(false);
 
 // Capacity configuration standards
-const standardCapacityLimit = ref(10.0);
-const standardTTTPLimit = ref(10.8);
+const standardTTTPLimit = ref(10.0);
+
+function getRandomLimit(tttp: number): number {
+    const curbWeight = 1.5 + Math.random() * 1.0; // random curb weight between 1.5 and 2.5
+    return Math.round((tttp - curbWeight) * 100) / 100;
+}
+
+const vehicleLimitCache = new Map<string, { tttp: number; limit: number }>();
 
 const capacityConfigs = ref<Record<number, CapacityConfig>>({
-    108: { code: 108, tttp: 10.8, limit: 10.0 },
-    107: { code: 107, tttp: 10.7, limit: 10.0 },
-    97: { code: 97, tttp: 9.7, limit: 10.0 }
+    108: { code: 108, tttp: 10.0, limit: 8.0 },
+    107: { code: 107, tttp: 10.0, limit: 8.0 },
+    97: { code: 97, tttp: 10.0, limit: 8.0 }
 });
 
-watch(standardCapacityLimit, (newVal) => {
-    if (capacityConfigs.value[108]) capacityConfigs.value[108]!.limit = newVal || 10.0;
-    if (capacityConfigs.value[107]) capacityConfigs.value[107]!.limit = newVal || 10.0;
-    if (capacityConfigs.value[97]) capacityConfigs.value[97]!.limit = newVal || 10.0;
+watch(standardTTTPLimit, (newVal) => {
+    const tttp = newVal || 10.0;
+    if (capacityConfigs.value[108]) {
+        capacityConfigs.value[108]!.tttp = tttp;
+        capacityConfigs.value[108]!.limit = Math.round((tttp - 2.0) * 100) / 100;
+    }
+    if (capacityConfigs.value[107]) {
+        capacityConfigs.value[107]!.tttp = tttp;
+        capacityConfigs.value[107]!.limit = Math.round((tttp - 2.0) * 100) / 100;
+    }
+    if (capacityConfigs.value[97]) {
+        capacityConfigs.value[97]!.tttp = tttp;
+        capacityConfigs.value[97]!.limit = Math.round((tttp - 2.0) * 100) / 100;
+    }
+    vehicleLimitCache.clear();
 }, { immediate: true });
 
-watch(standardTTTPLimit, (newVal) => {
-    if (capacityConfigs.value[108]) capacityConfigs.value[108]!.tttp = newVal || 10.8;
-    if (capacityConfigs.value[107]) capacityConfigs.value[107]!.tttp = newVal || 10.8;
-    if (capacityConfigs.value[97]) capacityConfigs.value[97]!.tttp = newVal || 10.8;
-}, { immediate: true });
+watch([excelFile, csvRecords], () => {
+    vehicleLimitCache.clear();
+});
 
 // Configs for new vehicles not found in DB
 const newVehicles = ref<NewVehicleConfig[]>([]);
@@ -373,10 +388,13 @@ function detectNewVehicles() {
         const norm = normalizePlate(plate);
         if (!sheet1Vehicles.value.has(norm)) {
             // New vehicle detected
+            const tttp = standardTTTPLimit.value;
             list.push({
                 plateNumber: plate,
-                capacityCode: 108, // default code
-                isCustom: false
+                capacityCode: 108,
+                isCustom: true,
+                customTTTP: tttp,
+                customLimit: getRandomLimit(tttp)
             });
         }
     });
@@ -387,29 +405,40 @@ function detectNewVehicles() {
 // Get the capacity info for a vehicle (checks new vehicle settings or Sheet1 db)
 function getVehicleCapacity(plate: string): CapacityConfig {
     const norm = normalizePlate(plate);
-    const fallback: CapacityConfig = { code: 108, tttp: 10.8, limit: 10.0 };
+    const fallbackTTTP = standardTTTPLimit.value;
     
-    // Check if it's one of the configured new vehicles
+    // 1. Check if it's one of the configured new vehicles
     const newVeh = newVehicles.value.find(v => normalizePlate(v.plateNumber) === norm);
     if (newVeh) {
-        if (newVeh.isCustom) {
-            return {
-                code: 0,
-                tttp: newVeh.customTTTP || 10.8,
-                limit: newVeh.customLimit || 10.0
-            };
-        }
-        return capacityConfigs.value[newVeh.capacityCode] || capacityConfigs.value[108] || fallback;
+        const tttp = newVeh.customTTTP || fallbackTTTP;
+        const limit = newVeh.customLimit || getRandomLimit(tttp);
+        return {
+            code: 0,
+            tttp: tttp,
+            limit: limit
+        };
     }
     
-    // Check in database map
+    // 2. Check cache first
+    if (vehicleLimitCache.has(norm)) {
+        const cached = vehicleLimitCache.get(norm)!;
+        return { code: 0, tttp: cached.tttp, limit: cached.limit };
+    }
+    
+    // 3. Check in database map
     const code = sheet1Vehicles.value.get(norm);
-    if (code && capacityConfigs.value[code]) {
-        return capacityConfigs.value[code]!;
+    if (code) {
+        // In the database map (Sheet1), column 4 code is the TTTP * 10 (e.g. 108 -> 10.8)
+        const tttp = code / 10;
+        const limit = getRandomLimit(tttp);
+        vehicleLimitCache.set(norm, { tttp, limit });
+        return { code, tttp, limit };
     }
     
-    // Fallback default
-    return capacityConfigs.value[108] || fallback;
+    // 4. Fallback default
+    const limit = getRandomLimit(fallbackTTTP);
+    vehicleLimitCache.set(norm, { tttp: fallbackTTTP, limit });
+    return { code: 108, tttp: fallbackTTTP, limit };
 }
 
 // Computed: Total CSV Weight in tons
@@ -907,15 +936,6 @@ async function compileAndDownload() {
 
                 <div class="flex flex-col gap-3">
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn mức hàng tiêu chuẩn (tấn)</label>
-                        <input 
-                            type="number" 
-                            v-model.number="standardCapacityLimit" 
-                            step="0.1"
-                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
-                        >
-                    </div>
-                    <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép tiêu chuẩn (tấn)</label>
                         <input 
                             type="number" 
@@ -923,6 +943,15 @@ async function compileAndDownload() {
                             step="0.1"
                             class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
                         >
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn mức hàng tiêu chuẩn (tấn)</label>
+                        <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-[12px] text-xs font-bold text-gray-600 select-none font-mono">
+                            Ngẫu nhiên: [{{ (standardTTTPLimit - 2.5).toFixed(1) }} - {{ (standardTTTPLimit - 1.5).toFixed(1) }}] t
+                        </div>
+                        <span class="text-[9px] text-gray-400 leading-tight">
+                            Bằng Trọng tải cho phép tiêu chuẩn trừ xác xe ngẫu nhiên (1.5 - 2.5t).
+                        </span>
                     </div>
                 </div>
             </div>
