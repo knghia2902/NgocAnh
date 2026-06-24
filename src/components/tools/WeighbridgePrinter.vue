@@ -1309,11 +1309,13 @@ const handleKeyDown = (event: KeyboardEvent) => {
         selectedElementIds.value.forEach(id => {
             const el = (cfgForm.printElements || []).find(e => e.id === id);
             if (!el) return;
-            const elW = el.width || 10;
-            const elH = el.height || 5;
+            const elX = Number(el.x) || 0;
+            const elY = Number(el.y) || 0;
+            const elW = Number(el.width) || 10;
+            const elH = Number(el.height) || 5;
             
-            el.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - elW, el.x + deltaX));
-            el.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - elH, el.y + deltaY));
+            el.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - elW, elX + deltaX));
+            el.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - elH, elY + deltaY));
         });
         
         saveBargeConfig();
