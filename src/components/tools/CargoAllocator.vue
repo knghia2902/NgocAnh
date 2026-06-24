@@ -44,6 +44,15 @@ interface SplitTrip {
     weightTons: number;
     notes: string;
     isNew?: boolean;
+    // New fields to match "Ánh phân bổ bằng tay.csv"
+    customer: string;
+    weight1: number;
+    weight2: number;
+    weightNet: number;
+    direction: string;
+    bargeName: string;
+    date1Obj: Date;
+    date2Obj: Date;
 }
 
 // Local State
@@ -300,6 +309,23 @@ function formatExcelDateTime(date: Date): string {
     const MM = pad(date.getMonth() + 1);
     const YYYY = date.getFullYear();
     return `${hh}:${mm}:${ss}\n${DD}/${MM}/${YYYY}`;
+}
+
+function formatExcelDate(d: Date): string {
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+function formatExcelTime(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getHours()}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function formatExcelDateTimeCombined(d: Date): string {
+    const hour24 = d.getHours();
+    const ampm = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 || 12;
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${hour12}:${min} ${ampm}`;
 }
 
 // Handle Ticket Import (accepts CSV and Excel)
@@ -585,7 +611,7 @@ function clearAllTickets() {
 }
 
 // Tabs and filters for Source tickets
-const activeDataTab = ref<'source' | 'generated'>('source');
+const activeDataTab = ref<'source' | 'generated' | 'template'>('source');
 const sourceCurrentPage = ref(1);
 const sourceSearchQuery = ref('');
 
@@ -779,6 +805,14 @@ const generatedTrips = computed<SplitTrip[]>(() => {
         notes: string;
         isNew?: boolean;
         dateObj: Date;
+        // New columns to match "Ánh phân bổ bằng tay.csv"
+        customer: string;
+        weight1: number;
+        weight2: number;
+        weightNet: number;
+        durationMs: number;
+        direction: string;
+        bargeName: string;
     }
     
     const tempTrips: TempTrip[] = [];
@@ -842,19 +876,41 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             const jitterMs = (Math.random() * 20 - 10) * 60 * 1000;
             tripTime = new Date(tripTime.getTime() + jitterMs);
             
-            // Clean up cargo name (e.g. Viên Nén Gỗ (FSC Mix 1%) -> Viên Nén Gỗ)
-            const cleanCargo = record.cargoType.split(' (')[0] || '';
+            const tripWeightTons = weights[j] || 0;
+            const tripWeightNet = Math.round(tripWeightTons * 1000);
+            
+            // Calculate weight1 and weight2 based on direction
+            let tripWeight1 = record.weight1;
+            let tripWeight2 = record.weight2;
+            const isXuat = record.direction.toUpperCase().includes('XUẤT') || record.direction.toUpperCase().includes('XUAT');
+            
+            if (isXuat) {
+                // Export: Weight 1 is Tare, Weight 2 is Gross
+                tripWeight1 = record.weight1 || 3500;
+                tripWeight2 = tripWeight1 + tripWeightNet;
+            } else {
+                // Import: Weight 2 is Tare, Weight 1 is Gross
+                tripWeight2 = record.weight2 || 3500;
+                tripWeight1 = tripWeight2 + tripWeightNet;
+            }
             
             tempTrips.push({
                 plateNumber: formatPlate(record.plateNumber),
                 tttp: capacity.tttp,
                 limit: capacity.limit,
-                ticketNo: record.ticketNo,
-                cargoType: cleanCargo,
-                weightTons: weights[j] || 0,
+                ticketNo: j === 0 ? record.ticketNo : '', // Only keep ticketNo for the first trip
+                cargoType: record.cargoType, // Keep full original cargo type
+                weightTons: tripWeightTons,
                 notes: '',
                 isNew: true,
-                dateObj: tripTime
+                dateObj: tripTime,
+                customer: record.customer,
+                weight1: tripWeight1,
+                weight2: tripWeight2,
+                weightNet: tripWeightNet,
+                durationMs: durationMs,
+                direction: record.direction,
+                bargeName: record.bargeName
             });
         }
     });
@@ -925,11 +981,15 @@ const generatedTrips = computed<SplitTrip[]>(() => {
     // Re-apply sorted times and STTs sequentially so everything looks chronological in output
     const startSTT = nextSTT.value;
     const finalTrips: SplitTrip[] = tempTrips.map((t, idx) => {
-        const { dateObj, ...rest } = t;
+        const { dateObj, durationMs, ...rest } = t;
+        const tripDate2 = dateObj;
+        const tripDate1 = new Date(dateObj.getTime() - durationMs);
         return {
             ...rest,
             stt: startSTT + idx,
-            timeStr: sortedTimeStrings[idx] || ''
+            timeStr: sortedTimeStrings[idx] || '',
+            date1Obj: tripDate1,
+            date2Obj: tripDate2
         };
     });
     
@@ -980,15 +1040,102 @@ async function compileAndDownload() {
     try {
         let workbook: any = null;
         let dsSheet;
-        let templateRow = null;
-        
-        if (!workbook) {
-            // Create a brand new workbook from scratch
-            const ExcelJS = await import('exceljs');
-            workbook = new ExcelJS.Workbook();
-            dsSheet = workbook.addWorksheet('DS');
+        const ExcelJS = await import('exceljs');
+        workbook = new ExcelJS.Workbook();
+        dsSheet = workbook.addWorksheet('DS');
+
+        if (activeDataTab.value === 'template') {
+            // Set 15 columns matching "Ánh phân bổ bằng tay.csv"
+            dsSheet.columns = [
+                { header: 'So phieu', key: 'ticketNo', width: 18 },
+                { header: 'So xe', key: 'plateNumber', width: 15 },
+                { header: 'Khach hang', key: 'customer', width: 30 },
+                { header: 'KL can lan 1', key: 'weight1', width: 15 },
+                { header: 'KL can lan 2', key: 'weight2', width: 15 },
+                { header: 'KL hang', key: 'weightNet', width: 15 },
+                { header: 'Ngay can lan 1', key: 'date1', width: 15 },
+                { header: 'Gio can lan 1', key: 'time1', width: 15 },
+                { header: '', key: 'dateTime1', width: 22 },
+                { header: 'Ngay can lan 2', key: 'date2', width: 15 },
+                { header: 'Gio can lan 2', key: 'time2', width: 15 },
+                { header: '', key: 'dateTime2', width: 22 },
+                { header: 'Xuat/Nhap', key: 'direction', width: 15 },
+                { header: 'Loai Hang', key: 'cargoType', width: 30 },
+                { header: 'Loai Salan', key: 'bargeName', width: 35 }
+            ];
             
-            // Set column widths
+            const headerRow = dsSheet.getRow(1);
+            headerRow.getCell(1).value = 'So phieu';
+            headerRow.getCell(2).value = 'So xe';
+            headerRow.getCell(3).value = 'Khach hang';
+            headerRow.getCell(4).value = 'KL can lan 1';
+            headerRow.getCell(5).value = 'KL can lan 2';
+            headerRow.getCell(6).value = 'KL hang';
+            headerRow.getCell(7).value = 'Ngay can lan 1';
+            headerRow.getCell(8).value = 'Gio can lan 1';
+            headerRow.getCell(9).value = '';
+            headerRow.getCell(10).value = 'Ngay can lan 2';
+            headerRow.getCell(11).value = 'Gio can lan 2';
+            headerRow.getCell(12).value = '';
+            headerRow.getCell(13).value = 'Xuat/Nhap';
+            headerRow.getCell(14).value = 'Loai Hang';
+            headerRow.getCell(15).value = 'Loai Salan';
+            
+            headerRow.font = { name: 'Arial', size: 10, bold: true };
+            headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            
+            for (let colIdx = 1; colIdx <= 15; colIdx++) {
+                const cell = headerRow.getCell(colIdx);
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
+                };
+            }
+            headerRow.height = 25;
+            
+            let currentRowIdx = 2;
+            generatedTrips.value.forEach(trip => {
+                const row = dsSheet.getRow(currentRowIdx);
+                row.getCell(1).value = trip.ticketNo;
+                row.getCell(2).value = trip.plateNumber;
+                row.getCell(3).value = trip.customer;
+                row.getCell(4).value = trip.weight1;
+                row.getCell(5).value = trip.weight2;
+                row.getCell(6).value = trip.weightNet;
+                row.getCell(7).value = formatExcelDate(trip.date1Obj);
+                row.getCell(8).value = formatExcelTime(trip.date1Obj);
+                row.getCell(9).value = formatExcelDateTimeCombined(trip.date1Obj);
+                row.getCell(10).value = formatExcelDate(trip.date2Obj);
+                row.getCell(11).value = formatExcelTime(trip.date2Obj);
+                row.getCell(12).value = formatExcelDateTimeCombined(trip.date2Obj);
+                row.getCell(13).value = trip.direction;
+                row.getCell(14).value = trip.cargoType;
+                row.getCell(15).value = trip.bargeName;
+                
+                for (let colIdx = 1; colIdx <= 15; colIdx++) {
+                    const cell = row.getCell(colIdx);
+                    cell.font = { name: 'Arial', size: 10 };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+                    };
+                    if ([1, 2, 7, 8, 9, 10, 11, 12, 13].includes(colIdx)) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    } else if ([4, 5, 6].includes(colIdx)) {
+                        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                        cell.numFmt = '#,##0.00';
+                    } else {
+                        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                    }
+                }
+                currentRowIdx++;
+            });
+        } else {
+            // Set 10 columns for summary layout
             dsSheet.columns = [
                 { header: '', key: 'A', width: 3 },
                 { header: 'STT', key: 'stt', width: 8 },
@@ -1032,54 +1179,26 @@ async function compileAndDownload() {
                 };
             }
             headerRow.height = 25;
-        } else {
-            dsSheet = workbook.getWorksheet('DS');
-            if (!dsSheet) {
-                addToast('Không tìm thấy sheet "DS" trong tệp Excel!', 'error');
-                compiling.value = false;
-                return;
-            }
-            templateRow = dsSheet.getRow(10);
-        }
-        
-        // Find last row and STT
-        let lastRowIdx = 9;
-        let lastSTT = 0;
-        
-        // (Starting from STT = 1 for a new workbook)
-        
-        // Helper to copy styles
-        const copyStyles = (srcCell: any, destCell: any) => {
-            if (srcCell.font) destCell.font = JSON.parse(JSON.stringify(srcCell.font));
-            if (srcCell.alignment) destCell.alignment = JSON.parse(JSON.stringify(srcCell.alignment));
-            if (srcCell.border) destCell.border = JSON.parse(JSON.stringify(srcCell.border));
-            if (srcCell.fill) destCell.fill = JSON.parse(JSON.stringify(srcCell.fill));
-            if (srcCell.numFmt) destCell.numFmt = srcCell.numFmt;
-        };
-        
-        let currentSTT = lastSTT;
-        let currentRowIdx = lastRowIdx + 1;
-        
-        generatedTrips.value.forEach(trip => {
-            currentSTT++;
             
-            const row = dsSheet.getRow(currentRowIdx);
-            row.getCell(2).value = currentSTT;             // Col B: STT
-            row.getCell(3).value = trip.timeStr;           // Col C: Date/Time
-            row.getCell(4).value = trip.plateNumber;       // Col D: Plate
-            row.getCell(5).value = trip.tttp;              // Col E: TTTP
-            row.getCell(6).value = trip.limit;             // Col F: Allowed Cargo
-            row.getCell(7).value = trip.ticketNo;          // Col G: Ticket No
-            row.getCell(8).value = trip.cargoType;         // Col H: Cargo type
-            row.getCell(9).value = trip.weightTons;        // Col I: Weight in tons
-            row.getCell(10).value = null;                  // Col J: Ghi chú
+            let currentSTT = 0;
+            let currentRowIdx = 10;
             
-            // Apply styles cell-by-cell for columns B to J (columns 2 to 10)
-            for (let colIdx = 2; colIdx <= 10; colIdx++) {
-                const cell = row.getCell(colIdx);
-                if (templateRow) {
-                    copyStyles(templateRow.getCell(colIdx), cell);
-                } else {
+            generatedTrips.value.forEach(trip => {
+                currentSTT++;
+                
+                const row = dsSheet.getRow(currentRowIdx);
+                row.getCell(2).value = currentSTT;             // Col B: STT
+                row.getCell(3).value = trip.timeStr;           // Col C: Date/Time
+                row.getCell(4).value = trip.plateNumber;       // Col D: Plate
+                row.getCell(5).value = trip.tttp;              // Col E: TTTP
+                row.getCell(6).value = trip.limit;             // Col F: Allowed Cargo
+                row.getCell(7).value = trip.ticketNo;          // Col G: Ticket No
+                row.getCell(8).value = trip.cargoType;         // Col H: Cargo type
+                row.getCell(9).value = trip.weightTons;        // Col I: Weight in tons
+                row.getCell(10).value = null;                  // Col J: Ghi chú
+                
+                for (let colIdx = 2; colIdx <= 10; colIdx++) {
+                    const cell = row.getCell(colIdx);
                     cell.font = { name: 'Arial', size: 10 };
                     cell.border = {
                         top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
@@ -1096,10 +1215,10 @@ async function compileAndDownload() {
                         cell.alignment = { horizontal: 'left', vertical: 'middle' };
                     }
                 }
-            }
-            
-            currentRowIdx++;
-        });
+                
+                currentRowIdx++;
+            });
+        }
         
         // Write to buffer
         const buffer = await workbook.xlsx.writeBuffer();
@@ -1109,7 +1228,9 @@ async function compileAndDownload() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'SỐ THEO DÕI XẾP HÀNG HÓA_PhanBo.xlsx';
+        link.download = activeDataTab.value === 'template' 
+            ? 'SỔ PHÂN BỔ CHI TIẾT_PhanBo.xlsx' 
+            : 'SỔ THEO DÕI XẾP HÀNG HÓA_PhanBo.xlsx';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -1238,7 +1359,18 @@ async function compileAndDownload() {
                                 : 'text-gray-500 hover:bg-gray-50'
                         ]"
                     >
-                        1. Phiếu cân thực tế ({{ csvRecords.length }})
+                        1. Phiếu cân ({{ csvRecords.length }})
+                    </button>
+                    <button 
+                        @click="activeDataTab = 'template'"
+                        :class="[
+                            'px-4 py-2 text-xs font-black rounded-lg transition-all',
+                            activeDataTab === 'template' 
+                                ? 'bg-primary/10 text-primary border border-primary/20' 
+                                : 'text-gray-500 hover:bg-gray-50'
+                        ]"
+                    >
+                        2. Phân bổ ({{ generatedTrips.length }})
                     </button>
                     <button 
                         @click="activeDataTab = 'generated'"
@@ -1249,7 +1381,7 @@ async function compileAndDownload() {
                                 : 'text-gray-500 hover:bg-gray-50'
                         ]"
                     >
-                        2. Kết quả phân bổ tải trọng ({{ generatedTrips.length }})
+                        3. Theo dõi ({{ generatedTrips.length }})
                     </button>
 
                     <!-- Cloud Sync Indicator -->
@@ -1537,6 +1669,111 @@ async function compileAndDownload() {
                     </button>
                 </div>
             </div>
+
+            <!-- Tab Content: Detail Template (Theo dõi) -->
+            <div v-if="activeDataTab === 'template'" class="flex flex-col gap-4">
+                <!-- Search Filter Row -->
+                <div class="flex items-center justify-between gap-4">
+                    <div class="relative w-full max-w-[320px] flex items-center">
+                        <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                        <input 
+                            type="text" 
+                            v-model="searchQuery" 
+                            placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
+                            class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                        >
+                        <button 
+                            v-if="searchQuery" 
+                            @click="searchQuery = ''" 
+                            class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                        >
+                            <span class="material-symbols-outlined text-xs">close</span>
+                        </button>
+                    </div>
+                    
+                    <span class="text-[10px] font-bold text-gray-400">
+                        Đang hiển thị {{ filteredTrips.length }} / {{ generatedTrips.length }} dòng kết quả
+                    </span>
+                </div>
+
+                <!-- Preview Data Table -->
+                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                    <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                <th class="p-2 bg-gray-55 font-bold">Số phiếu</th>
+                                <th class="p-2 bg-gray-50 font-bold">Số xe</th>
+                                <th class="p-2 bg-gray-55 font-bold">Khách hàng</th>
+                                <th class="p-2 text-right bg-gray-50 font-bold">KL cân lần 1</th>
+                                <th class="p-2 text-right bg-gray-55 font-bold">KL cân lần 2</th>
+                                <th class="p-2 text-right bg-gray-50 font-bold">KL hàng</th>
+                                <th class="p-2 text-center bg-gray-55 font-bold">Ngày cân 1</th>
+                                <th class="p-2 text-center bg-gray-50 font-bold">Giờ cân 1</th>
+                                <th class="p-2 bg-gray-55 font-bold">Ngày giờ 1</th>
+                                <th class="p-2 text-center bg-gray-50 font-bold">Ngày cân 2</th>
+                                <th class="p-2 text-center bg-gray-55 font-bold">Giờ cân 2</th>
+                                <th class="p-2 bg-gray-50 font-bold">Ngày giờ 2</th>
+                                <th class="p-2 text-center bg-gray-55 font-bold">X/N</th>
+                                <th class="p-2 bg-gray-50 font-bold">Loại hàng</th>
+                                <th class="p-2 bg-gray-55 font-bold">Loại Sà lan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                            <tr 
+                                v-for="trip in pagedTrips" 
+                                :key="trip.stt"
+                                class="hover:bg-gray-50 transition-colors"
+                            >
+                                <td class="p-2 font-bold text-gray-800">{{ trip.ticketNo }}</td>
+                                <td class="p-2 font-bold text-gray-900">{{ trip.plateNumber }}</td>
+                                <td class="p-2 max-w-[150px] truncate text-gray-500" :title="trip.customer">{{ trip.customer }}</td>
+                                <td class="p-2 text-right font-mono text-gray-600">{{ trip.weight1.toLocaleString() }}</td>
+                                <td class="p-2 text-right font-mono text-gray-600">{{ trip.weight2.toLocaleString() }}</td>
+                                <td class="p-2 text-right font-black text-primary font-mono">{{ trip.weightNet.toLocaleString() }}</td>
+                                <td class="p-2 text-center text-gray-500 font-mono">{{ formatExcelDate(trip.date1Obj) }}</td>
+                                <td class="p-2 text-center text-gray-500 font-mono">{{ formatExcelTime(trip.date1Obj) }}</td>
+                                <td class="p-2 text-gray-400 text-[10px] font-mono whitespace-nowrap">{{ formatExcelDateTimeCombined(trip.date1Obj) }}</td>
+                                <td class="p-2 text-center text-gray-500 font-mono">{{ formatExcelDate(trip.date2Obj) }}</td>
+                                <td class="p-2 text-center text-gray-500 font-mono">{{ formatExcelTime(trip.date2Obj) }}</td>
+                                <td class="p-2 text-gray-400 text-[10px] font-mono whitespace-nowrap">{{ formatExcelDateTimeCombined(trip.date2Obj) }}</td>
+                                <td class="p-2 text-center">
+                                    <span :class="['px-1.5 py-0.5 rounded text-[10px] font-black', trip.direction.toUpperCase().includes('XUẤT') || trip.direction.toUpperCase().includes('XUAT') ? 'bg-primary/10 text-primary' : 'bg-teal-50 text-teal-600']">
+                                        {{ trip.direction.toUpperCase().includes('XUẤT') || trip.direction.toUpperCase().includes('XUAT') ? 'XUẤT' : 'NHẬP' }}
+                                    </span>
+                                </td>
+                                <td class="p-2 truncate max-w-[150px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
+                                <td class="p-2 truncate max-w-[150px]" :title="trip.bargeName">{{ trip.bargeName }}</td>
+                            </tr>
+                            <tr v-if="filteredTrips.length === 0">
+                                <td colspan="15" class="p-8 text-center text-gray-400 italic">
+                                    Không tìm thấy bản ghi nào khớp bộ lọc!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Pagination -->
+                <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-2">
+                    <button 
+                        @click="currentPage = Math.max(1, currentPage - 1)" 
+                        :disabled="currentPage === 1"
+                        class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
+                    >
+                        <span class="material-symbols-outlined text-lg">chevron_left</span>
+                    </button>
+                    <span class="text-xs font-bold text-gray-500">
+                        Trang {{ currentPage }} / {{ totalPages }}
+                    </span>
+                    <button 
+                        @click="currentPage = Math.min(totalPages, currentPage + 1)" 
+                        :disabled="currentPage === totalPages"
+                        class="size-8 rounded-[10px] hover:bg-gray-100 disabled:opacity-30 flex items-center justify-center text-gray-600 border border-gray-100 transition-colors"
+                    >
+                        <span class="material-symbols-outlined text-lg">chevron_right</span>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Action Export Section -->
@@ -1548,7 +1785,7 @@ async function compileAndDownload() {
             >
                 <span v-if="compiling" class="material-symbols-outlined text-base animate-spin">sync</span>
                 <span v-else class="material-symbols-outlined text-base">download_for_offline</span>
-                {{ compiling ? 'Đang xử lý dữ liệu...' : 'Xử lý & Tải xuống SỔ THEO DÕI XẾP HÀNG HÓA' }}
+                {{ compiling ? 'Đang xử lý dữ liệu...' : (activeDataTab === 'template' ? 'Xử lý & Tải xuống SỔ PHÂN BỔ CHI TIẾT (Mẫu Ánh)' : 'Xử lý & Tải xuống SỔ THEO DÕI XẾP HÀNG HÓA') }}
             </button>
         </div>
 
