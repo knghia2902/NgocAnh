@@ -43,8 +43,8 @@ export interface BargeConfig {
     xn: string;
     ticketPrefix: string;
     ticketSeed: string | number;
-    chinhpham: number;
-    phupham: number;
+    chinhpham: number | string;
+    phupham: number | string;
     ketluan: string;
     locked?: boolean;
     printFields?: CustomFieldConfig[];

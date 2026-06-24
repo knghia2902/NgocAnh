@@ -1537,11 +1537,30 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
         case 'note': return t.note || '-';
         case 'driver': return t.driver || '-';
         case 'goodsCode': return cfgForm.goodsCode || '-';
-        case 'xn': return cfgForm.xn;
+        case 'xn': {
+            const val = cfgForm.xn || '';
+            if (val.toUpperCase() === 'XUẤT KHẨU') return 'XUẤT';
+            if (val.toUpperCase() === 'NHẬP KHẨU') return 'NHẬP';
+            return val;
+        }
         case 'dateIn': return t.dateIn ? formatDateTimeStr(t.dateIn) : '';
         case 'dateOut': return t.dateOut ? formatDateTimeStr(t.dateOut) : '';
-        case 'chinhpham': return `${cfgForm.chinhpham} %`;
-        case 'phupham': return `${cfgForm.phupham} %`;
+        case 'chinhpham': {
+            const val = String(cfgForm.chinhpham ?? '');
+            if (!val) return '-';
+            if (val.trim().endsWith('%') || isNaN(Number(val))) {
+                return val;
+            }
+            return `${val} %`;
+        }
+        case 'phupham': {
+            const val = String(cfgForm.phupham ?? '');
+            if (!val) return '-';
+            if (val.trim().endsWith('%') || isNaN(Number(val))) {
+                return val;
+            }
+            return `${val} %`;
+        }
         case 'ketluan': return cfgForm.ketluan || '-';
         default: return '';
     }
@@ -3213,11 +3232,11 @@ onUnmounted(() => {
                                         <div class="space-y-3">
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tỷ lệ Chính phẩm (%)</label>
-                                                <input v-model.number="cfgForm.chinhpham" :disabled="cfgForm.locked" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <input v-model="cfgForm.chinhpham" :disabled="cfgForm.locked" type="text" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tỷ lệ Phụ phẩm (%)</label>
-                                                <input v-model.number="cfgForm.phupham" :disabled="cfgForm.locked" type="number" min="0" max="100" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <input v-model="cfgForm.phupham" :disabled="cfgForm.locked" type="text" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Kết luận</label>
@@ -3605,7 +3624,8 @@ onUnmounted(() => {
                                                         </span>
                                                         <span class="mr-1 shrink-0 font-sans">:</span>
                                                         <span 
-                                                            class="grow font-sans truncate"
+                                                            class="grow font-sans"
+                                                            :class="(el.fieldId === 'ketluan' || el.fieldId === 'note') ? 'whitespace-pre-wrap break-words' : 'truncate'"
                                                             style="font-weight: inherit;"
                                                         >
                                                             [{{ el.fieldId }}]
@@ -3817,7 +3837,10 @@ onUnmounted(() => {
                         <div v-if="el.type === 'field'" style="display: flex; align-items: baseline; width: 100%; height: 100%; overflow: hidden;">
                             <span style="flex-shrink: 0; font-weight: inherit;" :style="{ width: (el.labelWidth || 20) + 'mm' }">{{ el.label }}</span>
                             <span style="flex-shrink: 0; margin-right: 1mm;">:</span>
-                            <span style="flex-grow: 1; font-weight: inherit;">
+                            <span 
+                                style="flex-grow: 1; font-weight: inherit;"
+                                :style="{ whiteSpace: (el.fieldId === 'ketluan' || el.fieldId === 'note') ? 'pre-wrap' : 'inherit', wordBreak: (el.fieldId === 'ketluan' || el.fieldId === 'note') ? 'break-word' : 'inherit' }"
+                            >
                                 {{ getFieldValue(el.fieldId!, truck) }}
                             </span>
                         </div>
