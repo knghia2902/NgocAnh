@@ -34,39 +34,39 @@ const getDefaultPrintFields = (): CustomFieldConfig[] => [
 ];
 
 const getDefaultPrintElements = (): PrintElement[] => [
-    { id: 'companyName', type: 'text', x: 5, y: 5, width: 140, height: 5, text: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC', fontSize: 10, fontWeight: 'bold' },
-    { id: 'companyAddress', type: 'text', x: 5, y: 10, width: 140, height: 4, text: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam', fontSize: 7 },
-    { id: 'companyPhone', type: 'text', x: 5, y: 14, width: 140, height: 4, text: 'ĐT: 0964 258 671 / Fax:', fontSize: 7 },
-    { id: 'ticketNo', type: 'field', x: 150, y: 5, width: 45, height: 5, label: 'Phiếu số', fieldId: 'ticketNo', labelWidth: 15, fontSize: 9, fontWeight: 'bold' },
-    { id: 'title', type: 'text', x: 0, y: 22, width: 200, height: 6, text: 'PHIẾU CÂN XE', fontSize: 14, fontWeight: 'bold', align: 'center' },
-    { id: 'dateIn', type: 'field', x: 25, y: 29, width: 75, height: 4, label: 'Ngày, giờ vào', fieldId: 'dateIn', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
-    { id: 'dateOut', type: 'field', x: 105, y: 29, width: 75, height: 4, label: 'Ngày, giờ ra', fieldId: 'dateOut', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
+    { id: 'companyName', type: 'text', x: 5, y: 30, width: 140, height: 5, text: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC', fontSize: 10, fontWeight: 'bold' },
+    { id: 'companyAddress', type: 'text', x: 5, y: 35, width: 140, height: 4, text: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam', fontSize: 7 },
+    { id: 'companyPhone', type: 'text', x: 5, y: 39, width: 140, height: 4, text: 'ĐT: 0964 258 671 / Fax:', fontSize: 7 },
+    { id: 'ticketNo', type: 'field', x: 150, y: 30, width: 45, height: 5, label: 'Phiếu số', fieldId: 'ticketNo', labelWidth: 15, fontSize: 9, fontWeight: 'bold' },
+    { id: 'title', type: 'text', x: 0, y: 47, width: 200, height: 6, text: 'PHIẾU CÂN XE', fontSize: 14, fontWeight: 'bold', align: 'center' },
+    { id: 'dateIn', type: 'field', x: 25, y: 54, width: 75, height: 4, label: 'Ngày, giờ vào', fieldId: 'dateIn', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
+    { id: 'dateOut', type: 'field', x: 105, y: 54, width: 75, height: 4, label: 'Ngày, giờ ra', fieldId: 'dateOut', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
     
     // Left Column Fields
-    { id: 'plateNumber', type: 'field', x: 10, y: 38, width: 85, height: 5, label: 'Số xe', fieldId: 'plateNumber', labelWidth: 24, fontSize: 8.5, fontWeight: 'bold' },
-    { id: 'goods', type: 'field', x: 10, y: 44, width: 85, height: 5, label: 'Hàng hóa', fieldId: 'goods', labelWidth: 24, fontSize: 8.5 },
-    { id: 'owner', type: 'field', x: 10, y: 50, width: 85, height: 5, label: 'Tên chủ hàng', fieldId: 'owner', labelWidth: 24, fontSize: 8.5 },
-    { id: 'weight1', type: 'field', x: 10, y: 56, width: 85, height: 5, label: 'Trọng lượng lần 1', fieldId: 'weight1', labelWidth: 24, fontSize: 8.5 },
-    { id: 'weight2', type: 'field', x: 10, y: 62, width: 85, height: 5, label: 'Trọng lượng lần 2', fieldId: 'weight2', labelWidth: 24, fontSize: 8.5 },
-    { id: 'weightNet', type: 'field', x: 10, y: 68, width: 85, height: 5, label: 'Trọng lượng hàng', fieldId: 'weightNet', labelWidth: 24, fontSize: 8.5 },
-    { id: 'words', type: 'field', x: 10, y: 74, width: 180, height: 5, label: 'Bằng chữ', fieldId: 'words', labelWidth: 24, fontSize: 8.5, fontStyle: 'italic' },
+    { id: 'plateNumber', type: 'field', x: 10, y: 63, width: 85, height: 5, label: 'Số xe', fieldId: 'plateNumber', labelWidth: 24, fontSize: 8.5, fontWeight: 'bold' },
+    { id: 'goods', type: 'field', x: 10, y: 69, width: 85, height: 5, label: 'Hàng hóa', fieldId: 'goods', labelWidth: 24, fontSize: 8.5 },
+    { id: 'owner', type: 'field', x: 10, y: 75, width: 85, height: 5, label: 'Tên chủ hàng', fieldId: 'owner', labelWidth: 24, fontSize: 8.5 },
+    { id: 'weight1', type: 'field', x: 10, y: 81, width: 85, height: 5, label: 'Trọng lượng lần 1', fieldId: 'weight1', labelWidth: 24, fontSize: 8.5 },
+    { id: 'weight2', type: 'field', x: 10, y: 87, width: 85, height: 5, label: 'Trọng lượng lần 2', fieldId: 'weight2', labelWidth: 24, fontSize: 8.5 },
+    { id: 'weightNet', type: 'field', x: 10, y: 93, width: 85, height: 5, label: 'Trọng lượng hàng', fieldId: 'weightNet', labelWidth: 24, fontSize: 8.5 },
+    { id: 'words', type: 'field', x: 10, y: 99, width: 180, height: 5, label: 'Bằng chữ', fieldId: 'words', labelWidth: 24, fontSize: 8.5, fontStyle: 'italic' },
     
     // Right Column Fields
-    { id: 'barge', type: 'field', x: 105, y: 38, width: 85, height: 5, label: 'Sà lan', fieldId: 'barge', labelWidth: 24, fontSize: 8.5 },
-    { id: 'driver', type: 'field', x: 105, y: 44, width: 85, height: 5, label: 'Tài xế', fieldId: 'driver', labelWidth: 24, fontSize: 8.5 },
-    { id: 'goodsCode', type: 'field', x: 105, y: 50, width: 85, height: 5, label: 'Mã hàng', fieldId: 'goodsCode', labelWidth: 24, fontSize: 8.5 },
-    { id: 'xn', type: 'field', x: 105, y: 56, width: 85, height: 5, label: 'X/N', fieldId: 'xn', labelWidth: 24, fontSize: 8.5 },
-    { id: 'qualityHeader', type: 'text', x: 105, y: 62, width: 85, height: 4, text: 'ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA', fontSize: 8, fontWeight: 'bold' },
-    { id: 'chinhpham', type: 'field', x: 105, y: 67, width: 85, height: 5, label: '*Chính phẩm', fieldId: 'chinhpham', labelWidth: 24, fontSize: 8.5 },
-    { id: 'phupham', type: 'field', x: 105, y: 73, width: 85, height: 5, label: '*Phụ phẩm', fieldId: 'phupham', labelWidth: 24, fontSize: 8.5 },
-    { id: 'ketluan', type: 'field', x: 105, y: 79, width: 85, height: 5, label: 'Kết luận', fieldId: 'ketluan', labelWidth: 24, fontSize: 8.5 },
+    { id: 'barge', type: 'field', x: 105, y: 63, width: 85, height: 5, label: 'Sà lan', fieldId: 'barge', labelWidth: 24, fontSize: 8.5 },
+    { id: 'driver', type: 'field', x: 105, y: 69, width: 85, height: 5, label: 'Tài xế', fieldId: 'driver', labelWidth: 24, fontSize: 8.5 },
+    { id: 'goodsCode', type: 'field', x: 105, y: 75, width: 85, height: 5, label: 'Mã hàng', fieldId: 'goodsCode', labelWidth: 24, fontSize: 8.5 },
+    { id: 'xn', type: 'field', x: 105, y: 81, width: 85, height: 5, label: 'X/N', fieldId: 'xn', labelWidth: 24, fontSize: 8.5 },
+    { id: 'qualityHeader', type: 'text', x: 105, y: 87, width: 85, height: 4, text: 'ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA', fontSize: 8, fontWeight: 'bold' },
+    { id: 'chinhpham', type: 'field', x: 105, y: 92, width: 85, height: 5, label: '*Chính phẩm', fieldId: 'chinhpham', labelWidth: 24, fontSize: 8.5 },
+    { id: 'phupham', type: 'field', x: 105, y: 98, width: 85, height: 5, label: '*Phụ phẩm', fieldId: 'phupham', labelWidth: 24, fontSize: 8.5 },
+    { id: 'ketluan', type: 'field', x: 105, y: 104, width: 85, height: 5, label: 'Kết luận', fieldId: 'ketluan', labelWidth: 24, fontSize: 8.5 },
     
     // Footer
-    { id: 'sig1', type: 'text', x: 5, y: 89, width: 36, height: 4, text: 'NV TRẠM CÂN', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig2', type: 'text', x: 45, y: 89, width: 36, height: 4, text: 'BẢO VỆ', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig3', type: 'text', x: 85, y: 89, width: 36, height: 4, text: 'CHỦ HÀNG', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig4', type: 'text', x: 125, y: 89, width: 36, height: 4, text: 'THỦ KHO', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig5', type: 'text', x: 165, y: 89, width: 36, height: 4, text: 'TÀI XẾ', align: 'center', fontSize: 7.5, fontWeight: 'bold' }
+    { id: 'sig1', type: 'text', x: 5, y: 114, width: 36, height: 4, text: 'NV TRẠM CÂN', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig2', type: 'text', x: 45, y: 114, width: 36, height: 4, text: 'BẢO VỆ', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig3', type: 'text', x: 85, y: 114, width: 36, height: 4, text: 'CHỦ HÀNG', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig4', type: 'text', x: 125, y: 114, width: 36, height: 4, text: 'THỦ KHO', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig5', type: 'text', x: 165, y: 114, width: 36, height: 4, text: 'TÀI XẾ', align: 'center', fontSize: 7.5, fontWeight: 'bold' }
 ];
 
 defineExpose({
