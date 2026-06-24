@@ -765,6 +765,11 @@ onMounted(async () => {
             csvRecords.value = saved;
         }
 
+        const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
+        if (savedHistory && Array.isArray(savedHistory)) {
+            existingTrips.value = savedHistory;
+        }
+
         // Đồng bộ dữ liệu từ đám mây
         await loadTicketsFromSupabase();
     } catch (e) {
@@ -778,6 +783,15 @@ watch(csvRecords, async (newVal) => {
         await dbContext.set('allocator_tickets', newVal);
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phiếu cân vào IndexedDB:', e);
+    }
+}, { deep: true });
+
+// Auto-save history on change
+watch(existingTrips, async (newVal) => {
+    try {
+        await dbContext.set('allocator_history_trips', newVal);
+    } catch (e) {
+        console.error('Lỗi khi lưu lịch sử chuyến xe vào IndexedDB:', e);
     }
 }, { deep: true });
 
@@ -1056,6 +1070,65 @@ const totalPages = computed(() => {
 watch(searchQuery, () => {
     currentPage.value = 1;
 });
+
+// History panel states
+const historySearchQuery = ref('');
+const historyCurrentPage = ref(1);
+
+const filteredHistoryTrips = computed(() => {
+    if (!historySearchQuery.value.trim()) return existingTrips.value;
+    const q = historySearchQuery.value.toLowerCase();
+    return existingTrips.value.filter(t => 
+        t.plateNumber.toLowerCase().includes(q) || 
+        t.ticketNo.toLowerCase().includes(q) || 
+        t.cargoType.toLowerCase().includes(q)
+    );
+});
+
+const pagedHistoryTrips = computed(() => {
+    const start = (historyCurrentPage.value - 1) * itemsPerPage;
+    return filteredHistoryTrips.value.slice(start, start + itemsPerPage);
+});
+
+const historyTotalPages = computed(() => {
+    return Math.ceil(filteredHistoryTrips.value.length / itemsPerPage);
+});
+
+watch(historySearchQuery, () => {
+    historyCurrentPage.value = 1;
+});
+
+// Save generated temporary trips into history
+function saveToHistory() {
+    if (generatedTrips.value.length === 0) {
+        addToast('Không có dữ liệu phân bổ để lưu!', 'info');
+        return;
+    }
+    
+    if (confirm(`Bạn có chắc chắn muốn lưu ${generatedTrips.value.length} chuyến xe này vào Sổ Theo Dõi và làm sạch danh sách phiếu cân hiện tại ở Tab 1 không?`)) {
+        // Append generated trips to history
+        existingTrips.value = [...existingTrips.value, ...generatedTrips.value];
+        
+        // Clear active tickets in Tab 1
+        csvRecords.value = [];
+        csvFile.value = null;
+        
+        // Save empty tickets list to Supabase
+        saveTicketsToSupabase();
+        
+        // Switch tab to Tab 3 (Theo dõi)
+        activeDataTab.value = 'generated';
+        addToast('Đã lưu thành công vào Sổ Theo Dõi!', 'success');
+    }
+}
+
+// Clear all history
+function clearHistory() {
+    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong Sổ Theo Dõi không? Hành động này không thể hoàn tác!')) {
+        existingTrips.value = [];
+        addToast('Đã xóa sạch lịch sử Sổ Theo Dõi!', 'info');
+    }
+}
 
 // Export source tickets (Tab 1) as Excel
 async function exportSourceTickets() {
