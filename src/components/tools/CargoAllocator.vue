@@ -879,20 +879,12 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             const tripWeightTons = weights[j] || 0;
             const tripWeightNet = Math.round(tripWeightTons * 1000);
             
-            // Calculate weight1 and weight2 based on direction
-            let tripWeight1 = record.weight1;
-            let tripWeight2 = record.weight2;
+            // Calculate weight1 (xác xe) and weight2 (xác xe + hàng)
             const isXuat = record.direction.toUpperCase().includes('XUẤT') || record.direction.toUpperCase().includes('XUAT');
+            const tareWeight = isXuat ? (record.weight1 || 3500) : (record.weight2 || 3500);
             
-            if (isXuat) {
-                // Export: Weight 1 is Tare, Weight 2 is Gross
-                tripWeight1 = record.weight1 || 3500;
-                tripWeight2 = tripWeight1 + tripWeightNet;
-            } else {
-                // Import: Weight 2 is Tare, Weight 1 is Gross
-                tripWeight2 = record.weight2 || 3500;
-                tripWeight1 = tripWeight2 + tripWeightNet;
-            }
+            const tripWeight1 = tareWeight; // Luôn là cân xác xe (cân lần 1)
+            const tripWeight2 = tareWeight + tripWeightNet; // Luôn là cân khi đã có hàng trên xe (cân lần 2)
             
             tempTrips.push({
                 plateNumber: formatPlate(record.plateNumber),
