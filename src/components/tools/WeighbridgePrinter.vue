@@ -535,6 +535,10 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
     sortKey.value = '';
     sortOrder.value = 'asc';
     
+    // Reset designer selection
+    selectedElementId.value = null;
+    selectedElementIds.value = [];
+    
     // Load config of active barge
     if (activeBarge.value) {
         const cfg = activeBarge.value.config || {};
@@ -961,9 +965,33 @@ const copyLayoutFromBarge = (fromBargeId: number) => {
 
 // Visual Page Designer State
 const selectedElementId = ref<string | null>(null);
+const selectedElementIds = ref<string[]>([]);
 const selectedElement = computed(() => {
     return (cfgForm.printElements || []).find(el => el.id === selectedElementId.value) || null;
 });
+
+// Watch and clamp all elements to stay within A5 paper bounds (210mm x 148mm)
+watch(() => cfgForm.printElements, (newElements) => {
+    if (!newElements) return;
+    newElements.forEach(el => {
+        const elW = el.width || 10;
+        const elH = el.height || 5;
+        
+        // Clamp width and height
+        if (el.width > CANVAS_WIDTH_MM) el.width = CANVAS_WIDTH_MM;
+        if (el.height > CANVAS_HEIGHT_MM) el.height = CANVAS_HEIGHT_MM;
+        
+        // Clamp positions to stay inside
+        if (el.x < 0) el.x = 0;
+        if (el.y < 0) el.y = 0;
+        if (el.x + elW > CANVAS_WIDTH_MM) {
+            el.x = CANVAS_WIDTH_MM - elW;
+        }
+        if (el.y + elH > CANVAS_HEIGHT_MM) {
+            el.y = CANVAS_HEIGHT_MM - elH;
+        }
+    });
+}, { deep: true });
 
 const availableFields = [
     { id: 'ticketNo', label: 'Số phiếu' },
@@ -993,9 +1021,9 @@ let dragStartMouseY = 0;
 let dragStartElX = 0;
 let dragStartElY = 0;
 
-const MM_TO_PX = 4; // 1mm = 4px (A5: 200x138mm = 800x552px)
-const CANVAS_WIDTH_MM = 200;
-const CANVAS_HEIGHT_MM = 138;
+const MM_TO_PX = 4; // 1mm = 4px (A5: 210x148mm = 840x592px)
+const CANVAS_WIDTH_MM = 210;
+const CANVAS_HEIGHT_MM = 148;
 
 interface AlignmentGuide {
     type: 'h' | 'v';
@@ -1004,21 +1032,23 @@ interface AlignmentGuide {
 
 const alignmentGuides = ref<AlignmentGuide[]>([]);
 
+let dragStartPositions = new Map<string, { x: number; y: number }>();
+
 const handleDragMove = (event: MouseEvent) => {
     if (!draggingElementId.value) return;
-    const el = (cfgForm.printElements || []).find(e => e.id === draggingElementId.value);
-    if (!el) return;
+    const primaryEl = (cfgForm.printElements || []).find(e => e.id === draggingElementId.value);
+    if (!primaryEl) return;
     
     const deltaX_px = event.clientX - dragStartMouseX;
     const deltaY_px = event.clientY - dragStartMouseY;
     const deltaX_mm = deltaX_px / MM_TO_PX;
     const deltaY_mm = deltaY_px / MM_TO_PX;
     
-    // Tentative position (rounded to 0.5mm)
-    let newX = Math.round((dragStartElX + deltaX_mm) * 2) / 2;
-    let newY = Math.round((dragStartElY + deltaY_mm) * 2) / 2;
+    // Tentative position of primary element (rounded to 0.5mm)
+    let newPrimaryX = Math.round((dragStartElX + deltaX_mm) * 2) / 2;
+    let newPrimaryY = Math.round((dragStartElY + deltaY_mm) * 2) / 2;
     
-    // Snapping logic
+    // Snapping logic for primary element
     const SNAP_THRESHOLD_MM = 1.0; // 1mm threshold
     const guides: AlignmentGuide[] = [];
     const elements = cfgForm.printElements || [];
@@ -1026,11 +1056,12 @@ const handleDragMove = (event: MouseEvent) => {
     let snappedX = false;
     let snappedY = false;
     
-    const elW = el.width || 10;
-    const elH = el.height || 5;
+    const primaryW = primaryEl.width || 10;
+    const primaryH = primaryEl.height || 5;
     
     for (const other of elements) {
-        if (other.id === el.id) continue;
+        // Do not snap to any element that is currently selected/dragged together
+        if (selectedElementIds.value.includes(other.id)) continue;
         
         const otherW = other.width || 10;
         const otherH = other.height || 5;
@@ -1038,32 +1069,32 @@ const handleDragMove = (event: MouseEvent) => {
         // 1. Vertical snapping (X-axis)
         if (!snappedX) {
             // Left edge to Left edge
-            if (Math.abs(newX - other.x) < SNAP_THRESHOLD_MM) {
-                newX = other.x;
+            if (Math.abs(newPrimaryX - other.x) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = other.x;
                 snappedX = true;
                 guides.push({ type: 'v', pos: other.x * MM_TO_PX });
             }
             // Right edge to Right edge
-            else if (Math.abs((newX + elW) - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
-                newX = other.x + otherW - elW;
+            else if (Math.abs((newPrimaryX + primaryW) - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = other.x + otherW - primaryW;
                 snappedX = true;
                 guides.push({ type: 'v', pos: (other.x + otherW) * MM_TO_PX });
             }
             // Left edge to Right edge
-            else if (Math.abs(newX - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
-                newX = other.x + otherW;
+            else if (Math.abs(newPrimaryX - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = other.x + otherW;
                 snappedX = true;
                 guides.push({ type: 'v', pos: (other.x + otherW) * MM_TO_PX });
             }
             // Right edge to Left edge
-            else if (Math.abs((newX + elW) - other.x) < SNAP_THRESHOLD_MM) {
-                newX = other.x - elW;
+            else if (Math.abs((newPrimaryX + primaryW) - other.x) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = other.x - primaryW;
                 snappedX = true;
                 guides.push({ type: 'v', pos: other.x * MM_TO_PX });
             }
             // Center to Center
-            else if (Math.abs((newX + elW / 2) - (other.x + otherW / 2)) < SNAP_THRESHOLD_MM) {
-                newX = other.x + otherW / 2 - elW / 2;
+            else if (Math.abs((newPrimaryX + primaryW / 2) - (other.x + otherW / 2)) < SNAP_THRESHOLD_MM) {
+                newPrimaryX = other.x + otherW / 2 - primaryW / 2;
                 snappedX = true;
                 guides.push({ type: 'v', pos: (other.x + otherW / 2) * MM_TO_PX });
             }
@@ -1072,44 +1103,59 @@ const handleDragMove = (event: MouseEvent) => {
         // 2. Horizontal snapping (Y-axis)
         if (!snappedY) {
             // Top edge to Top edge
-            if (Math.abs(newY - other.y) < SNAP_THRESHOLD_MM) {
-                newY = other.y;
+            if (Math.abs(newPrimaryY - other.y) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = other.y;
                 snappedY = true;
                 guides.push({ type: 'h', pos: other.y * MM_TO_PX });
             }
             // Bottom edge to Bottom edge
-            else if (Math.abs((newY + elH) - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
-                newY = other.y + otherH - elH;
+            else if (Math.abs((newPrimaryY + primaryH) - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = other.y + otherH - primaryH;
                 snappedY = true;
                 guides.push({ type: 'h', pos: (other.y + otherH) * MM_TO_PX });
             }
             // Top edge to Bottom edge
-            else if (Math.abs(newY - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
-                newY = other.y + otherH;
+            else if (Math.abs(newPrimaryY - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = other.y + otherH;
                 snappedY = true;
                 guides.push({ type: 'h', pos: (other.y + otherH) * MM_TO_PX });
             }
             // Bottom edge to Top edge
-            else if (Math.abs((newY + elH) - other.y) < SNAP_THRESHOLD_MM) {
-                newY = other.y - elH;
+            else if (Math.abs((newPrimaryY + primaryH) - other.y) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = other.y - primaryH;
                 snappedY = true;
                 guides.push({ type: 'h', pos: other.y * MM_TO_PX });
             }
             // Center to Center
-            else if (Math.abs((newY + elH / 2) - (other.y + otherH / 2)) < SNAP_THRESHOLD_MM) {
-                newY = other.y + otherH / 2 - elH / 2;
+            else if (Math.abs((newPrimaryY + primaryH / 2) - (other.y + otherH / 2)) < SNAP_THRESHOLD_MM) {
+                newPrimaryY = other.y + otherH / 2 - primaryH / 2;
                 snappedY = true;
                 guides.push({ type: 'h', pos: (other.y + otherH / 2) * MM_TO_PX });
             }
         }
     }
     
-    // Constrain boundaries
-    newX = Math.max(0, Math.min(CANVAS_WIDTH_MM - elW, newX));
-    newY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - elH, newY));
+    // Constrain boundaries for primary element
+    newPrimaryX = Math.max(0, Math.min(CANVAS_WIDTH_MM - primaryW, newPrimaryX));
+    newPrimaryY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - primaryH, newPrimaryY));
     
-    el.x = newX;
-    el.y = newY;
+    // Calculate final delta based on primary element movement
+    const actualDeltaX = newPrimaryX - dragStartElX;
+    const actualDeltaY = newPrimaryY - dragStartElY;
+    
+    // Move all selected elements
+    selectedElementIds.value.forEach(id => {
+        const item = elements.find(e => e.id === id);
+        if (!item) return;
+        const startPos = dragStartPositions.get(id);
+        if (!startPos) return;
+        
+        const w = item.width || 10;
+        const h = item.height || 5;
+        
+        item.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - w, startPos.x + actualDeltaX));
+        item.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - h, startPos.y + actualDeltaY));
+    });
     
     alignmentGuides.value = guides;
 };
@@ -1124,55 +1170,119 @@ const handleDragEnd = () => {
 
 const startDrag = (event: MouseEvent, el: PrintElement) => {
     if (cfgForm.locked) return;
-    selectedElementId.value = el.id;
+    
+    // Check if shift or ctrl is held to toggle selection
+    if (event.shiftKey || event.ctrlKey) {
+        if (selectedElementIds.value.includes(el.id)) {
+            selectedElementIds.value = selectedElementIds.value.filter(id => id !== el.id);
+            if (selectedElementId.value === el.id) {
+                selectedElementId.value = selectedElementIds.value[0] || null;
+            }
+        } else {
+            selectedElementIds.value.push(el.id);
+            selectedElementId.value = el.id; // Make primary
+        }
+    } else {
+        // Normal click: if not already selected, select it exclusively.
+        // If already selected, do not clear selection (so user can drag group).
+        if (!selectedElementIds.value.includes(el.id)) {
+            selectedElementIds.value = [el.id];
+            selectedElementId.value = el.id;
+        } else {
+            selectedElementId.value = el.id;
+        }
+    }
+    
     draggingElementId.value = el.id;
     dragStartMouseX = event.clientX;
     dragStartMouseY = event.clientY;
     dragStartElX = el.x;
     dragStartElY = el.y;
     
+    // Save starting positions for all selected elements
+    dragStartPositions.clear();
+    selectedElementIds.value.forEach(id => {
+        const item = (cfgForm.printElements || []).find(e => e.id === id);
+        if (item) {
+            dragStartPositions.set(id, { x: item.x, y: item.y });
+        }
+    });
+    
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
-    if (!isOpen.value || activeTab.value !== 'config' || cfgForm.locked || !selectedElement.value) return;
+    if (!isOpen.value || activeTab.value !== 'config' || cfgForm.locked || selectedElementIds.value.length === 0) return;
     
-    // Ignore Arrow key movements when user is typing in inputs/textareas/selects
+    // Ignore Arrow and Delete key movements when user is typing in inputs/textareas/selects
     const activeEl = document.activeElement;
     if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
         return;
     }
     
-    const el = selectedElement.value;
     let step = 0.5;
     if (event.shiftKey) step = 1;
     let handled = false;
     
+    let deltaX = 0;
+    let deltaY = 0;
+    
     if (event.key === 'ArrowUp') {
-        el.y = Math.max(0, el.y - step);
+        deltaY = -step;
         handled = true;
     } else if (event.key === 'ArrowDown') {
-        el.y = Math.min(CANVAS_HEIGHT_MM - (el.height || 5), el.y + step);
+        deltaY = step;
         handled = true;
     } else if (event.key === 'ArrowLeft') {
-        el.x = Math.max(0, el.x - step);
+        deltaX = -step;
         handled = true;
     } else if (event.key === 'ArrowRight') {
-        el.x = Math.min(CANVAS_WIDTH_MM - (el.width || 10), el.x + step);
+        deltaX = step;
         handled = true;
+    } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        const toDeleteIds = [...selectedElementIds.value];
+        if (toDeleteIds.length > 0) {
+            const confirmDelete = confirm(`Bạn có muốn xóa ${toDeleteIds.length} phần tử đang chọn?`);
+            if (confirmDelete) {
+                cfgForm.printElements = (cfgForm.printElements || []).filter(el => !toDeleteIds.includes(el.id));
+                selectedElementIds.value = [];
+                selectedElementId.value = null;
+                saveBargeConfig();
+            }
+            handled = true;
+        }
     }
     
-    if (handled) {
+    if (handled && (event.key.startsWith('Arrow'))) {
         event.preventDefault();
+        
+        // Move all selected elements
+        selectedElementIds.value.forEach(id => {
+            const el = (cfgForm.printElements || []).find(e => e.id === id);
+            if (!el) return;
+            const elW = el.width || 10;
+            const elH = el.height || 5;
+            
+            el.x = Math.max(0, Math.min(CANVAS_WIDTH_MM - elW, el.x + deltaX));
+            el.y = Math.max(0, Math.min(CANVAS_HEIGHT_MM - elH, el.y + deltaY));
+        });
+        
         saveBargeConfig();
     }
 };
 
 const deleteElement = (id: string) => {
     if (cfgForm.locked) return;
-    cfgForm.printElements = (cfgForm.printElements || []).filter(el => el.id !== id);
-    if (selectedElementId.value === id) selectedElementId.value = null;
+    const toDeleteIds = selectedElementIds.value.includes(id) 
+        ? [...selectedElementIds.value] 
+        : [id];
+        
+    cfgForm.printElements = (cfgForm.printElements || []).filter(el => !toDeleteIds.includes(el.id));
+    selectedElementIds.value = selectedElementIds.value.filter(selId => !toDeleteIds.includes(selId));
+    if (toDeleteIds.includes(selectedElementId.value || '')) {
+        selectedElementId.value = selectedElementIds.value[0] || null;
+    }
     saveBargeConfig();
 };
 
@@ -3088,28 +3198,28 @@ onUnmounted(() => {
                                                 <div class="flex flex-col gap-1">
                                                     <label class="flex justify-between select-none">
                                                         <span>Vị trí X (mm)</span>
-                                                        <span class="text-gray-400">max 200</span>
+                                                        <span class="text-gray-400">max 210</span>
                                                     </label>
                                                     <input 
                                                         v-model.number="selectedElement.x" 
                                                         type="number" 
                                                         step="0.5" 
                                                         min="0" 
-                                                        max="200" 
+                                                        max="210" 
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
                                                 <div class="flex flex-col gap-1">
                                                     <label class="flex justify-between select-none">
                                                         <span>Vị trí Y (mm)</span>
-                                                        <span class="text-gray-400">max 138</span>
+                                                        <span class="text-gray-400">max 148</span>
                                                     </label>
                                                     <input 
                                                         v-model.number="selectedElement.y" 
                                                         type="number" 
                                                         step="0.5" 
                                                         min="0" 
-                                                        max="138" 
+                                                        max="148" 
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3275,8 +3385,8 @@ onUnmounted(() => {
                                         <div class="w-full overflow-auto bg-gray-50 border border-gray-200 rounded-2xl p-4 flex justify-center items-center shadow-inner relative group">
                                             <div 
                                                 class="relative bg-white border border-dashed border-gray-300 shadow-lg select-none overflow-hidden"
-                                                style="width: 800px; height: 552px; background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px;"
-                                                @mousedown="selectedElementId = null"
+                                                style="width: 840px; height: 592px; background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px;"
+                                                @mousedown="selectedElementId = null; selectedElementIds = []"
                                             >
                                                 <!-- Alignment Snap Guides -->
                                                 <div 
@@ -3293,7 +3403,9 @@ onUnmounted(() => {
                                                     :key="el.id"
                                                     class="absolute cursor-move select-none flex flex-col"
                                                     :class="[
-                                                        selectedElementId === el.id ? 'ring-2 ring-primary ring-offset-1 z-30' : 'hover:ring-1 hover:ring-primary/50 z-20'
+                                                        selectedElementIds.includes(el.id) 
+                                                            ? (selectedElementId === el.id ? 'ring-2 ring-primary ring-offset-1 z-30 bg-primary/[0.03]' : 'ring-2 ring-teal-500 ring-offset-1 z-25 bg-teal-500/[0.03]') 
+                                                            : 'hover:ring-1 hover:ring-primary/50 z-20'
                                                     ]"
                                                     :style="{
                                                         left: (el.x * MM_TO_PX) + 'px',
@@ -3347,7 +3459,7 @@ onUnmounted(() => {
                                                     ></div>
 
                                                     <!-- Selected Indicator Badge -->
-                                                    <div v-if="selectedElementId === el.id" class="absolute -top-4 left-0 bg-primary text-white text-[8px] px-1 py-0.5 rounded font-mono uppercase font-bold tracking-wider pointer-events-none shadow-sm z-40">
+                                                    <div v-if="selectedElementIds.includes(el.id)" class="absolute -top-4 left-0 text-white text-[8px] px-1 py-0.5 rounded font-mono uppercase font-bold tracking-wider pointer-events-none shadow-sm z-40" :class="selectedElementId === el.id ? 'bg-primary' : 'bg-teal-500'">
                                                         {{ el.type === 'field' ? el.fieldId : el.type }}
                                                     </div>
                                                 </div>
@@ -3576,7 +3688,7 @@ onUnmounted(() => {
 @media print {
     @page {
         size: A5 landscape;
-        margin: 5mm;
+        margin: 0;
     }
 
     :global(body) {
@@ -3601,8 +3713,8 @@ onUnmounted(() => {
 
     .print-page {
         page-break-after: always;
-        width: 200mm;
-        height: 138mm;
+        width: 210mm;
+        height: 148mm;
         box-sizing: border-box;
         position: relative;
         overflow: hidden;
