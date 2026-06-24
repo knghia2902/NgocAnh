@@ -623,16 +623,38 @@ async function loadTicketsFromSupabase() {
             .single();
         if (error) throw error;
         
-        if (data?.settings && data.settings.allocator_tickets) {
+        if (data?.settings) {
             const remoteTickets = data.settings.allocator_tickets;
             if (Array.isArray(remoteTickets)) {
-                const localJSON = JSON.stringify(csvRecords.value);
-                const remoteJSON = JSON.stringify(remoteTickets);
-                if (localJSON !== remoteJSON) {
-                    csvRecords.value = remoteTickets;
-                    await dbContext.set('allocator_tickets', remoteTickets);
+                // Merge local and remote tickets to prevent data loss
+                const merged = [...csvRecords.value];
+                let changed = false;
+                
+                remoteTickets.forEach((r: any) => {
+                    const exists = merged.some(l => l.id === r.id || (l.ticketNo && l.ticketNo === r.ticketNo));
+                    if (!exists) {
+                        merged.push(r);
+                        changed = true;
+                    }
+                });
+                
+                if (changed || csvRecords.value.length < remoteTickets.length) {
+                    csvRecords.value = merged;
+                    await dbContext.set('allocator_tickets', merged);
+                    await saveTicketsToSupabase();
+                } else if (csvRecords.value.length > remoteTickets.length) {
+                    // Local has more tickets, upload them to Supabase
+                    await saveTicketsToSupabase();
+                } else {
+                    syncStatus.value = 'synced';
                 }
-                syncStatus.value = 'synced';
+            } else {
+                // If remote has no tickets but local has, push local to remote
+                if (csvRecords.value.length > 0) {
+                    await saveTicketsToSupabase();
+                } else {
+                    syncStatus.value = 'synced';
+                }
             }
         }
     } catch (e) {
