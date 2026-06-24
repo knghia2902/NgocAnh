@@ -75,13 +75,7 @@ function getRandomLimit(tttp: number): number {
 
 const vehicleLimitCache = new Map<string, { tttp: number; limit: number }>();
 
-watch(standardTTTPLimit, () => {
-    vehicleLimitCache.clear();
-}, { immediate: true });
-
-watch(csvRecords, () => {
-    vehicleLimitCache.clear();
-});
+// vehicleLimitCache is maintained locally
 
 // Configs for new vehicles not found in DB
 const newVehicles = ref<NewVehicleConfig[]>([]);
@@ -129,6 +123,46 @@ function splitWeightRandomly(weightTons: number, numTrips: number, tripLimit: nu
     return weights;
 }
 const timeIntervalMinutes = ref(90);
+
+watch(standardTTTPLimit, async (newVal) => {
+    vehicleLimitCache.clear();
+    try {
+        await dbContext.set('allocator_standard_limit', newVal);
+    } catch (e) {
+        console.error('Lỗi khi lưu hạn mức tiêu chuẩn vào IndexedDB:', e);
+    }
+}, { immediate: true });
+
+watch(csvRecords, () => {
+    vehicleLimitCache.clear();
+});
+
+watch(distStrategy, async (newVal) => {
+    try {
+        await dbContext.set('allocator_dist_strategy', newVal);
+    } catch (e) {}
+});
+
+watch(spacingStrategy, async (newVal) => {
+    try {
+        await dbContext.set('allocator_spacing_strategy', newVal);
+    } catch (e) {}
+});
+
+watch(timeIntervalMinutes, async (newVal) => {
+    try {
+        await dbContext.set('allocator_time_interval', newVal);
+    } catch (e) {}
+});
+
+// Auto-save custom vehicle limits on change
+watch(newVehicles, async (newVal) => {
+    try {
+        await dbContext.set('allocator_vehicles', newVal);
+    } catch (e) {
+        console.error('Lỗi khi lưu cấu hình xe vào IndexedDB:', e);
+    }
+}, { deep: true });
 
 // Pagination
 const currentPage = ref(1);
@@ -588,15 +622,37 @@ watch(sourceSearchQuery, () => {
     sourceCurrentPage.value = 1;
 });
 
-// Mounted hook to load tickets from IndexedDB
+// Mounted hook to load settings, vehicle limits, and tickets from IndexedDB
 onMounted(async () => {
     try {
+        const savedLimit = await dbContext.get<number>('allocator_standard_limit');
+        if (savedLimit !== undefined && savedLimit !== null) {
+            standardTTTPLimit.value = savedLimit;
+        }
+
+        const savedDist = await dbContext.get<any>('allocator_dist_strategy');
+        if (savedDist) distStrategy.value = savedDist;
+
+        const savedSpacing = await dbContext.get<any>('allocator_spacing_strategy');
+        if (savedSpacing) spacingStrategy.value = savedSpacing;
+
+        const savedInterval = await dbContext.get<number>('allocator_time_interval');
+        if (savedInterval) timeIntervalMinutes.value = savedInterval;
+
+        const savedVehs = await dbContext.get<NewVehicleConfig[]>('allocator_vehicles');
+        if (savedVehs && Array.isArray(savedVehs)) {
+            newVehicles.value = savedVehs;
+        }
+
         const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
         if (saved && Array.isArray(saved)) {
             csvRecords.value = saved;
         }
+        
+        // Initial detection
+        detectNewVehicles();
     } catch (e) {
-        console.error('Lỗi khi nạp danh sách phiếu cân từ IndexedDB:', e);
+        console.error('Lỗi khi nạp dữ liệu từ IndexedDB:', e);
     }
 });
 
