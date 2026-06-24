@@ -16,6 +16,24 @@ export interface CustomFieldConfig {
     order: number;
 }
 
+export interface PrintElement {
+    id: string;
+    type: 'text' | 'field' | 'line' | 'rect';
+    x: number; // in mm
+    y: number; // in mm
+    width: number; // in mm
+    height: number; // in mm
+    text?: string;
+    label?: string; // (for type='field')
+    fieldId?: string;
+    labelWidth?: number; // in mm (for type='field')
+    fontSize?: number; // in pt
+    fontWeight?: 'normal' | 'bold' | 'black';
+    fontStyle?: 'normal' | 'italic';
+    align?: 'left' | 'center' | 'right';
+    borderStyle?: 'solid' | 'dashed' | 'double';
+}
+
 export interface BargeConfig {
     [key: string]: any;
     goods: string;
@@ -30,6 +48,7 @@ export interface BargeConfig {
     ketluan: string;
     locked?: boolean;
     printFields?: CustomFieldConfig[];
+    printElements?: PrintElement[];
     companyName?: string;
     companyAddress?: string;
     companyPhone?: string;

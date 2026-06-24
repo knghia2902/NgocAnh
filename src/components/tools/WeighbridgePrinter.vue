@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
 import { authStore } from '@/stores/auth';
 import { excelService } from '@/services/excel/ExcelService';
-import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig } from '@/services/excel/WeighbridgeService';
+import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig, type PrintElement } from '@/services/excel/WeighbridgeService';
 const props = withDefaults(defineProps<{
     hideCard?: boolean;
 }>(), {
@@ -31,6 +31,42 @@ const getDefaultPrintFields = (): CustomFieldConfig[] => [
     { id: 'chinhpham', label: '*Chính phẩm', visible: true, column: 'right', order: 4 },
     { id: 'phupham', label: '*Phụ phẩm', visible: true, column: 'right', order: 5 },
     { id: 'ketluan', label: 'Kết luận', visible: true, column: 'right', order: 6 }
+];
+
+const getDefaultPrintElements = (): PrintElement[] => [
+    { id: 'companyName', type: 'text', x: 5, y: 5, width: 140, height: 5, text: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC', fontSize: 10, fontWeight: 'bold' },
+    { id: 'companyAddress', type: 'text', x: 5, y: 10, width: 140, height: 4, text: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam', fontSize: 7 },
+    { id: 'companyPhone', type: 'text', x: 5, y: 14, width: 140, height: 4, text: 'ĐT: 0964 258 671 / Fax:', fontSize: 7 },
+    { id: 'ticketNo', type: 'field', x: 150, y: 5, width: 45, height: 5, label: 'Phiếu số', fieldId: 'ticketNo', labelWidth: 15, fontSize: 9, fontWeight: 'bold' },
+    { id: 'title', type: 'text', x: 0, y: 22, width: 200, height: 6, text: 'PHIẾU CÂN XE', fontSize: 14, fontWeight: 'bold', align: 'center' },
+    { id: 'dateIn', type: 'field', x: 25, y: 29, width: 75, height: 4, label: 'Ngày, giờ vào', fieldId: 'dateIn', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
+    { id: 'dateOut', type: 'field', x: 105, y: 29, width: 75, height: 4, label: 'Ngày, giờ ra', fieldId: 'dateOut', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
+    
+    // Left Column Fields
+    { id: 'plateNumber', type: 'field', x: 10, y: 38, width: 85, height: 5, label: 'Số xe', fieldId: 'plateNumber', labelWidth: 24, fontSize: 8.5, fontWeight: 'bold' },
+    { id: 'goods', type: 'field', x: 10, y: 44, width: 85, height: 5, label: 'Hàng hóa', fieldId: 'goods', labelWidth: 24, fontSize: 8.5 },
+    { id: 'owner', type: 'field', x: 10, y: 50, width: 85, height: 5, label: 'Tên chủ hàng', fieldId: 'owner', labelWidth: 24, fontSize: 8.5 },
+    { id: 'weight1', type: 'field', x: 10, y: 56, width: 85, height: 5, label: 'Trọng lượng lần 1', fieldId: 'weight1', labelWidth: 24, fontSize: 8.5 },
+    { id: 'weight2', type: 'field', x: 10, y: 62, width: 85, height: 5, label: 'Trọng lượng lần 2', fieldId: 'weight2', labelWidth: 24, fontSize: 8.5 },
+    { id: 'weightNet', type: 'field', x: 10, y: 68, width: 85, height: 5, label: 'Trọng lượng hàng', fieldId: 'weightNet', labelWidth: 24, fontSize: 8.5 },
+    { id: 'words', type: 'field', x: 10, y: 74, width: 180, height: 5, label: 'Bằng chữ', fieldId: 'words', labelWidth: 24, fontSize: 8.5, fontStyle: 'italic' },
+    
+    // Right Column Fields
+    { id: 'barge', type: 'field', x: 105, y: 38, width: 85, height: 5, label: 'Sà lan', fieldId: 'barge', labelWidth: 24, fontSize: 8.5 },
+    { id: 'driver', type: 'field', x: 105, y: 44, width: 85, height: 5, label: 'Tài xế', fieldId: 'driver', labelWidth: 24, fontSize: 8.5 },
+    { id: 'goodsCode', type: 'field', x: 105, y: 50, width: 85, height: 5, label: 'Mã hàng', fieldId: 'goodsCode', labelWidth: 24, fontSize: 8.5 },
+    { id: 'xn', type: 'field', x: 105, y: 56, width: 85, height: 5, label: 'X/N', fieldId: 'xn', labelWidth: 24, fontSize: 8.5 },
+    { id: 'qualityHeader', type: 'text', x: 105, y: 62, width: 85, height: 4, text: 'ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA', fontSize: 8, fontWeight: 'bold' },
+    { id: 'chinhpham', type: 'field', x: 105, y: 67, width: 85, height: 5, label: '*Chính phẩm', fieldId: 'chinhpham', labelWidth: 24, fontSize: 8.5 },
+    { id: 'phupham', type: 'field', x: 105, y: 73, width: 85, height: 5, label: '*Phụ phẩm', fieldId: 'phupham', labelWidth: 24, fontSize: 8.5 },
+    { id: 'ketluan', type: 'field', x: 105, y: 79, width: 85, height: 5, label: 'Kết luận', fieldId: 'ketluan', labelWidth: 24, fontSize: 8.5 },
+    
+    // Footer
+    { id: 'sig1', type: 'text', x: 5, y: 89, width: 36, height: 4, text: 'NV TRẠM CÂN', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig2', type: 'text', x: 45, y: 89, width: 36, height: 4, text: 'BẢO VỆ', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig3', type: 'text', x: 85, y: 89, width: 36, height: 4, text: 'CHỦ HÀNG', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig4', type: 'text', x: 125, y: 89, width: 36, height: 4, text: 'THỦ KHO', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
+    { id: 'sig5', type: 'text', x: 165, y: 89, width: 36, height: 4, text: 'TÀI XẾ', align: 'center', fontSize: 7.5, fontWeight: 'bold' }
 ];
 
 defineExpose({
@@ -125,6 +161,7 @@ const cfgForm = reactive<BargeConfig>({
     ketluan: 'Chính phẩm đạt tiêu chuẩn',
     locked: false,
     printFields: getDefaultPrintFields(),
+    printElements: getDefaultPrintElements(),
     companyName: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC',
     companyAddress: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam',
     companyPhone: 'ĐT: 0964 258 671 / Fax:',
@@ -513,6 +550,7 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.ketluan = cfg.ketluan || 'Chính phẩm đạt tiêu chuẩn';
         cfgForm.locked = cfg.locked || false;
         cfgForm.printFields = cfg.printFields || getDefaultPrintFields();
+        cfgForm.printElements = (cfg.printElements || getDefaultPrintElements()).filter(el => !['lineHeader', 'lineTitle', 'lineFooter'].includes(el.id));
         cfgForm.companyName = cfg.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
         cfgForm.companyAddress = cfg.companyAddress || 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam';
         cfgForm.companyPhone = cfg.companyPhone || 'ĐT: 0964 258 671 / Fax:';
@@ -770,24 +808,320 @@ const toggleBargeLock = async () => {
     }
 };
 
-// Custom field layouts computed and methods
-const printFieldsLeft = computed(() => {
-    return (cfgForm.printFields || [])
-        .filter(f => f.column === 'left')
-        .sort((a, b) => a.order - b.order);
+// Visual Page Designer State
+const selectedElementId = ref<string | null>(null);
+const selectedElement = computed(() => {
+    return (cfgForm.printElements || []).find(el => el.id === selectedElementId.value) || null;
 });
 
-const printFieldsRight = computed(() => {
-    return (cfgForm.printFields || [])
-        .filter(f => f.column === 'right')
-        .sort((a, b) => a.order - b.order);
-});
+const availableFields = [
+    { id: 'ticketNo', label: 'Số phiếu' },
+    { id: 'plateNumber', label: 'Số xe (Biển số)' },
+    { id: 'goods', label: 'Hàng hóa' },
+    { id: 'goodsCode', label: 'Mã hàng hóa' },
+    { id: 'owner', label: 'Chủ hàng' },
+    { id: 'operator', label: 'Nhân viên cân' },
+    { id: 'xn', label: 'Phương thức Xuất/Nhập' },
+    { id: 'barge', label: 'Tên sà lan' },
+    { id: 'driver', label: 'Tài xế' },
+    { id: 'weight1', label: 'Trọng lượng cân lần 1' },
+    { id: 'weight2', label: 'Trọng lượng cân lần 2' },
+    { id: 'weightNet', label: 'Trọng lượng hàng (Net)' },
+    { id: 'words', label: 'Khối lượng bằng chữ' },
+    { id: 'dateIn', label: 'Ngày giờ vào' },
+    { id: 'dateOut', label: 'Ngày giờ ra' },
+    { id: 'chinhpham', label: 'Đánh giá: % Chính phẩm' },
+    { id: 'phupham', label: 'Đánh giá: % Phụ phẩm' },
+    { id: 'ketluan', label: 'Đánh giá: Kết luận' },
+    { id: 'note', label: 'Ghi chú' }
+];
 
-const isFirstQualityField = (fieldId: string) => {
-    const visibleRight = printFieldsRight.value.filter(f => f.visible);
-    const firstQuality = visibleRight.find(f => f.id === 'chinhpham' || f.id === 'phupham');
-    return firstQuality?.id === fieldId;
+const draggingElementId = ref<string | null>(null);
+let dragStartMouseX = 0;
+let dragStartMouseY = 0;
+let dragStartElX = 0;
+let dragStartElY = 0;
+
+const MM_TO_PX = 4; // 1mm = 4px (A5: 200x138mm = 800x552px)
+const CANVAS_WIDTH_MM = 200;
+const CANVAS_HEIGHT_MM = 138;
+
+interface AlignmentGuide {
+    type: 'h' | 'v';
+    pos: number; // in pixels relative to canvas
+}
+
+const alignmentGuides = ref<AlignmentGuide[]>([]);
+
+const handleDragMove = (event: MouseEvent) => {
+    if (!draggingElementId.value) return;
+    const el = (cfgForm.printElements || []).find(e => e.id === draggingElementId.value);
+    if (!el) return;
+    
+    const deltaX_px = event.clientX - dragStartMouseX;
+    const deltaY_px = event.clientY - dragStartMouseY;
+    const deltaX_mm = deltaX_px / MM_TO_PX;
+    const deltaY_mm = deltaY_px / MM_TO_PX;
+    
+    // Tentative position (rounded to 0.5mm)
+    let newX = Math.round((dragStartElX + deltaX_mm) * 2) / 2;
+    let newY = Math.round((dragStartElY + deltaY_mm) * 2) / 2;
+    
+    // Snapping logic
+    const SNAP_THRESHOLD_MM = 1.0; // 1mm threshold
+    const guides: AlignmentGuide[] = [];
+    const elements = cfgForm.printElements || [];
+    
+    let snappedX = false;
+    let snappedY = false;
+    
+    const elW = el.width || 10;
+    const elH = el.height || 5;
+    
+    for (const other of elements) {
+        if (other.id === el.id) continue;
+        
+        const otherW = other.width || 10;
+        const otherH = other.height || 5;
+        
+        // 1. Vertical snapping (X-axis)
+        if (!snappedX) {
+            // Left edge to Left edge
+            if (Math.abs(newX - other.x) < SNAP_THRESHOLD_MM) {
+                newX = other.x;
+                snappedX = true;
+                guides.push({ type: 'v', pos: other.x * MM_TO_PX });
+            }
+            // Right edge to Right edge
+            else if (Math.abs((newX + elW) - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
+                newX = other.x + otherW - elW;
+                snappedX = true;
+                guides.push({ type: 'v', pos: (other.x + otherW) * MM_TO_PX });
+            }
+            // Left edge to Right edge
+            else if (Math.abs(newX - (other.x + otherW)) < SNAP_THRESHOLD_MM) {
+                newX = other.x + otherW;
+                snappedX = true;
+                guides.push({ type: 'v', pos: (other.x + otherW) * MM_TO_PX });
+            }
+            // Right edge to Left edge
+            else if (Math.abs((newX + elW) - other.x) < SNAP_THRESHOLD_MM) {
+                newX = other.x - elW;
+                snappedX = true;
+                guides.push({ type: 'v', pos: other.x * MM_TO_PX });
+            }
+            // Center to Center
+            else if (Math.abs((newX + elW / 2) - (other.x + otherW / 2)) < SNAP_THRESHOLD_MM) {
+                newX = other.x + otherW / 2 - elW / 2;
+                snappedX = true;
+                guides.push({ type: 'v', pos: (other.x + otherW / 2) * MM_TO_PX });
+            }
+        }
+        
+        // 2. Horizontal snapping (Y-axis)
+        if (!snappedY) {
+            // Top edge to Top edge
+            if (Math.abs(newY - other.y) < SNAP_THRESHOLD_MM) {
+                newY = other.y;
+                snappedY = true;
+                guides.push({ type: 'h', pos: other.y * MM_TO_PX });
+            }
+            // Bottom edge to Bottom edge
+            else if (Math.abs((newY + elH) - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
+                newY = other.y + otherH - elH;
+                snappedY = true;
+                guides.push({ type: 'h', pos: (other.y + otherH) * MM_TO_PX });
+            }
+            // Top edge to Bottom edge
+            else if (Math.abs(newY - (other.y + otherH)) < SNAP_THRESHOLD_MM) {
+                newY = other.y + otherH;
+                snappedY = true;
+                guides.push({ type: 'h', pos: (other.y + otherH) * MM_TO_PX });
+            }
+            // Bottom edge to Top edge
+            else if (Math.abs((newY + elH) - other.y) < SNAP_THRESHOLD_MM) {
+                newY = other.y - elH;
+                snappedY = true;
+                guides.push({ type: 'h', pos: other.y * MM_TO_PX });
+            }
+            // Center to Center
+            else if (Math.abs((newY + elH / 2) - (other.y + otherH / 2)) < SNAP_THRESHOLD_MM) {
+                newY = other.y + otherH / 2 - elH / 2;
+                snappedY = true;
+                guides.push({ type: 'h', pos: (other.y + otherH / 2) * MM_TO_PX });
+            }
+        }
+    }
+    
+    // Constrain boundaries
+    newX = Math.max(0, Math.min(CANVAS_WIDTH_MM - elW, newX));
+    newY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - elH, newY));
+    
+    el.x = newX;
+    el.y = newY;
+    
+    alignmentGuides.value = guides;
 };
+
+const handleDragEnd = () => {
+    draggingElementId.value = null;
+    alignmentGuides.value = [];
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
+    saveBargeConfig();
+};
+
+const startDrag = (event: MouseEvent, el: PrintElement) => {
+    if (cfgForm.locked) return;
+    selectedElementId.value = el.id;
+    draggingElementId.value = el.id;
+    dragStartMouseX = event.clientX;
+    dragStartMouseY = event.clientY;
+    dragStartElX = el.x;
+    dragStartElY = el.y;
+    
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+};
+
+const handleKeyDown = (event: KeyboardEvent) => {
+    if (!isOpen.value || activeTab.value !== 'config' || cfgForm.locked || !selectedElement.value) return;
+    
+    // Ignore Arrow key movements when user is typing in inputs/textareas/selects
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+    }
+    
+    const el = selectedElement.value;
+    let step = 0.5;
+    if (event.shiftKey) step = 1;
+    let handled = false;
+    
+    if (event.key === 'ArrowUp') {
+        el.y = Math.max(0, el.y - step);
+        handled = true;
+    } else if (event.key === 'ArrowDown') {
+        el.y = Math.min(CANVAS_HEIGHT_MM - (el.height || 5), el.y + step);
+        handled = true;
+    } else if (event.key === 'ArrowLeft') {
+        el.x = Math.max(0, el.x - step);
+        handled = true;
+    } else if (event.key === 'ArrowRight') {
+        el.x = Math.min(CANVAS_WIDTH_MM - (el.width || 10), el.x + step);
+        handled = true;
+    }
+    
+    if (handled) {
+        event.preventDefault();
+        saveBargeConfig();
+    }
+};
+
+const deleteElement = (id: string) => {
+    if (cfgForm.locked) return;
+    cfgForm.printElements = (cfgForm.printElements || []).filter(el => el.id !== id);
+    if (selectedElementId.value === id) selectedElementId.value = null;
+    saveBargeConfig();
+};
+
+const duplicateElement = (el: PrintElement) => {
+    if (cfgForm.locked) return;
+    const id = el.type + '_' + Date.now();
+    const newEl: PrintElement = {
+        ...el,
+        id,
+        x: Math.min(CANVAS_WIDTH_MM - el.width, el.x + 4),
+        y: Math.min(CANVAS_HEIGHT_MM - el.height, el.y + 4)
+    };
+    cfgForm.printElements = [...(cfgForm.printElements || []), newEl];
+    selectedElementId.value = id;
+    saveBargeConfig();
+};
+
+const resetToDefaultLayout = () => {
+    if (cfgForm.locked) return;
+    if (confirm('Bạn có chắc chắn muốn khôi phục thiết kế mẫu phiếu cân về ban đầu không?')) {
+        cfgForm.printElements = getDefaultPrintElements();
+        selectedElementId.value = null;
+        saveBargeConfigImmediately();
+    }
+};
+
+const addStaticText = () => {
+    if (cfgForm.locked) return;
+    const id = 'text_' + Date.now();
+    const newEl: PrintElement = {
+        id,
+        type: 'text',
+        x: 10,
+        y: 10,
+        width: 50,
+        height: 5,
+        text: 'Chữ tĩnh mới',
+        fontSize: 8.5,
+        fontWeight: 'normal',
+        align: 'left'
+    };
+    cfgForm.printElements = [...(cfgForm.printElements || []), newEl];
+    selectedElementId.value = id;
+    saveBargeConfig();
+};
+
+const addFieldElement = (fieldId: string, label: string) => {
+    if (cfgForm.locked) return;
+    const id = 'field_' + fieldId + '_' + Date.now();
+    const newEl: PrintElement = {
+        id,
+        type: 'field',
+        x: 10,
+        y: 10,
+        width: 80,
+        height: 5,
+        label,
+        fieldId,
+        labelWidth: 24,
+        fontSize: 8.5
+    };
+    cfgForm.printElements = [...(cfgForm.printElements || []), newEl];
+    selectedElementId.value = id;
+    saveBargeConfig();
+};
+
+const addLineElement = (direction: 'horizontal' | 'vertical') => {
+    if (cfgForm.locked) return;
+    const id = 'line_' + direction + '_' + Date.now();
+    const newEl: PrintElement = {
+        id,
+        type: 'line',
+        x: 10,
+        y: 10,
+        width: direction === 'horizontal' ? 100 : 0.5,
+        height: direction === 'horizontal' ? 0.5 : 50
+    };
+    cfgForm.printElements = [...(cfgForm.printElements || []), newEl];
+    selectedElementId.value = id;
+    saveBargeConfig();
+};
+
+const addRectElement = () => {
+    if (cfgForm.locked) return;
+    const id = 'rect_' + Date.now();
+    const newEl: PrintElement = {
+        id,
+        type: 'rect',
+        x: 10,
+        y: 10,
+        width: 60,
+        height: 30,
+        borderStyle: 'solid'
+    };
+    cfgForm.printElements = [...(cfgForm.printElements || []), newEl];
+    selectedElementId.value = id;
+    saveBargeConfig();
+};
+
+
 
 const getFieldValue = (fieldId: string, truck?: Truck) => {
     const sampleTruck = {
@@ -826,60 +1160,7 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
     }
 };
 
-const moveField = (fieldId: string, direction: 'up' | 'down') => {
-    if (cfgForm.locked) return;
-    const fields = cfgForm.printFields || [];
-    const index = fields.findIndex(f => f.id === fieldId);
-    if (index === -1) return;
-    
-    const currentField = fields[index];
-    if (!currentField) return;
-    
-    const columnFields = fields.filter(f => f.column === currentField.column).sort((a, b) => a.order - b.order);
-    const colIndex = columnFields.findIndex(f => f.id === fieldId);
-    
-    if (direction === 'up' && colIndex > 0) {
-        const prevField = columnFields[colIndex - 1];
-        if (prevField) {
-            const tempOrder = currentField.order;
-            currentField.order = prevField.order;
-            prevField.order = tempOrder;
-        }
-    } else if (direction === 'down' && colIndex < columnFields.length - 1) {
-        const nextField = columnFields[colIndex + 1];
-        if (nextField) {
-            const tempOrder = currentField.order;
-            currentField.order = nextField.order;
-            nextField.order = tempOrder;
-        }
-    }
-    resequenceFields();
-};
 
-const switchColumn = (fieldId: string) => {
-    if (cfgForm.locked) return;
-    const fields = cfgForm.printFields || [];
-    const field = fields.find(f => f.id === fieldId);
-    if (!field) return;
-    
-    field.column = field.column === 'left' ? 'right' : 'left';
-    const maxOrder = fields.filter(f => f.column === field.column).reduce((max, f) => Math.max(max, f.order), 0);
-    field.order = maxOrder + 1;
-    
-    resequenceFields();
-};
-
-const resequenceFields = () => {
-    const fields = cfgForm.printFields || [];
-    ['left', 'right'].forEach(col => {
-        fields
-            .filter(f => f.column === col)
-            .sort((a, b) => a.order - b.order)
-            .forEach((f, idx) => {
-                f.order = idx + 1;
-            });
-    });
-};
 
 // Watch config form for auto-saving
 watch(cfgForm, () => {
@@ -1723,6 +2004,11 @@ const triggerPrint = (singleTruck?: Truck) => {
 // Initialize
 onMounted(() => {
     loadVessels();
+    document.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeyDown);
 });
 </script>
 
@@ -2352,6 +2638,12 @@ onMounted(() => {
                                         <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
                                             <tr class="text-gray-500 border-b border-gray-100 font-bold select-none">
                                                 <th class="p-2.5 w-10 text-center bg-gray-50">STT</th>
+                                                <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('ticketNo')">
+                                                    <div class="flex items-center gap-1">
+                                                        Số phiếu
+                                                        <span v-if="sortKey === 'ticketNo'" class="material-symbols-outlined text-[12px] font-bold">{{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                                                    </div>
+                                                </th>
                                                 <th class="p-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors" @click="toggleSort('plateNumber')">
                                                     <div class="flex items-center gap-1">
                                                         Số xe (Biển số)
@@ -2405,12 +2697,13 @@ onMounted(() => {
                                         </thead>
                                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
                                             <tr v-if="filteredTrucks.length === 0">
-                                                <td colspan="10" class="p-6 text-center text-gray-400 italic">
+                                                <td colspan="11" class="p-6 text-center text-gray-400 italic">
                                                     Chưa có dữ liệu xe. Hãy tải file Excel hoặc thêm xe thủ công để hiển thị.
                                                 </td>
                                             </tr>
                                             <tr v-for="(truck, index) in filteredTrucks" :key="truck.id" class="hover:bg-gray-50 transition-colors">
                                                 <td class="p-2 text-center text-gray-400 font-bold">{{ index + 1 }}</td>
+                                                <td class="p-2 font-mono text-[#4a2c32] font-bold">{{ truck.ticketNo }}</td>
                                                 <td class="p-2 font-bold text-gray-900">{{ truck.plateNumber }}</td>
                                                 <td class="p-2 text-gray-600">{{ truck.driver || '-' }}</td>
                                                 <td class="p-2 text-right font-medium">{{ formatNumber(truck.weight1) }}</td>
@@ -2521,200 +2814,265 @@ onMounted(() => {
 
                             <!-- Visual Template Designer Section (Full width) -->
                             <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5">
-                                <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-2">
-                                    <span class="material-symbols-outlined text-base">design_services</span>
-                                    Thiết kế bố cục và Tùy biến nhãn biểu in
+                                <h3 class="text-sm font-black text-primary mb-4 flex items-center justify-between border-b border-gray-100 pb-2">
+                                    <div class="flex items-center gap-1.5 select-none">
+                                        <span class="material-symbols-outlined text-base">design_services</span>
+                                        Thiết kế tự do &amp; Kéo thả mẫu phiếu cân A5
+                                    </div>
+                                    <button 
+                                        @click="resetToDefaultLayout" 
+                                        :disabled="cfgForm.locked"
+                                        class="px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold rounded-lg border border-red-100 transition-all select-none"
+                                    >
+                                        Khôi phục mẫu chuẩn
+                                    </button>
                                 </h3>
                                 
-                                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-                                    <!-- Field Control Panel (xl:col-span-6) -->
-                                    <div class="xl:col-span-6 space-y-3">
-                                        <div class="flex items-center justify-between text-[10px] font-bold text-gray-400 pb-1.5 border-b border-gray-100 select-none">
-                                            <span>Trường thông tin</span>
-                                            <span>Hiện | Cột hiển thị | Thứ tự</span>
+                                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                                    <!-- Left Panel (Sidebar): Elements & Configuration (lg:col-span-4) -->
+                                    <div class="lg:col-span-4 flex flex-col gap-4">
+                                        <!-- Add elements toolbar -->
+                                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex flex-col gap-3">
+                                            <h4 class="text-xs font-black text-[#4a2c32] uppercase tracking-wider select-none">Thanh công cụ thiết kế</h4>
+                                            
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <button 
+                                                    @click="addStaticText" 
+                                                    :disabled="cfgForm.locked"
+                                                    class="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-primary hover:text-primary transition-all flex items-center gap-1"
+                                                >
+                                                    <span class="material-symbols-outlined text-xs">title</span> Chữ tĩnh
+                                                </button>
+                                                <button 
+                                                    @click="addLineElement('horizontal')" 
+                                                    :disabled="cfgForm.locked"
+                                                    class="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-primary hover:text-primary transition-all flex items-center gap-1"
+                                                >
+                                                    <span class="material-symbols-outlined text-xs">horizontal_rule</span> Kẻ ngang
+                                                </button>
+                                                <button 
+                                                    @click="addLineElement('vertical')" 
+                                                    :disabled="cfgForm.locked"
+                                                    class="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-primary hover:text-primary transition-all flex items-center gap-1"
+                                                >
+                                                    <span class="material-symbols-outlined text-xs">vertical_align_center</span> Kẻ dọc
+                                                </button>
+                                                <button 
+                                                    @click="addRectElement" 
+                                                    :disabled="cfgForm.locked"
+                                                    class="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-700 hover:border-primary hover:text-primary transition-all flex items-center gap-1"
+                                                >
+                                                    <span class="material-symbols-outlined text-xs">check_box_outline_blank</span> Khung viền
+                                                </button>
+                                            </div>
+
+                                            <div class="flex flex-col gap-1 mt-1">
+                                                <label class="text-[10px] font-bold text-gray-500 select-none">Thêm trường dữ liệu xe cân:</label>
+                                                <select 
+                                                    @change="(e) => {
+                                                        const target = e.target as HTMLSelectElement;
+                                                        if (target.value) {
+                                                            const opt = availableFields.find(o => o.id === target.value);
+                                                            if (opt) addFieldElement(opt.id, opt.label);
+                                                            target.value = '';
+                                                        }
+                                                    }"
+                                                    :disabled="cfgForm.locked"
+                                                    class="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[11px] font-bold focus:outline-none focus:border-primary cursor-pointer w-full"
+                                                >
+                                                    <option value="">-- Chọn trường để thêm --</option>
+                                                    <option v-for="item in availableFields" :key="item.id" :value="item.id">
+                                                        {{ item.label }}
+                                                    </option>
+                                                </select>
+                                            </div>
                                         </div>
-                                        
-                                        <div class="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
-                                            <div 
-                                                v-for="f in (cfgForm.printFields || [])" 
-                                                :key="f.id" 
-                                                class="flex items-center justify-between p-2 rounded-[10px] border border-gray-100 hover:border-primary/20 transition-all gap-3 bg-gray-50/50"
-                                            >
-                                                <!-- Left: Label renaming input -->
-                                                <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                                                    <span class="material-symbols-outlined text-gray-300 text-xs shrink-0 select-none">drag_indicator</span>
+
+                                        <!-- Selected Element Config Panel -->
+                                        <div v-if="selectedElement" class="bg-gray-50 p-4 rounded-xl border border-primary/10 flex flex-col gap-3.5">
+                                            <div class="flex items-center justify-between border-b border-primary/5 pb-2">
+                                                <h4 class="text-xs font-black text-primary uppercase tracking-wider flex items-center gap-1 select-none">
+                                                    <span class="material-symbols-outlined text-sm">edit_attributes</span>
+                                                    Cấu hình phần tử
+                                                </h4>
+                                                <div class="flex items-center gap-1">
+                                                    <button 
+                                                        @click="duplicateElement(selectedElement!)" 
+                                                        title="Nhân bản phần tử"
+                                                        class="p-1 text-gray-500 hover:text-primary hover:bg-white rounded transition-colors"
+                                                    >
+                                                        <span class="material-symbols-outlined text-sm">content_copy</span>
+                                                    </button>
+                                                    <button 
+                                                        @click="deleteElement(selectedElement!.id)" 
+                                                        title="Xóa phần tử"
+                                                        class="p-1 text-red-500 hover:text-red-700 hover:bg-white rounded transition-colors"
+                                                    >
+                                                        <span class="material-symbols-outlined text-sm">delete</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-3 text-[10px] font-bold text-gray-500">
+                                                <div class="flex flex-col gap-1">
+                                                    <label class="flex justify-between select-none">
+                                                        <span>Vị trí X (mm)</span>
+                                                        <span class="text-gray-400">max 200</span>
+                                                    </label>
                                                     <input 
-                                                        v-model="f.label" 
-                                                        :disabled="cfgForm.locked" 
-                                                        type="text" 
-                                                        class="px-2 py-1 bg-white border border-gray-200 rounded-[6px] text-xs font-semibold focus:outline-none focus:border-primary w-full truncate disabled:bg-transparent disabled:border-none"
+                                                        v-model.number="selectedElement.x" 
+                                                        type="number" 
+                                                        step="0.5" 
+                                                        min="0" 
+                                                        max="200" 
+                                                        class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
-                                                
-                                                <!-- Right: Actions -->
-                                                <div class="flex items-center gap-2 shrink-0">
-                                                    <!-- Visibility Checkbox -->
-                                                    <label class="flex items-center cursor-pointer select-none" title="Bật/Tắt hiển thị">
+                                                <div class="flex flex-col gap-1">
+                                                    <label class="flex justify-between select-none">
+                                                        <span>Vị trí Y (mm)</span>
+                                                        <span class="text-gray-400">max 138</span>
+                                                    </label>
+                                                    <input 
+                                                        v-model.number="selectedElement.y" 
+                                                        type="number" 
+                                                        step="0.5" 
+                                                        min="0" 
+                                                        max="138" 
+                                                        class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-3 text-[10px] font-bold text-gray-500">
+                                                <div class="flex flex-col gap-1">
+                                                    <label class="select-none">Rộng W (mm)</label>
+                                                    <input 
+                                                        v-model.number="selectedElement.width" 
+                                                        type="number" 
+                                                        step="0.5" 
+                                                        min="0.5" 
+                                                        class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
+                                                    />
+                                                </div>
+                                                <div class="flex flex-col gap-1">
+                                                    <label class="select-none">Cao H (mm)</label>
+                                                    <input 
+                                                        v-model.number="selectedElement.height" 
+                                                        type="number" 
+                                                        step="0.5" 
+                                                        min="0.5" 
+                                                        class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div v-if="selectedElement.type === 'text'" class="flex flex-col gap-1 text-[10px] font-bold text-gray-500">
+                                                <label class="select-none">Nội dung chữ tĩnh</label>
+                                                <textarea 
+                                                    v-model="selectedElement.text" 
+                                                    rows="2" 
+                                                    class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary resize-none font-sans font-bold"
+                                                ></textarea>
+                                            </div>
+
+                                            <div v-if="selectedElement.type === 'field'" class="flex flex-col gap-2.5">
+                                                <div class="flex flex-col gap-1 text-[10px] font-bold text-gray-500">
+                                                    <label class="select-none">Tiêu đề nhãn (Label)</label>
+                                                    <input 
+                                                        v-model="selectedElement.label" 
+                                                        type="text" 
+                                                        class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-sans font-bold"
+                                                    />
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-3 text-[10px] font-bold text-gray-500">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="select-none">Độ rộng nhãn (mm)</label>
                                                         <input 
-                                                            v-model="f.visible" 
-                                                            :disabled="cfgForm.locked" 
-                                                            type="checkbox" 
-                                                            class="rounded border-gray-300 text-primary focus:ring-primary size-3.5 cursor-pointer disabled:opacity-50"
+                                                            v-model.number="selectedElement.labelWidth" 
+                                                            type="number" 
+                                                            step="0.5" 
+                                                            min="1" 
+                                                            class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                         />
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="select-none">Trường liên kết</label>
+                                                        <select 
+                                                            v-model="selectedElement.fieldId" 
+                                                            class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-bold cursor-pointer"
+                                                        >
+                                                            <option v-for="item in availableFields" :key="item.id" :value="item.id">
+                                                                {{ item.label }}
+                                                            </option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div v-if="selectedElement.type === 'rect'" class="flex flex-col gap-1 text-[10px] font-bold text-gray-500">
+                                                <label class="select-none">Kiểu viền (Border style)</label>
+                                                <select 
+                                                    v-model="selectedElement.borderStyle" 
+                                                    class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-bold cursor-pointer"
+                                                >
+                                                    <option value="solid">Viền đơn (Solid)</option>
+                                                    <option value="dashed">Đường đứt nét (Dashed)</option>
+                                                    <option value="double">Viền kép (Double)</option>
+                                                </select>
+                                            </div>
+
+                                            <!-- Typography (Not for lines and rects) -->
+                                            <div v-if="selectedElement.type === 'text' || selectedElement.type === 'field'" class="flex flex-col gap-2 bg-white p-3 rounded-lg border border-gray-150">
+                                                <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest select-none">Định dạng chữ</span>
+                                                
+                                                <div class="grid grid-cols-2 gap-3 text-[10px] font-bold text-gray-500 items-center">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="select-none">Cỡ chữ (pt)</label>
+                                                        <input 
+                                                            v-model.number="selectedElement.fontSize" 
+                                                            type="number" 
+                                                            step="0.5" 
+                                                            min="4" 
+                                                            class="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary font-mono"
+                                                        />
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="select-none">Độ đậm</label>
+                                                        <select 
+                                                            v-model="selectedElement.fontWeight" 
+                                                            class="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary cursor-pointer"
+                                                        >
+                                                            <option value="normal">Bình thường</option>
+                                                            <option value="bold">In đậm</option>
+                                                            <option value="black">Siêu đậm</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="flex items-center justify-between text-[10px] font-bold text-gray-500 pt-1">
+                                                    <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                                        <input 
+                                                            v-model="selectedElement.fontStyle" 
+                                                            type="checkbox" 
+                                                            true-value="italic"
+                                                            false-value="normal"
+                                                            class="rounded text-primary focus:ring-primary/20"
+                                                        />
+                                                        <span>In nghiêng (Italic)</span>
                                                     </label>
                                                     
-                                                    <!-- Column Switcher -->
-                                                    <button 
-                                                        @click="switchColumn(f.id)" 
-                                                        :disabled="cfgForm.locked"
-                                                        class="px-2 py-1 text-[9px] font-black rounded-lg border transition-all select-none w-14 text-center"
-                                                        :class="f.column === 'left' ? 'bg-teal-50 text-teal-600 border-teal-100 hover:bg-teal-100' : 'bg-primary/5 text-primary border-primary/10 hover:bg-primary/10'"
-                                                    >
-                                                        Cột {{ f.column === 'left' ? 'Trái' : 'Phải' }}
-                                                    </button>
-                                                    
-                                                        <!-- Order Buttons -->
-                                                    <div class="flex items-center gap-0.5 select-none">
-                                                        <button 
-                                                            @click="moveField(f.id, 'up')" 
-                                                            :disabled="cfgForm.locked"
-                                                            class="size-5 rounded-md hover:bg-gray-150 text-gray-500 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                                                            title="Di chuyển lên"
-                                                        >
-                                                            <span class="material-symbols-outlined text-[10px] font-bold">arrow_upward</span>
-                                                        </button>
-                                                        <button 
-                                                            @click="moveField(f.id, 'down')" 
-                                                            :disabled="cfgForm.locked"
-                                                            class="size-5 rounded-md hover:bg-gray-150 text-gray-500 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-                                                            title="Di chuyển xuống"
-                                                        >
-                                                            <span class="material-symbols-outlined text-[10px] font-bold">arrow_downward</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Live Preview Mockup (xl:col-span-6) -->
-                                    <div class="xl:col-span-6 flex flex-col items-center border border-gray-100 rounded-2xl p-4 bg-gray-50/50">
-                                        <div class="text-[9px] uppercase font-black text-gray-400 mb-3 select-none">Xem trước biểu mẫu in</div>
-                                        
-                                        <!-- Real Mockup Container -->
-                                        <div class="bg-white border border-gray-200 rounded-xl p-4 w-full max-w-[480px] shadow-sm font-serif text-[10px] text-black">
-                                            <!-- Mockup Header -->
-                                            <div class="flex justify-between items-start text-[8px] mb-2 font-bold border-b border-gray-100 pb-1.5 w-full gap-2">
-                                                <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-                                                    <input 
-                                                        v-model="cfgForm.companyName" 
-                                                        :disabled="cfgForm.locked" 
-                                                        class="bg-transparent border-none text-[8px] font-black text-gray-850 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 -ml-1 w-full focus:ring-1 focus:ring-primary py-0 font-serif"
-                                                        placeholder="Tên công ty"
-                                                    />
-                                                    <input 
-                                                        v-model="cfgForm.companyAddress" 
-                                                        :disabled="cfgForm.locked" 
-                                                        class="bg-transparent border-none text-[6.5px] font-normal text-gray-500 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 -ml-1 w-full focus:ring-1 focus:ring-primary py-0 font-serif"
-                                                        placeholder="Địa chỉ công ty"
-                                                    />
-                                                    <input 
-                                                        v-model="cfgForm.companyPhone" 
-                                                        :disabled="cfgForm.locked" 
-                                                        class="bg-transparent border-none text-[6.5px] font-normal text-gray-500 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 -ml-1 w-full focus:ring-1 focus:ring-primary py-0 font-serif"
-                                                        placeholder="Số điện thoại"
-                                                    />
-                                                </div>
-                                                <div class="text-right whitespace-nowrap pt-0.5 text-gray-700">Phiếu số: PC-001</div>
-                                            </div>
-                                            
-                                            <!-- Title -->
-                                            <div class="text-center mb-2 px-4">
-                                                <input 
-                                                    v-model="cfgForm.ticketTitle" 
-                                                    :disabled="cfgForm.locked"
-                                                    class="bg-transparent border-none text-xs font-black text-center text-gray-900 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-1 w-full focus:ring-1 focus:ring-primary py-0.5 font-serif"
-                                                    placeholder="TIÊU ĐỀ PHIẾU"
-                                                />
-                                                <div class="text-[7px] italic text-gray-400 mt-0.5">Ngày giờ vào/ra: 2026-06-20...</div>
-                                            </div>
-                                            
-                                            <!-- Columns mockup -->
-                                            <div class="grid grid-cols-2 gap-4 border-t border-b border-gray-100 py-3">
-                                                <!-- Left -->
-                                                <div class="space-y-1.5">
-                                                    <div v-for="f in printFieldsLeft.filter(f => f.visible)" :key="f.id" class="flex items-baseline">
-                                                        <input 
-                                                            v-model="f.label" 
-                                                            :disabled="cfgForm.locked"
-                                                            class="w-20 shrink-0 bg-transparent border-none text-gray-500 font-semibold focus:outline-none hover:bg-gray-100 focus:bg-white focus:ring-1 focus:ring-primary rounded px-0.5 -ml-0.5 text-[8.5px] truncate font-serif"
-                                                        />
-                                                        <span class="w-2 shrink-0 text-center font-semibold">:</span>
-                                                        
-                                                        <!-- Config Values / Dynamic Values -->
-                                                        <input 
-                                                            v-if="['goods', 'owner', 'goodsCode', 'operator'].includes(f.id)"
-                                                            v-model="cfgForm[f.id]"
-                                                            :disabled="cfgForm.locked"
-                                                            class="grow bg-transparent border-none font-bold text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 -ml-0.5 text-[8.5px] focus:ring-1 focus:ring-primary w-full py-0 font-serif"
-                                                            :placeholder="'Nhập ' + f.label"
-                                                        />
+                                                    <div class="flex items-center gap-1">
+                                                        <label class="select-none">Căn lề:</label>
                                                         <select 
-                                                            v-else-if="f.id === 'xn'"
-                                                            v-model="cfgForm.xn"
-                                                            :disabled="cfgForm.locked"
-                                                            class="grow bg-transparent border-none font-bold text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 -ml-0.5 text-[8.5px] focus:ring-1 focus:ring-primary w-full py-0 h-4 font-serif"
+                                                            v-model="selectedElement.align" 
+                                                            class="px-1.5 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary cursor-pointer font-bold"
                                                         >
-                                                            <option value="XUẤT">XUẤT</option>
-                                                            <option value="NHẬP">NHẬP</option>
+                                                            <option value="left">Trái</option>
+                                                            <option value="center">Giữa</option>
+                                                            <option value="right">Phải</option>
                                                         </select>
-                                                        <span 
-                                                            v-else 
-                                                            class="grow font-bold text-gray-850 truncate" 
-                                                            :class="(f.id === 'plateNumber' || f.id === 'weightNet') ? 'text-[11px]' : ''"
-                                                        >
-                                                            {{ getFieldValue(f.id) }}
-                                                        </span>
                                                     </div>
-                                                </div>
-                                                
-                                                <!-- Right -->
-                                                <div class="space-y-1.5">
-                                                    <template v-for="f in printFieldsRight.filter(f => f.visible)" :key="f.id">
-                                                        <div v-if="f.id === 'chinhpham' && isFirstQualityField(f.id)" class="font-bold text-[8px] text-primary uppercase pt-1 border-t border-gray-50 mb-1">
-                                                            ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA
-                                                        </div>
-                                                        <div class="flex items-baseline">
-                                                            <input 
-                                                                v-model="f.label" 
-                                                                :disabled="cfgForm.locked"
-                                                                class="w-20 shrink-0 bg-transparent border-none text-gray-500 font-semibold focus:outline-none hover:bg-gray-100 focus:bg-white focus:ring-1 focus:ring-primary rounded px-0.5 -ml-0.5 text-[8.5px] truncate font-serif"
-                                                                :class="f.id === 'chinhpham' || f.id === 'phupham' ? 'font-normal' : ''"
-                                                            />
-                                                            <span class="w-2 shrink-0 text-center font-semibold">{{ f.id === 'chinhpham' || f.id === 'phupham' ? ':' : ' ' }}</span>
-                                                            
-                                                            <div v-if="f.id === 'chinhpham' || f.id === 'phupham'" class="grow flex items-baseline">
-                                                                <input 
-                                                                    v-model.number="cfgForm[f.id]" 
-                                                                    :disabled="cfgForm.locked"
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max="100"
-                                                                    class="border-b border-black bg-transparent w-14 text-center font-bold pb-0.5 focus:outline-none text-[8.5px] p-0 h-4 border-t-0 border-x-0 focus:ring-0 font-serif"
-                                                                />
-                                                                <span class="ml-1 text-[8px] font-normal">%</span>
-                                                            </div>
-                                                            
-                                                            <input 
-                                                                v-else-if="['goods', 'owner', 'goodsCode', 'operator', 'ketluan'].includes(f.id)"
-                                                                v-model="cfgForm[f.id]"
-                                                                :disabled="cfgForm.locked"
-                                                                class="grow bg-transparent border-none font-bold text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 -ml-0.5 text-[8.5px] focus:ring-1 focus:ring-primary w-full py-0 font-serif"
-                                                                :placeholder="'Nhập ' + f.label"
-                                                            />
-                                                            <span v-else class="grow font-bold text-gray-850 truncate font-serif">{{ getFieldValue(f.id) }}</span>
-                                                        </div>
-                                                    </template>
                                                 </div>
                                             </div>
                                             
@@ -2724,9 +3082,103 @@ onMounted(() => {
                                                     <input 
                                                         v-model="cfgForm.signatures![sIdx]" 
                                                         :disabled="cfgForm.locked"
-                                                        class="bg-transparent border-none text-[6.5px] font-black text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 w-full text-center focus:ring-1 focus:ring-primary py-0 font-serif"
+                                                        class="bg-transparent border-none text-[6.5px] font-black text-gray-800 focus:outline-none hover:bg-gray-100 focus:bg-white rounded px-0.5 w-full text-center focus:ring-1 focus:ring-primary py-0 font-sans"
                                                         placeholder="Ký tên..."
                                                     />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div> <!-- End of Left Panel lg:col-span-4 -->
+
+                                    <!-- Right Panel: A5 Blueprint Canvas -->
+                                    <div class="lg:col-span-8 flex flex-col gap-3">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-[#4a2c32] flex items-center gap-1 select-none">
+                                                <span class="material-symbols-outlined text-sm">square_foot</span>
+                                                Khổ giấy in A5 (200mm x 138mm) - Kéo thả để bố trí layout
+                                            </span>
+                                            <span class="text-[9px] font-bold text-gray-400 select-none">Tỉ lệ 1mm = 4px | Dùng phím mũi tên để căn chỉnh mịn</span>
+                                        </div>
+                                        
+                                        <!-- Canvas Container -->
+                                        <div class="w-full overflow-auto bg-gray-50 border border-gray-200 rounded-2xl p-4 flex justify-center items-center shadow-inner relative group">
+                                            <div 
+                                                class="relative bg-white border border-dashed border-gray-300 shadow-lg select-none overflow-hidden"
+                                                style="width: 800px; height: 552px; background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px); background-size: 20px 20px;"
+                                                @mousedown="selectedElementId = null"
+                                            >
+                                                <!-- Alignment Snap Guides -->
+                                                <div 
+                                                    v-for="(guide, gIdx) in alignmentGuides" 
+                                                    :key="'guide_' + gIdx"
+                                                    class="absolute pointer-events-none z-50"
+                                                    :class="guide.type === 'h' ? 'left-0 right-0 border-t border-dashed border-red-500' : 'top-0 bottom-0 border-l border-dashed border-red-500'"
+                                                    :style="guide.type === 'h' ? { top: guide.pos + 'px', height: '0px' } : { left: guide.pos + 'px', width: '0px' }"
+                                                ></div>
+
+                                                <!-- Dynamic Print Elements -->
+                                                <div 
+                                                    v-for="el in (cfgForm.printElements || [])" 
+                                                    :key="el.id"
+                                                    class="absolute cursor-move select-none flex flex-col"
+                                                    :class="[
+                                                        selectedElementId === el.id ? 'ring-2 ring-primary ring-offset-1 z-30' : 'hover:ring-1 hover:ring-primary/50 z-20'
+                                                    ]"
+                                                    :style="{
+                                                        left: (el.x * MM_TO_PX) + 'px',
+                                                        top: (el.y * MM_TO_PX) + 'px',
+                                                        width: (el.width * MM_TO_PX) + 'px',
+                                                        height: (el.height * MM_TO_PX) + 'px',
+                                                        fontSize: (el.fontSize || 8.5) * 1.35 + 'px',
+                                                        fontWeight: el.fontWeight || 'bold',
+                                                        fontStyle: el.fontStyle || 'normal',
+                                                        textAlign: el.align || 'left',
+                                                        color: 'black',
+                                                        fontFamily: 'Arial, Helvetica, sans-serif',
+                                                        lineHeight: '1.2'
+                                                    }"
+                                                    @mousedown.stop="startDrag($event, el)"
+                                                >
+                                                    <!-- Field Type element -->
+                                                    <div v-if="el.type === 'field'" class="w-full h-full flex items-baseline overflow-hidden select-none pointer-events-none">
+                                                        <span 
+                                                            class="text-gray-500 shrink-0 font-sans" 
+                                                            style="font-weight: inherit;"
+                                                            :style="{ width: ((el.labelWidth || 20) * MM_TO_PX) + 'px' }"
+                                                        >
+                                                            {{ el.label }}
+                                                        </span>
+                                                        <span class="mr-1 shrink-0 font-sans">:</span>
+                                                        <span 
+                                                            class="grow font-sans truncate"
+                                                            :style="{ fontWeight: el.fontWeight === 'bold' || el.fontWeight === 'black' ? 'inherit' : 'bold' }"
+                                                        >
+                                                            [{{ el.fieldId }}]
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <!-- Static text element -->
+                                                    <div v-else-if="el.type === 'text'" class="w-full h-full overflow-hidden whitespace-pre-wrap select-none pointer-events-none font-sans">
+                                                        {{ el.text }}
+                                                    </div>
+                                                    
+                                                    <!-- Line element -->
+                                                    <div 
+                                                        v-else-if="el.type === 'line'" 
+                                                        class="w-full h-full bg-black select-none pointer-events-none"
+                                                    ></div>
+                                                    
+                                                    <!-- Rect element -->
+                                                    <div 
+                                                        v-else-if="el.type === 'rect'" 
+                                                        class="w-full h-full border border-black select-none pointer-events-none"
+                                                        :style="{ borderStyle: el.borderStyle || 'solid', borderWidth: '1px' }"
+                                                    ></div>
+
+                                                    <!-- Selected Indicator Badge -->
+                                                    <div v-if="selectedElementId === el.id" class="absolute -top-4 left-0 bg-primary text-white text-[8px] px-1 py-0.5 rounded font-mono uppercase font-bold tracking-wider pointer-events-none shadow-sm z-40">
+                                                        {{ el.type === 'field' ? el.fieldId : el.type }}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2865,94 +3317,47 @@ onMounted(() => {
         <!-- PRINT ONLY SECTION -->
         <teleport to="body">
             <div id="print-section" class="hidden">
-            <div v-for="truck in printTrucksList" :key="truck.id" class="print-page">
-                <!-- Header -->
-                <div class="ticket-header">
-                    <div class="ticket-logo-info">
-                        <div class="ticket-company">{{ cfgForm.companyName }}</div>
-                        <div class="ticket-address">{{ cfgForm.companyAddress }}</div>
-                        <div class="ticket-phone">{{ cfgForm.companyPhone }}</div>
-                    </div>
-                    <div class="ticket-number-box">
-                        <span class="ticket-number-label">Phiếu số: </span>
-                        <span class="ticket-number-val">{{ truck.ticketNo }}</span>
-                    </div>
-                </div>
-
-                <!-- Title -->
-                <div class="ticket-title-container">
-                    <div class="ticket-title">{{ cfgForm.ticketTitle || 'PHIẾU CÂN XE' }}</div>
-                    <div class="ticket-dates">
-                        <div>Ngày, giờ vào: {{ formatDateTimeStr(truck.dateIn) }}</div>
-                        <div>Ngày, giờ ra: {{ formatDateTimeStr(truck.dateOut) }}</div>
-                    </div>
-                </div>
-
-                <!-- Body (Two Columns) -->
-                <div class="ticket-body">
-                    <!-- Left Column -->
-                    <div class="ticket-col-left">
-                        <div 
-                            v-for="field in printFieldsLeft.filter(f => f.visible)" 
-                            :key="field.id" 
-                            class="ticket-row"
-                        >
-                            <span class="ticket-row-label">{{ field.label }}</span>
-                            <span class="ticket-row-separator">:</span>
-                            <span 
-                                :class="[
-                                    'ticket-row-val', 
-                                    (field.id === 'plateNumber' || field.id === 'weightNet') ? 'highlight' : '', 
-                                    (field.id === 'weight1' || field.id === 'weight2') ? 'highlight normal-weight' : '',
-                                    (field.id === 'words') ? 'text-italic' : '',
-                                    (field.id !== 'plateNumber' && field.id !== 'weightNet' && field.id !== 'weight1' && field.id !== 'weight2') ? 'normal-weight' : ''
-                                ]"
-                            >
-                                {{ getFieldValue(field.id, truck) }}
+                <div v-for="truck in printTrucksList" :key="truck.id" class="print-page" style="position: relative; width: 200mm; height: 138mm; padding: 0; box-sizing: border-box; overflow: hidden; font-family: Arial, Helvetica, sans-serif;">
+                                    <div 
+                                        v-for="el in (cfgForm.printElements || [])" 
+                                        :key="el.id"
+                                        class="print-element"
+                                        :style="{
+                                            position: 'absolute',
+                                            left: el.x + 'mm',
+                                            top: el.y + 'mm',
+                                            width: el.width + 'mm',
+                                            height: el.height + 'mm',
+                                            fontSize: el.fontSize + 'pt',
+                                            fontWeight: el.fontWeight || 'bold',
+                            fontStyle: el.fontStyle || 'normal',
+                            textAlign: el.align || 'left',
+                            lineHeight: '1.2',
+                            color: 'black'
+                        }"
+                    >
+                        <!-- Field type element -->
+                        <div v-if="el.type === 'field'" style="display: flex; align-items: baseline; width: 100%; height: 100%; overflow: hidden;">
+                            <span style="flex-shrink: 0; font-weight: inherit;" :style="{ width: (el.labelWidth || 20) + 'mm' }">{{ el.label }}</span>
+                            <span style="flex-shrink: 0; margin-right: 1mm;">:</span>
+                            <span style="flex-grow: 1;" :style="{ fontWeight: el.fontWeight === 'bold' || el.fontWeight === 'black' ? 'inherit' : 'bold' }">
+                                {{ getFieldValue(el.fieldId!, truck) }}
                             </span>
                         </div>
-                    </div>
-
-                    <!-- Right Column -->
-                    <div class="ticket-col-right">
-                        <template v-for="field in printFieldsRight.filter(f => f.visible)" :key="field.id">
-                            <!-- Section header for Quality Evaluation -->
-                            <div v-if="field.id === 'chinhpham' && isFirstQualityField(field.id)" class="ticket-quality-header">
-                                ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA
-                            </div>
-                            
-                            <div class="ticket-row">
-                                <span class="ticket-row-label" :class="field.id === 'chinhpham' || field.id === 'phupham' ? 'font-normal' : ''">
-                                    {{ field.label }}
-                                </span>
-                                <span class="ticket-row-separator">{{ field.id === 'chinhpham' || field.id === 'phupham' ? ':' : '&nbsp;' }}</span>
-                                
-                                <div v-if="field.id === 'chinhpham' || field.id === 'phupham'" class="ticket-row-val-underline-container">
-                                    <span class="ticket-row-val-underline">
-                                        {{ field.id === 'chinhpham' ? cfgForm.chinhpham : cfgForm.phupham }}
-                                    </span>
-                                    <span class="ticket-row-unit">%</span>
-                                </div>
-                                
-                                <span 
-                                    v-else
-                                    class="ticket-row-val normal-weight"
-                                >
-                                    {{ getFieldValue(field.id, truck) }}
-                                </span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <!-- Signatures -->
-                <div class="ticket-footer-signatures">
-                    <div v-for="(sig, sIdx) in (cfgForm.signatures || ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'])" :key="sIdx" class="sig-col">
-                        {{ sig }}
+                        
+                        <!-- Static text element -->
+                        <div v-else-if="el.type === 'text'" style="width: 100%; height: 100%; overflow: hidden; whitespace: pre-wrap;">
+                            {{ el.text }}
+                        </div>
+                        
+                        <!-- Line element -->
+                        <div v-else-if="el.type === 'line'" style="width: 100%; height: 100%; background-color: black;"></div>
+                        
+                        <!-- Rect element -->
+                        <div v-else-if="el.type === 'rect'" style="width: 100%; height: 100%; border: 0.5pt solid black;" :style="{ borderStyle: el.borderStyle || 'solid' }"></div>
                     </div>
                 </div>
             </div>
-        </div>
     </teleport>
 </div>
 </template>
@@ -3003,13 +3408,14 @@ onMounted(() => {
 
     .print-page {
         page-break-after: always;
-        height: 135mm; /* Adjusted to fit perfectly in A5 landscape printable area */
+        width: 200mm;
+        height: 138mm;
         box-sizing: border-box;
         position: relative;
         overflow: hidden;
         border: none;
-        padding: 2mm 5mm;
-        font-family: 'Times New Roman', Times, serif !important;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif !important;
         font-size: 11pt !important;
         color: black !important;
         background-color: white !important;
