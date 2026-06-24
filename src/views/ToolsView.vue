@@ -217,7 +217,7 @@ const handleSidebarSwitch = (id: string) => {
 
         <!-- Main Content Area -->
         <main class="flex-1 overflow-y-auto p-6 bg-cute-gradient flex flex-col items-center">
-          <div class="w-full max-w-4xl">
+          <div class="w-full max-w-[1200px]">
             <FormatConverter v-if="activeToolId === 'converter'" />
             <ExcelMerger v-else-if="activeToolId === 'merger'" />
             <PdfOcrTools v-else-if="activeToolId === 'ocr'" />
