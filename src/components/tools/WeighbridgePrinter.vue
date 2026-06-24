@@ -3555,8 +3555,8 @@ onUnmounted(() => {
                                                     width: canvasWidthPx + 'px',
                                                     height: canvasHeightPx + 'px',
                                                     boxSizing: 'content-box',
-                                                    backgroundImage: 'radial-gradient(circle, #e5e7eb 1px, transparent 1px)',
-                                                    backgroundSize: (20 * (canvasWidthPx / 840)) + 'px ' + (20 * (canvasWidthPx / 840)) + 'px'
+                                                    backgroundImage: 'linear-gradient(to right, rgba(226, 239, 252, 0.8) 1px, transparent 1px), linear-gradient(to bottom, rgba(226, 239, 252, 0.8) 1px, transparent 1px)',
+                                                    backgroundSize: (5 * currentMmToPx) + 'px ' + (5 * currentMmToPx) + 'px'
                                                 }"
                                                 @mousedown="selectedElementId = null; selectedElementIds = []"
                                             >
