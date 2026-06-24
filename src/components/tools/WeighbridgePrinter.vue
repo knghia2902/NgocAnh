@@ -1015,6 +1015,21 @@ const clampSelectedElement = (el: PrintElement | null) => {
     saveBargeConfig();
 };
 
+// Apply a property from the primary selected element to all selected elements
+const applyToAllSelected = (prop: keyof PrintElement) => {
+    const primary = selectedElement.value;
+    if (!primary || selectedElementIds.value.length <= 1) return;
+    const value = primary[prop];
+    selectedElementIds.value.forEach(id => {
+        if (id === selectedElementId.value) return;
+        const el = (cfgForm.printElements || []).find(e => e.id === id);
+        if (!el) return;
+        (el as any)[prop] = value;
+        clampElement(el);
+    });
+    saveBargeConfig();
+};
+
 // Watch and clamp all elements to stay within A5 paper bounds (210mm x 148mm)
 watch(() => JSON.stringify(cfgForm.printElements), () => {
     if (!cfgForm.printElements) return;
@@ -1215,6 +1230,11 @@ const handleDragMove = (event: MouseEvent) => {
     // Recompute primary position based on the group-constrained delta
     newPrimaryX = Number(dragStartElX) + actualDeltaX;
     newPrimaryY = Number(dragStartElY) + actualDeltaY;
+    
+    // Strict safety clamp for primary element
+    newPrimaryX = Math.max(0, Math.min(CANVAS_WIDTH_MM - (Number(primaryEl.width) || 10), newPrimaryX));
+    newPrimaryY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - (Number(primaryEl.height) || 5), newPrimaryY));
+    
     primaryEl.x = newPrimaryX;
     primaryEl.y = newPrimaryY;
     
@@ -1229,8 +1249,15 @@ const handleDragMove = (event: MouseEvent) => {
         const sx = Number(startPos.x) || 0;
         const sy = Number(startPos.y) || 0;
         
-        item.x = sx + actualDeltaX;
-        item.y = sy + actualDeltaY;
+        let newX = sx + actualDeltaX;
+        let newY = sy + actualDeltaY;
+        
+        // Strict safety clamp for secondary elements
+        newX = Math.max(0, Math.min(CANVAS_WIDTH_MM - (Number(item.width) || 10), newX));
+        newY = Math.max(0, Math.min(CANVAS_HEIGHT_MM - (Number(item.height) || 5), newY));
+        
+        item.x = newX;
+        item.y = newY;
     });
     
     alignmentGuides.value = guides;
@@ -1241,6 +1268,11 @@ const handleDragEnd = () => {
     alignmentGuides.value = [];
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
+    // Safety: clamp ALL selected elements within bounds before saving
+    selectedElementIds.value.forEach(id => {
+        const el = (cfgForm.printElements || []).find(e => e.id === id);
+        if (el) clampElement(el);
+    });
     saveBargeConfig();
 };
 
@@ -3264,6 +3296,7 @@ onUnmounted(() => {
                                                 <h4 class="text-xs font-black text-primary uppercase tracking-wider flex items-center gap-1 select-none">
                                                     <span class="material-symbols-outlined text-sm">edit_attributes</span>
                                                     Cấu hình phần tử
+                                                    <span v-if="selectedElementIds.length > 1" class="text-[9px] bg-teal-500 text-white px-1.5 py-0.5 rounded-full font-black ml-1">{{ selectedElementIds.length }} đã chọn</span>
                                                 </h4>
                                                 <div class="flex items-center gap-1">
                                                     <button 
@@ -3324,7 +3357,7 @@ onUnmounted(() => {
                                                         type="number" 
                                                         step="0.5" 
                                                         min="0.5" 
-                                                        @input="clampSelectedElement(selectedElement)"
+                                                        @input="clampSelectedElement(selectedElement); applyToAllSelected('width')"
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3335,7 +3368,7 @@ onUnmounted(() => {
                                                         type="number" 
                                                         step="0.5" 
                                                         min="0.5" 
-                                                        @input="clampSelectedElement(selectedElement)"
+                                                        @input="clampSelectedElement(selectedElement); applyToAllSelected('height')"
                                                         class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                     />
                                                 </div>
@@ -3367,7 +3400,7 @@ onUnmounted(() => {
                                                             type="number" 
                                                             step="0.5" 
                                                             min="1" 
-                                                            @input="clampSelectedElement(selectedElement)"
+                                                            @input="clampSelectedElement(selectedElement); applyToAllSelected('labelWidth')"
                                                             class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-mono"
                                                         />
                                                     </div>
@@ -3389,6 +3422,7 @@ onUnmounted(() => {
                                                 <label class="select-none">Kiểu viền (Border style)</label>
                                                 <select 
                                                     v-model="selectedElement.borderStyle" 
+                                                    @change="applyToAllSelected('borderStyle')"
                                                     class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-primary font-bold cursor-pointer"
                                                 >
                                                     <option value="solid">Viền đơn (Solid)</option>
@@ -3409,6 +3443,7 @@ onUnmounted(() => {
                                                             type="number" 
                                                             step="0.5" 
                                                             min="4" 
+                                                            @input="applyToAllSelected('fontSize')"
                                                             class="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary font-mono"
                                                         />
                                                     </div>
@@ -3416,6 +3451,7 @@ onUnmounted(() => {
                                                         <label class="select-none">Độ đậm</label>
                                                         <select 
                                                             v-model="selectedElement.fontWeight" 
+                                                            @change="applyToAllSelected('fontWeight')"
                                                             class="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary cursor-pointer"
                                                         >
                                                             <option value="normal">Bình thường</option>
@@ -3432,6 +3468,7 @@ onUnmounted(() => {
                                                             type="checkbox" 
                                                             true-value="italic"
                                                             false-value="normal"
+                                                            @change="applyToAllSelected('fontStyle')"
                                                             class="rounded text-primary focus:ring-primary/20"
                                                         />
                                                         <span>In nghiêng (Italic)</span>
@@ -3441,6 +3478,7 @@ onUnmounted(() => {
                                                         <label class="select-none">Căn lề:</label>
                                                         <select 
                                                             v-model="selectedElement.align" 
+                                                            @change="applyToAllSelected('align')"
                                                             class="px-1.5 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs focus:outline-none focus:border-primary cursor-pointer font-bold"
                                                         >
                                                             <option value="left">Trái</option>
