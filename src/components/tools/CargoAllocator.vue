@@ -72,26 +72,7 @@ function getRandomLimit(tttp: number): number {
 
 const vehicleLimitCache = new Map<string, { tttp: number; limit: number }>();
 
-const capacityConfigs = ref<Record<number, CapacityConfig>>({
-    108: { code: 108, tttp: 10.0, limit: 8.0 },
-    107: { code: 107, tttp: 10.0, limit: 8.0 },
-    97: { code: 97, tttp: 10.0, limit: 8.0 }
-});
-
-watch(standardTTTPLimit, (newVal) => {
-    const tttp = newVal || 10.0;
-    if (capacityConfigs.value[108]) {
-        capacityConfigs.value[108]!.tttp = tttp;
-        capacityConfigs.value[108]!.limit = Math.round((tttp - 2.0) * 100) / 100;
-    }
-    if (capacityConfigs.value[107]) {
-        capacityConfigs.value[107]!.tttp = tttp;
-        capacityConfigs.value[107]!.limit = Math.round((tttp - 2.0) * 100) / 100;
-    }
-    if (capacityConfigs.value[97]) {
-        capacityConfigs.value[97]!.tttp = tttp;
-        capacityConfigs.value[97]!.limit = Math.round((tttp - 2.0) * 100) / 100;
-    }
+watch(standardTTTPLimit, () => {
     vehicleLimitCache.clear();
 }, { immediate: true });
 
@@ -410,8 +391,8 @@ function getVehicleCapacity(plate: string): CapacityConfig {
     // 1. Check if it's one of the configured new vehicles
     const newVeh = newVehicles.value.find(v => normalizePlate(v.plateNumber) === norm);
     if (newVeh) {
-        const tttp = newVeh.customTTTP || fallbackTTTP;
-        const limit = newVeh.customLimit || getRandomLimit(tttp);
+        const tttp = newVeh.customTTTP !== undefined ? newVeh.customTTTP : fallbackTTTP;
+        const limit = newVeh.customLimit !== undefined ? newVeh.customLimit : getRandomLimit(tttp);
         return {
             code: 0,
             tttp: tttp,
@@ -425,11 +406,11 @@ function getVehicleCapacity(plate: string): CapacityConfig {
         return { code: 0, tttp: cached.tttp, limit: cached.limit };
     }
     
-    // 3. Check in database map
+    // 3. Check in database map (treat as standard TTTP)
     const code = sheet1Vehicles.value.get(norm);
     if (code) {
-        // In the database map (Sheet1), column 4 code is the TTTP * 10 (e.g. 108 -> 10.8)
-        const tttp = code / 10;
+        // Even if it has a code in the DB, we ignore it and use standard fallback TTTP
+        const tttp = fallbackTTTP;
         const limit = getRandomLimit(tttp);
         vehicleLimitCache.set(norm, { tttp, limit });
         return { code, tttp, limit };
@@ -438,7 +419,7 @@ function getVehicleCapacity(plate: string): CapacityConfig {
     // 4. Fallback default
     const limit = getRandomLimit(fallbackTTTP);
     vehicleLimitCache.set(norm, { tttp: fallbackTTTP, limit });
-    return { code: 108, tttp: fallbackTTTP, limit };
+    return { code: 0, tttp: fallbackTTTP, limit };
 }
 
 // Computed: Total CSV Weight in tons
