@@ -31,13 +31,6 @@ interface CapacityConfig {
     limit: number;     // Trọng lượng hàng cho phép (tấn)
 }
 
-interface NewVehicleConfig {
-    plateNumber: string;
-    capacityCode: number;
-    customTTTP?: number;
-    customLimit?: number;
-    isCustom: boolean;
-}
 
 interface SplitTrip {
     stt: number;
@@ -77,8 +70,7 @@ const vehicleLimitCache = new Map<string, { tttp: number; limit: number }>();
 
 // vehicleLimitCache is maintained locally
 
-// Configs for new vehicles not found in DB
-const newVehicles = ref<NewVehicleConfig[]>([]);
+// vehicleLimitCache is maintained locally
 
 // Algorithmic parameters
 const distStrategy = ref<'even' | 'max' | 'random'>('random');
@@ -155,14 +147,7 @@ watch(timeIntervalMinutes, async (newVal) => {
     } catch (e) {}
 });
 
-// Auto-save custom vehicle limits on change
-watch(newVehicles, async (newVal) => {
-    try {
-        await dbContext.set('allocator_vehicles', newVal);
-    } catch (e) {
-        console.error('Lỗi khi lưu cấu hình xe vào IndexedDB:', e);
-    }
-}, { deep: true });
+// Auto-save settings on change
 
 // Pagination
 const currentPage = ref(1);
@@ -622,7 +607,7 @@ watch(sourceSearchQuery, () => {
     sourceCurrentPage.value = 1;
 });
 
-// Mounted hook to load settings, vehicle limits, and tickets from IndexedDB
+// Mounted hook to load settings and tickets from IndexedDB
 onMounted(async () => {
     try {
         const savedLimit = await dbContext.get<number>('allocator_standard_limit');
@@ -639,18 +624,10 @@ onMounted(async () => {
         const savedInterval = await dbContext.get<number>('allocator_time_interval');
         if (savedInterval) timeIntervalMinutes.value = savedInterval;
 
-        const savedVehs = await dbContext.get<NewVehicleConfig[]>('allocator_vehicles');
-        if (savedVehs && Array.isArray(savedVehs)) {
-            newVehicles.value = savedVehs;
-        }
-
         const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
         if (saved && Array.isArray(saved)) {
             csvRecords.value = saved;
         }
-        
-        // Initial detection
-        detectNewVehicles();
     } catch (e) {
         console.error('Lỗi khi nạp dữ liệu từ IndexedDB:', e);
     }
@@ -660,73 +637,23 @@ onMounted(async () => {
 watch(csvRecords, async (newVal) => {
     try {
         await dbContext.set('allocator_tickets', newVal);
-        detectNewVehicles();
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phiếu cân vào IndexedDB:', e);
     }
 }, { deep: true });
 
-// Detect vehicles in CSV that are not registered in database
-function detectNewVehicles() {
-    if (csvRecords.value.length === 0) {
-        newVehicles.value = [];
-        return;
-    }
-    
-    const list: NewVehicleConfig[] = [];
-    const uniqueCSVPlates = new Set<string>();
-    
-    csvRecords.value.forEach(r => {
-        if (r.plateNumber) {
-            uniqueCSVPlates.add(r.plateNumber);
-        }
-    });
-    
-    uniqueCSVPlates.forEach(plate => {
-        const norm = normalizePlate(plate);
-        // New vehicle detected
-        const existing = newVehicles.value.find(v => normalizePlate(v.plateNumber) === norm);
-        if (existing) {
-            list.push(existing);
-        } else {
-            const tttp = standardTTTPLimit.value;
-            list.push({
-                plateNumber: plate,
-                capacityCode: 108,
-                isCustom: true,
-                customTTTP: tttp,
-                customLimit: getRandomLimit(tttp)
-            });
-        }
-    });
-    
-    newVehicles.value = list;
-}
-
-// Get the capacity info for a vehicle (checks vehicle settings)
+// Get the capacity info for a vehicle (uses standard limit)
 function getVehicleCapacity(plate: string): CapacityConfig {
     const norm = normalizePlate(plate);
     const fallbackTTTP = standardTTTPLimit.value;
     
-    // 1. Check if it's one of the configured new vehicles
-    const newVeh = newVehicles.value.find(v => normalizePlate(v.plateNumber) === norm);
-    if (newVeh) {
-        const tttp = newVeh.customTTTP !== undefined ? newVeh.customTTTP : fallbackTTTP;
-        const limit = newVeh.customLimit !== undefined ? newVeh.customLimit : getRandomLimit(tttp);
-        return {
-            code: 0,
-            tttp: tttp,
-            limit: limit
-        };
-    }
-    
-    // 2. Check cache first
+    // Check cache first
     if (vehicleLimitCache.has(norm)) {
         const cached = vehicleLimitCache.get(norm)!;
         return { code: 0, tttp: cached.tttp, limit: cached.limit };
     }
     
-    // 3. Fallback default
+    // Fallback default
     const limit = getRandomLimit(fallbackTTTP);
     vehicleLimitCache.set(norm, { tttp: fallbackTTTP, limit });
     return { code: 0, tttp: fallbackTTTP, limit };
@@ -1123,51 +1050,7 @@ async function compileAndDownload() {
             </div>
         </div>
 
-        <!-- Vehicle Configs Section -->
-        <div v-if="newVehicles.length > 0" class="bg-white border border-primary/5 rounded-[24px] p-5 soft-shadow flex flex-col gap-3 animate-fade-in">
-            <div class="flex items-center gap-2 text-[#4a2c32]">
-                <span class="material-symbols-outlined text-primary text-base">local_shipping</span>
-                <span class="text-xs font-black uppercase tracking-wide">Cấu hình tải trọng phương tiện ({{ newVehicles.length }} xe)</span>
-            </div>
-            <p class="text-[11px] text-gray-500 -mt-1 leading-relaxed">
-                Cài đặt trọng tải cho phép (TTTP) và hạn mức hàng thực tế chở cho từng phương tiện dưới đây.
-            </p>
-            
-            <div class="overflow-x-auto max-h-[220px] border border-gray-100 rounded-[16px] bg-white">
-                <table class="w-full text-left border-collapse text-[11px]">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-500 font-bold border-b border-gray-100">
-                            <th class="p-2.5 font-bold">Biển số</th>
-                            <th class="p-2.5 font-bold text-center">TTTP (tấn)</th>
-                            <th class="p-2.5 font-bold text-center">Hạn mức hàng (tấn)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 text-gray-700">
-                        <tr v-for="veh in newVehicles" :key="veh.plateNumber" class="hover:bg-gray-50">
-                            <td class="p-2.5 font-bold text-[#4a2c32]">{{ formatPlate(veh.plateNumber) }}</td>
-                            <td class="p-2.5 text-center">
-                                <input 
-                                    type="number" 
-                                    v-model.number="veh.customTTTP" 
-                                    placeholder="10.8" 
-                                    step="0.1" 
-                                    class="w-24 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center"
-                                >
-                            </td>
-                            <td class="p-2.5 text-center">
-                                <input 
-                                    type="number" 
-                                    v-model.number="veh.customLimit" 
-                                    placeholder="10.0" 
-                                    step="0.1" 
-                                    class="w-24 px-3 py-1 bg-white border border-gray-200 rounded-[10px] text-xs font-semibold focus:outline-none focus:border-primary transition-all text-center"
-                                >
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <!-- Settings Section -->
 
         <!-- 3-Column Settings & Capacities configs -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
