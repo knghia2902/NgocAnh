@@ -861,9 +861,9 @@ async function compileAndDownload() {
                     <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Chiến lược chia trọng lượng</label>
                         <select v-model="distStrategy" class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
-                            <option value="random">Phân bổ ngẫu nhiên (Khuyên dùng - Thực tế nhất)</option>
-                            <option value="even">Chia đều (Cân đối tải trọng)</option>
-                            <option value="max">Tối đa hóa công suất (Xếp đầy xe đầu)</option>
+                            <option value="random">Phân bổ ngẫu nhiên</option>
+                            <option value="even">Chia đều</option>
+                            <option value="max">Tối đa hóa công suất</option>
                         </select>
                         <span class="text-[9px] text-gray-400 leading-tight">
                             {{ distStrategy === 'random' ? 'Tự động tạo ra các số tải trọng ngẫu nhiên tự nhiên dưới hạn mức cho phép.' : distStrategy === 'even' ? 'Chia đều toàn bộ khối lượng thực tế cho số chuyến tối thiểu. Trọng lượng mỗi chuyến bằng nhau.' : 'Xếp tối đa tải trọng cho phép cho các chuyến đầu, chuyến cuối cùng chở phần khối lượng còn thừa.' }}
