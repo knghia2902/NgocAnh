@@ -55,17 +55,13 @@ interface SplitTrip {
 // Local State
 const csvFile = ref<File | null>(null);
 const ticketFileInput = ref<HTMLInputElement | null>(null);
-const excelFile = ref<File | null>(null);
 
 function triggerTicketFileInput() {
     ticketFileInput.value?.click();
 }
 const csvRecords = ref<CSVRecord[]>([]);
-const excelWorkbook = ref<any>(null); // ExcelJS Workbook
-const sheet1Vehicles = ref<Map<string, number>>(new Map()); // Normalized plate -> Capacity code
 const existingTrips = ref<SplitTrip[]>([]);
 
-const loadingExcel = ref(false);
 const loadingCSV = ref(false);
 const compiling = ref(false);
 
@@ -83,7 +79,7 @@ watch(standardTTTPLimit, () => {
     vehicleLimitCache.clear();
 }, { immediate: true });
 
-watch([excelFile, csvRecords], () => {
+watch(csvRecords, () => {
     vehicleLimitCache.clear();
 });
 
@@ -614,85 +610,12 @@ watch(csvRecords, async (newVal) => {
     }
 }, { deep: true });
 
-// Handle Excel File upload
-async function handleExcelUpload(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (!file) return;
-    
-    excelFile.value = file;
-    loadingExcel.value = true;
-    
-    try {
-        const ExcelJS = await import('exceljs');
-        const workbook = new ExcelJS.Workbook();
-        const arrayBuffer = await file.arrayBuffer();
-        await workbook.xlsx.load(arrayBuffer);
-        
-        excelWorkbook.value = workbook;
-        
-        // Scan Sheet1 for vehicles database
-        const sheet1 = workbook.getWorksheet('Sheet1');
-        const map = new Map<string, number>();
-        
-        if (sheet1) {
-            sheet1.eachRow((row) => {
-                const plate = row.getCell(3).value;
-                const code = row.getCell(4).value;
-                if (plate && code) {
-                    const normPlate = normalizePlate(String(plate));
-                    const parsedCode = parseInt(String(code), 10);
-                    if (normPlate && !isNaN(parsedCode)) {
-                        map.set(normPlate, parsedCode);
-                    }
-                }
-            });
-        }
-        
-        sheet1Vehicles.value = map;
-
-        // Scan DS sheet for existing rows starting at row 10
-        const dsSheet = workbook.getWorksheet('DS');
-        const existingList: SplitTrip[] = [];
-        if (dsSheet) {
-            for (let i = 10; i <= dsSheet.rowCount; i++) {
-                const row = dsSheet.getRow(i);
-                const sttVal = row.getCell(2).value;
-                const timeVal = row.getCell(3).value;
-                const plateVal = row.getCell(4).value;
-                
-                // If there's at least a valid STT, it's an existing trip row
-                if (sttVal !== null && sttVal !== undefined && !isNaN(parseInt(String(sttVal), 10))) {
-                    existingList.push({
-                        stt: parseInt(String(sttVal), 10),
-                        timeStr: String(timeVal || ''),
-                        plateNumber: String(plateVal || ''),
-                        tttp: parseFloat(String(row.getCell(5).value || 0)) || 0,
-                        limit: parseFloat(String(row.getCell(6).value || 0)) || 0,
-                        ticketNo: String(row.getCell(7).value || ''),
-                        cargoType: String(row.getCell(8).value || ''),
-                        weightTons: parseFloat(String(row.getCell(9).value || 0)) || 0,
-                        notes: String(row.getCell(10).value || ''),
-                        isNew: false
-                    });
-                }
-            }
-        }
-        existingTrips.value = existingList;
-        
-        addToast(`Đã tải lên cơ sở dữ liệu Excel. Tìm thấy ${map.size} xe lịch sử và ${existingList.length} dòng hiện có ở sheet DS.`, 'success');
-        detectNewVehicles();
-    } catch (error) {
-        console.error(error);
-        addToast('Lỗi khi tải hoặc phân tích tệp Excel!', 'error');
-    } finally {
-        loadingExcel.value = false;
-    }
-}
-
-// Detect vehicles in CSV that are not registered in Sheet1 database
+// Detect vehicles in CSV that are not registered in database
 function detectNewVehicles() {
-    if (csvRecords.value.length === 0 || sheet1Vehicles.value.size === 0) return;
+    if (csvRecords.value.length === 0) {
+        newVehicles.value = [];
+        return;
+    }
     
     const list: NewVehicleConfig[] = [];
     const uniqueCSVPlates = new Set<string>();
@@ -705,8 +628,11 @@ function detectNewVehicles() {
     
     uniqueCSVPlates.forEach(plate => {
         const norm = normalizePlate(plate);
-        if (!sheet1Vehicles.value.has(norm)) {
-            // New vehicle detected
+        // New vehicle detected
+        const existing = newVehicles.value.find(v => normalizePlate(v.plateNumber) === norm);
+        if (existing) {
+            list.push(existing);
+        } else {
             const tttp = standardTTTPLimit.value;
             list.push({
                 plateNumber: plate,
@@ -721,7 +647,7 @@ function detectNewVehicles() {
     newVehicles.value = list;
 }
 
-// Get the capacity info for a vehicle (checks new vehicle settings or Sheet1 db)
+// Get the capacity info for a vehicle (checks vehicle settings)
 function getVehicleCapacity(plate: string): CapacityConfig {
     const norm = normalizePlate(plate);
     const fallbackTTTP = standardTTTPLimit.value;
@@ -744,17 +670,7 @@ function getVehicleCapacity(plate: string): CapacityConfig {
         return { code: 0, tttp: cached.tttp, limit: cached.limit };
     }
     
-    // 3. Check in database map (treat as standard TTTP)
-    const code = sheet1Vehicles.value.get(norm);
-    if (code) {
-        // Even if it has a code in the DB, we ignore it and use standard fallback TTTP
-        const tttp = fallbackTTTP;
-        const limit = getRandomLimit(tttp);
-        vehicleLimitCache.set(norm, { tttp, limit });
-        return { code, tttp, limit };
-    }
-    
-    // 4. Fallback default
+    // 3. Fallback default
     const limit = getRandomLimit(fallbackTTTP);
     vehicleLimitCache.set(norm, { tttp: fallbackTTTP, limit });
     return { code: 0, tttp: fallbackTTTP, limit };
@@ -980,33 +896,83 @@ watch(searchQuery, () => {
 
 // Execute Excel update and download
 async function compileAndDownload() {
-    if (!excelWorkbook.value || generatedTrips.value.length === 0) {
-        addToast('Vui lòng tải lên đầy đủ tệp CSV và Excel!', 'error');
+    if (generatedTrips.value.length === 0) {
+        addToast('Không có dữ liệu chuyến xe để xuất!', 'info');
         return;
     }
     
     compiling.value = true;
     
     try {
-        const dsSheet = excelWorkbook.value.getWorksheet('DS');
-        if (!dsSheet) {
-            addToast('Không tìm thấy sheet "DS" trong tệp Excel!', 'error');
-            compiling.value = false;
-            return;
+        let workbook: any = null;
+        let dsSheet;
+        let templateRow = null;
+        
+        if (!workbook) {
+            // Create a brand new workbook from scratch
+            const ExcelJS = await import('exceljs');
+            workbook = new ExcelJS.Workbook();
+            dsSheet = workbook.addWorksheet('DS');
+            
+            // Set column widths
+            dsSheet.columns = [
+                { header: '', key: 'A', width: 3 },
+                { header: 'STT', key: 'stt', width: 8 },
+                { header: 'Ngày giờ', key: 'timeStr', width: 22 },
+                { header: 'Số xe', key: 'plateNumber', width: 15 },
+                { header: 'TTTP (tấn)', key: 'tttp', width: 15 },
+                { header: 'Hạn mức hàng (tấn)', key: 'limit', width: 22 },
+                { header: 'Số phiếu cân', key: 'ticketNo', width: 18 },
+                { header: 'Loại hàng hóa', key: 'cargoType', width: 18 },
+                { header: 'Trọng lượng hàng (tấn)', key: 'weightTons', width: 22 },
+                { header: 'Ghi chú', key: 'notes', width: 15 }
+            ];
+            
+            // Write headers at Row 9
+            const headerRow = dsSheet.getRow(9);
+            headerRow.getCell(2).value = 'STT';
+            headerRow.getCell(3).value = 'Ngày giờ';
+            headerRow.getCell(4).value = 'Số xe';
+            headerRow.getCell(5).value = 'TTTP (tấn)';
+            headerRow.getCell(6).value = 'Hạn mức hàng (tấn)';
+            headerRow.getCell(7).value = 'Số phiếu cân';
+            headerRow.getCell(8).value = 'Loại hàng hóa';
+            headerRow.getCell(9).value = 'Trọng lượng hàng (tấn)';
+            headerRow.getCell(10).value = 'Ghi chú';
+            
+            headerRow.font = { name: 'Arial', size: 10, bold: true };
+            headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            
+            for (let colIdx = 2; colIdx <= 10; colIdx++) {
+                const cell = headerRow.getCell(colIdx);
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFE2EBF5' } // soft light blue fill
+                };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+                    bottom: { style: 'medium', color: { argb: 'FF808080' } },
+                    right: { style: 'thin', color: { argb: 'FFBFBFBF' } }
+                };
+            }
+            headerRow.height = 25;
+        } else {
+            dsSheet = workbook.getWorksheet('DS');
+            if (!dsSheet) {
+                addToast('Không tìm thấy sheet "DS" trong tệp Excel!', 'error');
+                compiling.value = false;
+                return;
+            }
+            templateRow = dsSheet.getRow(10);
         }
         
         // Find last row and STT
         let lastRowIdx = 9;
         let lastSTT = 0;
-        for (let i = 10; i <= dsSheet.rowCount; i++) {
-            const cellVal = dsSheet.getRow(i).getCell(2).value; // Col B: STT
-            if (cellVal !== null && cellVal !== undefined && !isNaN(parseInt(String(cellVal), 10))) {
-                lastRowIdx = i;
-                lastSTT = parseInt(String(cellVal), 10);
-            }
-        }
         
-        const templateRow = dsSheet.getRow(10);
+        // (Starting from STT = 1 for a new workbook)
         
         // Helper to copy styles
         const copyStyles = (srcCell: any, destCell: any) => {
@@ -1034,16 +1000,35 @@ async function compileAndDownload() {
             row.getCell(9).value = trip.weightTons;        // Col I: Weight in tons
             row.getCell(10).value = null;                  // Col J: Ghi chú
             
-            // Copy styles cell-by-cell for columns B to J (columns 2 to 10)
+            // Apply styles cell-by-cell for columns B to J (columns 2 to 10)
             for (let colIdx = 2; colIdx <= 10; colIdx++) {
-                copyStyles(templateRow.getCell(colIdx), row.getCell(colIdx));
+                const cell = row.getCell(colIdx);
+                if (templateRow) {
+                    copyStyles(templateRow.getCell(colIdx), cell);
+                } else {
+                    cell.font = { name: 'Arial', size: 10 };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+                    };
+                    if (colIdx === 2 || colIdx === 3 || colIdx === 4 || colIdx === 7) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    } else if (colIdx === 5 || colIdx === 6 || colIdx === 9) {
+                        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                        cell.numFmt = '#,##0.00';
+                    } else {
+                        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                    }
+                }
             }
             
             currentRowIdx++;
         });
         
         // Write to buffer
-        const buffer = await excelWorkbook.value.xlsx.writeBuffer();
+        const buffer = await workbook.xlsx.writeBuffer();
         
         // Download
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -1082,59 +1067,27 @@ async function compileAndDownload() {
             </div>
         </div>
 
-        <!-- File Upload Slot (Sổ theo dõi gốc) -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
-            <div class="flex items-center gap-2.5">
-                <span class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-                    <span class="material-symbols-outlined text-base">table_chart</span>
-                </span>
-                <div>
-                    <h4 class="text-xs font-black text-[#4a2c32]">Tải lên tệp Sổ Theo Dõi Gốc</h4>
-                    <p class="text-[10px] text-gray-500">Định dạng .xlsx mẫu "SỐ THEO DÕI XẾP HÀNG HÓA.xlsx" để nạp cơ sở dữ liệu lịch sử xe</p>
-                </div>
+        <!-- Vehicle Configs Section -->
+        <div v-if="newVehicles.length > 0" class="bg-white border border-primary/5 rounded-[24px] p-5 soft-shadow flex flex-col gap-3 animate-fade-in">
+            <div class="flex items-center gap-2 text-[#4a2c32]">
+                <span class="material-symbols-outlined text-primary text-base">local_shipping</span>
+                <span class="text-xs font-black uppercase tracking-wide">Cấu hình tải trọng phương tiện ({{ newVehicles.length }} xe)</span>
             </div>
-            
-            <label 
-                class="border-2 border-dashed border-gray-100 rounded-[20px] p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:bg-primary/[0.02] hover:border-primary/45 transition-all duration-200"
-            >
-                <input type="file" accept=".xlsx" @change="handleExcelUpload" class="hidden">
-                <span class="material-symbols-outlined text-3xl text-gray-300">upload_file</span>
-                <span class="text-xs font-bold text-[#4a2c32]">
-                    {{ excelFile ? excelFile.name : 'Chọn sổ theo dõi (.xlsx)' }}
-                </span>
-                <span class="text-[10px] text-gray-400 animate-pulse" v-if="loadingExcel">Đang nạp file...</span>
-                <span class="text-[10px] text-gray-400" v-else>
-                    {{ excelFile ? `${(excelFile.size / 1024).toFixed(1)} KB` : 'Nhấp để duyệt file hoặc kéo thả' }}
-                </span>
-            </label>
-
-            <div v-if="sheet1Vehicles.size > 0" class="flex items-center justify-between text-[11px] font-bold bg-gray-50 p-2.5 rounded-[12px] border border-primary/5">
-                <span class="text-gray-500">Cơ sở dữ liệu lịch sử xe:</span>
-                <span class="text-primary font-black">Đã nạp {{ sheet1Vehicles.size }} xe từ Sheet1</span>
-            </div>
-        </div>
-
-        <!-- Warning block: New Vehicles detected -->
-        <div v-if="newVehicles.length > 0" class="bg-amber-50/50 border border-amber-200 rounded-[24px] p-5 flex flex-col gap-3 animate-fade-in">
-            <div class="flex items-center gap-2 text-amber-800">
-                <span class="material-symbols-outlined text-base">warning</span>
-                <span class="text-xs font-black uppercase tracking-wide">Phát hiện {{ newVehicles.length }} biển số xe mới chưa có trong lịch sử (Sheet1)</span>
-            </div>
-            <p class="text-[11px] text-gray-600 -mt-1 leading-relaxed">
-                Vui lòng cấu hình nhanh thông số tải trọng cho các phương tiện này. Hệ thống sẽ lưu trữ và áp dụng để chia tải.
+            <p class="text-[11px] text-gray-500 -mt-1 leading-relaxed">
+                Cài đặt trọng tải cho phép (TTTP) và hạn mức hàng thực tế chở cho từng phương tiện dưới đây.
             </p>
             
-            <div class="overflow-x-auto max-h-[220px] border border-amber-200/50 rounded-[16px] bg-white">
+            <div class="overflow-x-auto max-h-[220px] border border-gray-100 rounded-[16px] bg-white">
                 <table class="w-full text-left border-collapse text-[11px]">
                     <thead>
-                        <tr class="bg-amber-50/70 text-amber-850 font-bold border-b border-amber-100">
+                        <tr class="bg-gray-50 text-gray-500 font-bold border-b border-gray-100">
                             <th class="p-2.5 font-bold">Biển số</th>
                             <th class="p-2.5 font-bold text-center">TTTP (tấn)</th>
                             <th class="p-2.5 font-bold text-center">Hạn mức hàng (tấn)</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-150 text-gray-700">
-                        <tr v-for="veh in newVehicles" :key="veh.plateNumber" class="hover:bg-amber-50/20">
+                    <tbody class="divide-y divide-gray-100 text-gray-700">
+                        <tr v-for="veh in newVehicles" :key="veh.plateNumber" class="hover:bg-gray-50">
                             <td class="p-2.5 font-bold text-[#4a2c32]">{{ formatPlate(veh.plateNumber) }}</td>
                             <td class="p-2.5 text-center">
                                 <input 
@@ -1547,7 +1500,7 @@ async function compileAndDownload() {
         <div class="flex items-center justify-end border-t border-gray-100 pt-6">
             <button 
                 @click="compileAndDownload" 
-                :disabled="generatedTrips.length === 0 || compiling || !excelFile"
+                :disabled="generatedTrips.length === 0 || compiling"
                 class="px-6 py-3 bg-primary text-white font-bold rounded-[16px] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed shadow-soft flex items-center gap-2.5"
             >
                 <span v-if="compiling" class="material-symbols-outlined text-base animate-spin">sync</span>
