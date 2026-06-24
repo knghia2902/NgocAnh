@@ -880,8 +880,17 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             const tripWeightNet = Math.round(tripWeightTons * 1000);
             
             // Calculate weight1 (xác xe) and weight2 (xác xe + hàng)
-            const isXuat = record.direction.toUpperCase().includes('XUẤT') || record.direction.toUpperCase().includes('XUAT');
-            const tareWeight = isXuat ? (record.weight1 || 3500) : (record.weight2 || 3500);
+            // Xác xe (tare weight) luôn luôn là số cân nhỏ hơn trong hai lần cân của phiếu gốc
+            let tareWeight = 3500;
+            const w1 = record.weight1 || 0;
+            const w2 = record.weight2 || 0;
+            if (w1 > 0 && w2 > 0) {
+                tareWeight = Math.min(w1, w2);
+            } else if (w1 > 0) {
+                tareWeight = w1;
+            } else if (w2 > 0) {
+                tareWeight = w2;
+            }
             
             const tripWeight1 = tareWeight; // Luôn là cân xác xe (cân lần 1)
             const tripWeight2 = tareWeight + tripWeightNet; // Luôn là cân khi đã có hàng trên xe (cân lần 2)
