@@ -1446,6 +1446,7 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
     const t = truck || sampleTruck;
     
     switch (fieldId) {
+        case 'ticketNo': return t.ticketNo || '';
         case 'plateNumber': return t.plateNumber;
         case 'goods': return cfgForm.goods || 'Đất sét nguyên liệu';
         case 'owner': return cfgForm.owner || 'Công ty Cảng Nguyên Ngọc';
@@ -1458,6 +1459,8 @@ const getFieldValue = (fieldId: string, truck?: Truck) => {
         case 'driver': return t.driver || '-';
         case 'goodsCode': return cfgForm.goodsCode || '-';
         case 'xn': return cfgForm.xn;
+        case 'dateIn': return t.dateIn ? formatDateTimeStr(t.dateIn) : '';
+        case 'dateOut': return t.dateOut ? formatDateTimeStr(t.dateOut) : '';
         case 'chinhpham': return `${cfgForm.chinhpham} %`;
         case 'phupham': return `${cfgForm.phupham} %`;
         case 'ketluan': return cfgForm.ketluan || '-';
@@ -3671,7 +3674,7 @@ onUnmounted(() => {
         <!-- PRINT ONLY SECTION -->
         <teleport to="body">
             <div id="print-section" class="hidden">
-                <div v-for="truck in printTrucksList" :key="truck.id" class="print-page" style="position: relative; width: 200mm; height: 138mm; padding: 0; box-sizing: border-box; overflow: hidden; font-family: Arial, Helvetica, sans-serif;">
+                <div v-for="truck in printTrucksList" :key="truck.id" class="print-page" style="position: relative; width: 210mm; height: 148mm; padding: 0; box-sizing: border-box; overflow: hidden; font-family: Arial, Helvetica, sans-serif;">
                                     <div 
                                         v-for="el in (cfgForm.printElements || [])" 
                                         :key="el.id"
