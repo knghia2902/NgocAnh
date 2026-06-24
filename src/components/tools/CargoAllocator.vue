@@ -342,8 +342,8 @@ async function handleTicketImport(event: Event) {
         try {
             const text = await file.text();
             const newRecords = parseCSVText(text);
-            mergeTickets(newRecords);
-            addToast(`Đã tải lên và import thêm ${newRecords.length} phiếu cân từ tệp CSV`, 'success');
+            const { added, updated, skipped } = mergeTickets(newRecords);
+            addToast(`Import CSV: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
         } catch (error) {
             console.error(error);
             addToast('Lỗi khi đọc file CSV!', 'error');
@@ -464,8 +464,8 @@ async function handleTicketExcelUpload(file: File) {
             return;
         }
         
-        mergeTickets(newRecords);
-        addToast(`Đã import thêm ${newRecords.length} phiếu cân từ tệp Excel`, 'success');
+        const { added, updated, skipped } = mergeTickets(newRecords);
+        addToast(`Import Excel: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
         
     } catch (e) {
         console.error(e);
@@ -476,26 +476,48 @@ async function handleTicketExcelUpload(file: File) {
 }
 
 // Smart merge tickets to prevent duplicates
-function mergeTickets(newRecords: CSVRecord[]) {
+function mergeTickets(newRecords: CSVRecord[]): { added: number; updated: number; skipped: number } {
     const currentList = [...csvRecords.value];
+    let added = 0;
+    let updated = 0;
+    let skipped = 0;
     
     newRecords.forEach(rec => {
-        const matchIdx = rec.ticketNo 
+        // Tìm trùng theo số phiếu
+        let matchIdx = rec.ticketNo 
             ? currentList.findIndex(x => x.ticketNo === rec.ticketNo)
             : -1;
+        
+        // Nếu không có số phiếu, tìm trùng theo biển số + khối lượng hàng + ngày vào
+        if (matchIdx === -1 && rec.plateNumber) {
+            matchIdx = currentList.findIndex(x => 
+                x.plateNumber === rec.plateNumber && 
+                x.weightNet === rec.weightNet &&
+                x.dateInStr === rec.dateInStr
+            );
+        }
             
         const id = rec.id || 'ticket_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
         const mergedRec = { ...rec, id };
         
         if (matchIdx !== -1) {
-            currentList[matchIdx] = mergedRec;
+            // Kiểm tra nếu dữ liệu hoàn toàn giống nhau thì bỏ qua
+            const existing = currentList[matchIdx];
+            if (existing && existing.ticketNo === rec.ticketNo && existing.plateNumber === rec.plateNumber && existing.weightNet === rec.weightNet) {
+                skipped++;
+            } else {
+                currentList[matchIdx] = mergedRec;
+                updated++;
+            }
         } else {
             currentList.push(mergedRec);
+            added++;
         }
     });
     
     csvRecords.value = currentList;
     saveTicketsToSupabase();
+    return { added, updated, skipped };
 }
 
 // CRUD State & Functions
@@ -1580,7 +1602,7 @@ async function compileAndDownload() {
                 <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
                     <table class="w-full text-left border-collapse text-xs font-semibold">
                         <thead>
-                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="p-3 w-12 text-center bg-gray-55 font-bold">STT</th>
                                 <th class="p-3 bg-gray-50 font-bold">Số phiếu</th>
                                 <th class="p-3 bg-gray-55 font-bold">Số xe</th>
@@ -1688,7 +1710,7 @@ async function compileAndDownload() {
                 <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
                     <table class="w-full text-left border-collapse text-xs font-semibold">
                         <thead>
-                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="p-3 w-12 text-center bg-gray-50 font-bold">STT</th>
                                 <th class="p-3 bg-gray-50 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
                                 <th class="p-3 bg-gray-55 font-bold">Số xe</th>
@@ -1804,7 +1826,7 @@ async function compileAndDownload() {
                 <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
-                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                            <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="p-2 bg-gray-55 font-bold">Số phiếu</th>
                                 <th class="p-2 bg-gray-50 font-bold">Số xe</th>
                                 <th class="p-2 bg-gray-55 font-bold">Khách hàng</th>
