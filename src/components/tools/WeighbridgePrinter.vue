@@ -41,39 +41,42 @@ const getDefaultPrintFields = (): CustomFieldConfig[] => [
 ];
 
 const getDefaultPrintElements = (): PrintElement[] => [
-    { id: 'companyName', type: 'text', x: 5, y: 30, width: 140, height: 5, text: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC', fontSize: 10, fontWeight: 'bold' },
-    { id: 'companyAddress', type: 'text', x: 5, y: 35, width: 140, height: 4, text: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam', fontSize: 7 },
-    { id: 'companyPhone', type: 'text', x: 5, y: 39, width: 140, height: 4, text: 'ĐT: 0964 258 671 / Fax:', fontSize: 7 },
-    { id: 'ticketNo', type: 'field', x: 150, y: 30, width: 45, height: 5, label: 'Phiếu số', fieldId: 'ticketNo', labelWidth: 15, fontSize: 9, fontWeight: 'bold' },
-    { id: 'title', type: 'text', x: 0, y: 47, width: 200, height: 6, text: 'PHIẾU CÂN XE', fontSize: 14, fontWeight: 'bold', align: 'center' },
-    { id: 'dateIn', type: 'field', x: 25, y: 54, width: 75, height: 4, label: 'Ngày, giờ vào', fieldId: 'dateIn', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
-    { id: 'dateOut', type: 'field', x: 105, y: 54, width: 75, height: 4, label: 'Ngày, giờ ra', fieldId: 'dateOut', labelWidth: 20, fontSize: 8, fontStyle: 'italic' },
+    { id: 'companyName', type: 'text', x: 9, y: 18, width: 140, height: 5, text: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC', fontSize: 13, fontWeight: 'bold' },
+    { id: 'companyAddress', type: 'text', x: 9, y: 25, width: 150, height: 4, text: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam', fontSize: 10, fontWeight: 'normal' },
+    { id: 'companyPhone', type: 'text', x: 9, y: 30.5, width: 140, height: 4, text: 'ĐT: 0964 258 671 / Fax:', fontSize: 10, fontWeight: 'normal' },
+    { id: 'ticketNo', type: 'field', x: 145.5, y: 34.5, width: 45, height: 5, label: 'Phiếu số', fieldId: 'ticketNo', labelWidth: 15, fontSize: 10, fontWeight: 'normal' },
+    { id: 'title', type: 'text', x: 0, y: 38, width: 198.5, height: 9.5, text: 'PHIẾU CÂN XE', fontSize: 24, fontWeight: 'bold', align: 'center' },
+    { id: 'dateIn', type: 'field', x: 60, y: 49, width: 75, height: 4, label: 'Ngày, giờ vào', fieldId: 'dateIn', labelWidth: 24, fontSize: 10, fontWeight: 'normal' },
+    { id: 'dateOut', type: 'field', x: 60, y: 54.5, width: 75, height: 4, label: 'Ngày, giờ ra', fieldId: 'dateOut', labelWidth: 24, fontSize: 10, fontWeight: 'normal' },
     
     // Left Column Fields
-    { id: 'plateNumber', type: 'field', x: 10, y: 63, width: 85, height: 5, label: 'Số xe', fieldId: 'plateNumber', labelWidth: 24, fontSize: 8.5, fontWeight: 'bold' },
-    { id: 'goods', type: 'field', x: 10, y: 69, width: 85, height: 5, label: 'Hàng hóa', fieldId: 'goods', labelWidth: 24, fontSize: 8.5 },
-    { id: 'owner', type: 'field', x: 10, y: 75, width: 85, height: 5, label: 'Tên chủ hàng', fieldId: 'owner', labelWidth: 24, fontSize: 8.5 },
-    { id: 'weight1', type: 'field', x: 10, y: 81, width: 85, height: 5, label: 'Trọng lượng lần 1', fieldId: 'weight1', labelWidth: 24, fontSize: 8.5 },
-    { id: 'weight2', type: 'field', x: 10, y: 87, width: 85, height: 5, label: 'Trọng lượng lần 2', fieldId: 'weight2', labelWidth: 24, fontSize: 8.5 },
-    { id: 'weightNet', type: 'field', x: 10, y: 93, width: 85, height: 5, label: 'Trọng lượng hàng', fieldId: 'weightNet', labelWidth: 24, fontSize: 8.5 },
-    { id: 'words', type: 'field', x: 10, y: 99, width: 180, height: 5, label: 'Bằng chữ', fieldId: 'words', labelWidth: 24, fontSize: 8.5, fontStyle: 'italic' },
+    { id: 'plateNumber', type: 'field', x: 9, y: 61.5, width: 85, height: 5, label: 'Số xe', fieldId: 'plateNumber', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'goods', type: 'field', x: 9, y: 66.5, width: 85, height: 5, label: 'Hàng hóa', fieldId: 'goods', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'owner', type: 'field', x: 9, y: 73, width: 100.5, height: 5, label: 'Tên chủ hàng', fieldId: 'owner', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'weight1', type: 'field', x: 9, y: 79, width: 85, height: 5, label: 'Trọng lượng lần 1', fieldId: 'weight1', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'weight2', type: 'field', x: 9, y: 85.5, width: 85, height: 5, label: 'Trọng lượng lần 2', fieldId: 'weight2', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'weightNet', type: 'field', x: 9, y: 92.5, width: 85, height: 5, label: 'Trọng lượng hàng', fieldId: 'weightNet', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'words', type: 'field', x: 9, y: 97.5, width: 100, height: 8.5, label: 'Bằng chữ', fieldId: 'words', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'barge', type: 'field', x: 9, y: 106, width: 85, height: 5, label: 'Sà lan', fieldId: 'barge', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
     
     // Right Column Fields
-    { id: 'barge', type: 'field', x: 105, y: 63, width: 85, height: 5, label: 'Sà lan', fieldId: 'barge', labelWidth: 24, fontSize: 8.5 },
-    { id: 'driver', type: 'field', x: 105, y: 69, width: 85, height: 5, label: 'Tài xế', fieldId: 'driver', labelWidth: 24, fontSize: 8.5 },
-    { id: 'goodsCode', type: 'field', x: 105, y: 75, width: 85, height: 5, label: 'Mã hàng', fieldId: 'goodsCode', labelWidth: 24, fontSize: 8.5 },
-    { id: 'xn', type: 'field', x: 105, y: 81, width: 85, height: 5, label: 'X/N', fieldId: 'xn', labelWidth: 24, fontSize: 8.5 },
-    { id: 'qualityHeader', type: 'text', x: 105, y: 87, width: 85, height: 4, text: 'ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA', fontSize: 8, fontWeight: 'bold' },
-    { id: 'chinhpham', type: 'field', x: 105, y: 92, width: 85, height: 5, label: '*Chính phẩm', fieldId: 'chinhpham', labelWidth: 24, fontSize: 8.5 },
-    { id: 'phupham', type: 'field', x: 105, y: 98, width: 85, height: 5, label: '*Phụ phẩm', fieldId: 'phupham', labelWidth: 24, fontSize: 8.5 },
-    { id: 'ketluan', type: 'field', x: 105, y: 104, width: 85, height: 5, label: 'Kết luận', fieldId: 'ketluan', labelWidth: 24, fontSize: 8.5 },
+    { id: 'driver', type: 'field', x: 80.5, y: 61.5, width: 85, height: 5, label: 'Tài xế', fieldId: 'driver', labelWidth: 11, fontSize: 10, fontWeight: 'normal' },
+    { id: 'goodsCode', type: 'field', x: 114.5, y: 66.5, width: 85, height: 5, label: 'Mã hàng', fieldId: 'goodsCode', labelWidth: 15.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'xn', type: 'field', x: 114.5, y: 73, width: 85, height: 5, label: 'X/N', fieldId: 'xn', labelWidth: 15.5, fontSize: 10, fontWeight: 'normal' },
+    { id: 'qualityHeader', type: 'text', x: 114.5, y: 79, width: 85, height: 4, text: 'ĐÁNH GIÁ CHẤT LƯỢNG HÀNG HÓA', fontSize: 10, fontWeight: 'normal' },
+    { id: 'chinhpham', type: 'field', x: 114.5, y: 85.5, width: 85, height: 5, label: '*Chính phẩm', fieldId: 'chinhpham', labelWidth: 24, fontSize: 10, fontWeight: 'normal' },
+    { id: 'phupham', type: 'field', x: 114.5, y: 91.5, width: 85, height: 5, label: '*Phụ phẩm', fieldId: 'phupham', labelWidth: 24, fontSize: 10, fontWeight: 'normal' },
+    { id: 'ketluan', type: 'field', x: 116, y: 97.5, width: 85, height: 11.5, label: 'Kết luận', fieldId: 'ketluan', labelWidth: 22.5, fontSize: 10, fontWeight: 'normal' },
     
+    // Note Field
+    { id: 'field_note_1782290495031', type: 'field', x: 9, y: 111, width: 80, height: 5, label: 'Ghi chú', fieldId: 'note', labelWidth: 33.5, fontSize: 10, fontWeight: 'normal' },
+
     // Footer
-    { id: 'sig1', type: 'text', x: 5, y: 114, width: 36, height: 4, text: 'NV TRẠM CÂN', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig2', type: 'text', x: 45, y: 114, width: 36, height: 4, text: 'BẢO VỆ', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig3', type: 'text', x: 85, y: 114, width: 36, height: 4, text: 'CHỦ HÀNG', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig4', type: 'text', x: 125, y: 114, width: 36, height: 4, text: 'THỦ KHO', align: 'center', fontSize: 7.5, fontWeight: 'bold' },
-    { id: 'sig5', type: 'text', x: 165, y: 114, width: 36, height: 4, text: 'TÀI XẾ', align: 'center', fontSize: 7.5, fontWeight: 'bold' }
+    { id: 'sig1', type: 'text', x: 18.5, y: 118, width: 30, height: 4, text: 'NV TRẠM CÂN', align: 'center', fontSize: 10, fontWeight: 'bold' },
+    { id: 'sig2', type: 'text', x: 60, y: 118, width: 25, height: 4, text: 'BẢO VỆ', align: 'center', fontSize: 10, fontWeight: 'bold' },
+    { id: 'sig3', type: 'text', x: 86, y: 118, width: 25, height: 4, text: 'CHỦ HÀNG', align: 'center', fontSize: 10, fontWeight: 'bold' },
+    { id: 'sig4', type: 'text', x: 116, y: 118, width: 25, height: 4, text: 'THỦ KHO', align: 'center', fontSize: 10, fontWeight: 'bold' },
+    { id: 'sig5', type: 'text', x: 141, y: 118, width: 20, height: 4, text: 'TÀI XẾ', align: 'center', fontSize: 10, fontWeight: 'bold' }
 ];
 
 defineExpose({
@@ -753,7 +756,7 @@ let saveDebounceTimer: any = null;
 const saveBargeConfig = () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
-    if (cfgForm.locked) return; // Prevent auto-saving when locked
+    if (cfgForm.locked || authStore.role !== 'admin') return; // Prevent auto-saving when locked or not admin
     
     // Save to local backup immediately
     try {
@@ -790,6 +793,10 @@ const saveBargeConfig = () => {
 const saveBargeConfigImmediately = async () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
+    if (authStore.role !== 'admin') {
+        showToast('Chỉ Quản trị viên mới được phép lưu cấu hình!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể lưu cấu hình.', 'error');
         return;
@@ -831,6 +838,10 @@ const saveBargeConfigImmediately = async () => {
 const toggleBargeLock = async () => {
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
+    if (authStore.role !== 'admin') {
+        showToast('Chỉ Quản trị viên mới có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
 
     const newLockState = !cfgForm.locked;
     saving.value = true;
@@ -894,6 +905,10 @@ const saveAsGlobalDefaultLayout = () => {
 };
 
 const applyLayoutToAllBarges = async () => {
+    if (authStore.role !== 'admin') {
+        showToast('Chỉ Quản trị viên mới có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể thực hiện thao tác này.', 'error');
         return;
@@ -938,6 +953,10 @@ const applyLayoutToAllBarges = async () => {
 };
 
 const copyLayoutFromBarge = (fromBargeId: number) => {
+    if (authStore.role !== 'admin') {
+        showToast('Chỉ Quản trị viên mới có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể thay đổi thiết kế.', 'error');
         return;
@@ -1289,7 +1308,7 @@ const handleDragEnd = () => {
 };
 
 const startDrag = (event: MouseEvent, el: PrintElement) => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     
     // Check if shift or ctrl is held to toggle selection
     if (event.shiftKey || event.ctrlKey) {
@@ -1333,7 +1352,7 @@ const startDrag = (event: MouseEvent, el: PrintElement) => {
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
-    if (!isOpen.value || activeTab.value !== 'config' || cfgForm.locked || selectedElementIds.value.length === 0) return;
+    if (!isOpen.value || activeTab.value !== 'config' || cfgForm.locked || authStore.role !== 'admin' || selectedElementIds.value.length === 0) return;
     
     // Ignore Arrow and Delete key movements when user is typing in inputs/textareas/selects
     const activeEl = document.activeElement;
@@ -1403,7 +1422,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 const deleteElement = (id: string) => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     const toDeleteIds = selectedElementIds.value.includes(id) 
         ? [...selectedElementIds.value] 
         : [id];
@@ -1417,7 +1436,7 @@ const deleteElement = (id: string) => {
 };
 
 const duplicateElement = (el: PrintElement) => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     const id = el.type + '_' + Date.now();
     const newEl: PrintElement = {
         ...el,
@@ -1431,7 +1450,7 @@ const duplicateElement = (el: PrintElement) => {
 };
 
 const resetToDefaultLayout = () => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     if (confirm('Bạn có chắc chắn muốn khôi phục thiết kế mẫu phiếu cân về ban đầu không?')) {
         cfgForm.printElements = getDefaultPrintElements();
         selectedElementId.value = null;
@@ -1440,7 +1459,7 @@ const resetToDefaultLayout = () => {
 };
 
 const addStaticText = () => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     const id = 'text_' + Date.now();
     const newEl: PrintElement = {
         id,
@@ -1460,7 +1479,7 @@ const addStaticText = () => {
 };
 
 const addFieldElement = (fieldId: string, label: string) => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     const id = 'field_' + fieldId + '_' + Date.now();
     const newEl: PrintElement = {
         id,
@@ -1480,7 +1499,7 @@ const addFieldElement = (fieldId: string, label: string) => {
 };
 
 const addLineElement = (direction: 'horizontal' | 'vertical') => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     const id = 'line_' + direction + '_' + Date.now();
     const newEl: PrintElement = {
         id,
@@ -1496,7 +1515,7 @@ const addLineElement = (direction: 'horizontal' | 'vertical') => {
 };
 
 const addRectElement = () => {
-    if (cfgForm.locked) return;
+    if (cfgForm.locked || authStore.role !== 'admin') return;
     const id = 'rect_' + Date.now();
     const newEl: PrintElement = {
         id,
@@ -3176,7 +3195,7 @@ onUnmounted(() => {
                         </div>
 
                         <!-- TAB 2: CONFIGURATION -->
-                        <div v-if="activeTab === 'config'" class="flex flex-col gap-4 animate-fade-in">
+                        <div v-if="activeTab === 'config' && authStore.role === 'admin'" class="flex flex-col gap-4 animate-fade-in">
                             <!-- Banner lock warning -->
                             <div v-if="cfgForm.locked" class="bg-red-50 text-red-700 text-xs font-bold p-3 rounded-lg border border-red-200 mb-2 flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">warning</span>
