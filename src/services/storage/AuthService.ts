@@ -4,6 +4,7 @@ export interface User {
     username: string;
     role: 'admin' | 'staff';
     displayName?: string;
+    avatar?: string;
 }
 
 export async function sha256(message: string): Promise<string> {
@@ -25,7 +26,12 @@ export class AuthService {
         if (username === settings.username && password === settings.password) {
             return { 
                 success: true, 
-                user: { username, role: 'admin', displayName: settings.displayName || 'Admin' },
+                user: { 
+                    username, 
+                    role: 'admin', 
+                    displayName: settings.displayName || 'Admin',
+                    avatar: settings.avatar || ''
+                },
                 isFirstLogin: settings.is_first 
             };
         }
@@ -41,7 +47,8 @@ export class AuthService {
                 user: { 
                     username: matchedAccount.username, 
                     role: matchedAccount.role || 'staff', 
-                    displayName: matchedAccount.displayName || matchedAccount.username 
+                    displayName: matchedAccount.displayName || matchedAccount.username,
+                    avatar: matchedAccount.avatar || ''
                 },
                 isFirstLogin: false
             };
@@ -68,7 +75,7 @@ export class AuthService {
         return !error;
     }
 
-    async updateProfile(username: string, displayName: string, newPassword?: string): Promise<boolean> {
+    async updateProfile(username: string, displayName: string, newPassword?: string, avatar?: string): Promise<boolean> {
         const { data: current, error: fetchError } = await supabase.from('content').select('settings').eq('id', 'main').single();
         if (fetchError || !current?.settings) return false;
 
@@ -84,6 +91,9 @@ export class AuthService {
             if (newPassword) {
                 newSettings.password = newPassword;
                 newSettings.is_first = false;
+            }
+            if (avatar !== undefined) {
+                newSettings.avatar = avatar;
             }
             const { error } = await supabase
                 .from('content')
@@ -103,6 +113,9 @@ export class AuthService {
                 }
                 if (newPassword) {
                     updatedAcc.password = await sha256(newPassword);
+                }
+                if (avatar !== undefined) {
+                    updatedAcc.avatar = avatar;
                 }
                 return updatedAcc;
             }

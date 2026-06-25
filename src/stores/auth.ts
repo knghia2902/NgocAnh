@@ -6,6 +6,7 @@ interface AuthState {
     user: string | null;
     role: 'admin' | 'staff' | null;
     displayName: string | null;
+    avatar: string | null;
     isFirstLogin: boolean;
 }
 
@@ -18,6 +19,7 @@ const initialState: AuthState = {
     user: saved?.user ?? null,
     role: saved?.role ?? (saved?.isAuthenticated ? 'admin' : null),
     displayName: saved?.displayName ?? (saved?.isAuthenticated ? 'Admin' : null),
+    avatar: saved?.avatar ?? null,
     isFirstLogin: saved?.isFirstLogin ?? false
 };
 
@@ -35,6 +37,7 @@ export const login = async (username: string, pass: string) => {
         authStore.user = res.user.username;
         authStore.role = res.user.role;
         authStore.displayName = res.user.displayName || res.user.username;
+        authStore.avatar = res.user.avatar || null;
         authStore.isFirstLogin = res.isFirstLogin || false;
         return true;
     }
@@ -46,11 +49,15 @@ export const logout = () => {
     authStore.user = null;
     authStore.role = null;
     authStore.displayName = null;
+    authStore.avatar = null;
     authStore.isFirstLogin = false;
 };
 
-export const updateStoreProfile = (displayName: string) => {
+export const updateStoreProfile = (displayName: string, avatarUrl?: string) => {
     authStore.displayName = displayName;
+    if (avatarUrl !== undefined) {
+        authStore.avatar = avatarUrl;
+    }
 };
 
 
