@@ -109,10 +109,16 @@ const compiling = ref(false);
 
 // Capacity configuration standards
 const standardTTTPLimit = ref(10.0);
+const standardCargoLimitMin = ref(7.5);
+const standardCargoLimitMax = ref(8.5);
+let isInitialLoad = true;
 
 function getRandomLimit(tttp: number): number {
-    const curbWeight = 1.5 + Math.random() * 1.0; // random curb weight between 1.5 and 2.5
-    return Math.round((tttp - curbWeight) * 100) / 100;
+    const ratio = standardTTTPLimit.value > 0 ? tttp / standardTTTPLimit.value : 1.0;
+    const min = standardCargoLimitMin.value * ratio;
+    const max = standardCargoLimitMax.value * ratio;
+    const limit = min + Math.random() * (max - min);
+    return Math.round(limit * 100) / 100;
 }
 
 const vehicleLimitCache = new Map<string, { tttp: number; limit: number }>();
@@ -169,10 +175,32 @@ watch(standardTTTPLimit, async (newVal) => {
     vehicleLimitCache.clear();
     try {
         await dbContext.set('allocator_standard_limit', newVal);
+        if (!isInitialLoad) {
+            standardCargoLimitMin.value = Math.round((newVal - 2.5) * 100) / 100;
+            standardCargoLimitMax.value = Math.round((newVal - 1.5) * 100) / 100;
+        }
     } catch (e) {
         console.error('Lỗi khi lưu hạn mức tiêu chuẩn vào IndexedDB:', e);
     }
 }, { immediate: true });
+
+watch(standardCargoLimitMin, async (newVal) => {
+    vehicleLimitCache.clear();
+    try {
+        await dbContext.set('allocator_cargo_limit_min', newVal);
+    } catch (e) {
+        console.error('Lỗi khi lưu hạn mức hàng tối thiểu vào IndexedDB:', e);
+    }
+});
+
+watch(standardCargoLimitMax, async (newVal) => {
+    vehicleLimitCache.clear();
+    try {
+        await dbContext.set('allocator_cargo_limit_max', newVal);
+    } catch (e) {
+        console.error('Lỗi khi lưu hạn mức hàng tối đa vào IndexedDB:', e);
+    }
+});
 
 watch(csvRecords, () => {
     vehicleLimitCache.clear();
@@ -791,6 +819,22 @@ onMounted(async () => {
         if (savedLimit !== undefined && savedLimit !== null) {
             standardTTTPLimit.value = savedLimit;
         }
+
+        const savedCargoMin = await dbContext.get<number>('allocator_cargo_limit_min');
+        if (savedCargoMin !== undefined && savedCargoMin !== null) {
+            standardCargoLimitMin.value = savedCargoMin;
+        } else {
+            standardCargoLimitMin.value = Math.round((standardTTTPLimit.value - 2.5) * 100) / 100;
+        }
+
+        const savedCargoMax = await dbContext.get<number>('allocator_cargo_limit_max');
+        if (savedCargoMax !== undefined && savedCargoMax !== null) {
+            standardCargoLimitMax.value = savedCargoMax;
+        } else {
+            standardCargoLimitMax.value = Math.round((standardTTTPLimit.value - 1.5) * 100) / 100;
+        }
+
+        isInitialLoad = false;
 
         const savedDist = await dbContext.get<any>('allocator_dist_strategy');
         if (savedDist) distStrategy.value = savedDist;
@@ -1554,11 +1598,28 @@ async function compileAndDownload() {
                     </div>
                     <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn mức hàng tiêu chuẩn (tấn)</label>
-                        <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-[12px] text-xs font-bold text-gray-600 select-none font-mono">
-                            Ngẫu nhiên: [{{ (standardTTTPLimit - 2.5).toFixed(1) }} - {{ (standardTTTPLimit - 1.5).toFixed(1) }}] t
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-[9px] font-bold text-gray-400">Tối thiểu</span>
+                                <input 
+                                    type="number" 
+                                    v-model.number="standardCargoLimitMin" 
+                                    step="0.1"
+                                    class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                                >
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-[9px] font-bold text-gray-400">Tối đa</span>
+                                <input 
+                                    type="number" 
+                                    v-model.number="standardCargoLimitMax" 
+                                    step="0.1"
+                                    class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                                >
+                            </div>
                         </div>
                         <span class="text-[9px] text-gray-400 leading-tight">
-                            Bằng Trọng tải cho phép tiêu chuẩn trừ xác xe ngẫu nhiên (1.5 - 2.5t).
+                            Tải trọng tịnh (net weight) tối thiểu và tối đa của mỗi chuyến xe sau khi trừ xác xe.
                         </span>
                     </div>
                 </div>
