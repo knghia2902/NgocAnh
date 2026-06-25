@@ -2323,7 +2323,7 @@ const clearTrucks = async () => {
 // Vietnamese Number-to-Words Converter
 function DocSoThanhChu(so: number): string {
     const rounded = Math.round(so);
-    if (rounded === 0) return "Không ki-lô-gam";
+    if (rounded === 0) return "Không kg";
     const ChuSo = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
     
     function docXetChuc(chuc: number, donvi: number, KetQua: string) {
@@ -2389,7 +2389,7 @@ function DocSoThanhChu(so: number): string {
 
     let text = KetQuaFinal.trim().replace(/\s+/g, ' ');
     text = text.charAt(0).toUpperCase() + text.slice(1);
-    return text + " ki-lô-gam";
+    return text + " kg";
 }
 
 // Helpers for printing and formatting
