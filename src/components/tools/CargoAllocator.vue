@@ -672,41 +672,76 @@ async function loadTicketsFromSupabase() {
         if (error) throw error;
         
         if (data?.settings) {
+            let stateChanged = false;
+
+            // 1. Merge tickets
             const remoteTickets = data.settings.allocator_tickets;
             if (Array.isArray(remoteTickets)) {
-                // Merge local and remote tickets to prevent data loss
                 const merged = [...csvRecords.value];
-                let changed = false;
+                let ticketsChanged = false;
                 
                 remoteTickets.forEach((r: any) => {
                     const exists = merged.some(l => l.id === r.id || (l.ticketNo && l.ticketNo === r.ticketNo));
                     if (!exists) {
                         merged.push(r);
-                        changed = true;
+                        ticketsChanged = true;
                     }
                 });
                 
-                if (changed || csvRecords.value.length < remoteTickets.length) {
+                if (ticketsChanged || csvRecords.value.length < remoteTickets.length) {
                     csvRecords.value = merged;
                     await dbContext.set('allocator_tickets', merged);
-                    await saveTicketsToSupabase();
+                    stateChanged = true;
                 } else if (csvRecords.value.length > remoteTickets.length) {
-                    // Local has more tickets, upload them to Supabase
-                    await saveTicketsToSupabase();
-                } else {
-                    syncStatus.value = 'synced';
+                    stateChanged = true;
                 }
+            } else if (csvRecords.value.length > 0) {
+                stateChanged = true;
+            }
+
+            // 2. Merge history trips
+            const remoteHistory = data.settings.allocator_history_trips;
+            if (Array.isArray(remoteHistory)) {
+                const mergedHistory = [...existingTrips.value];
+                let historyChanged = false;
+                
+                remoteHistory.forEach((r: any) => {
+                    const exists = mergedHistory.some(l => {
+                        if (r.ticketNo && l.ticketNo && r.ticketNo === l.ticketNo) {
+                            return true;
+                        }
+                        return l.plateNumber === r.plateNumber && 
+                               l.timeStr === r.timeStr && 
+                               Math.abs(l.weightTons - r.weightTons) < 0.001;
+                    });
+                    if (!exists) {
+                        mergedHistory.push(r);
+                        historyChanged = true;
+                    }
+                });
+                
+                if (historyChanged || existingTrips.value.length < remoteHistory.length) {
+                    // Sort merged history by STT
+                    mergedHistory.sort((a, b) => (a.stt || 0) - (b.stt || 0));
+                    existingTrips.value = mergedHistory;
+                    await dbContext.set('allocator_history_trips', mergedHistory);
+                    stateChanged = true;
+                } else if (existingTrips.value.length > remoteHistory.length) {
+                    stateChanged = true;
+                }
+            } else if (existingTrips.value.length > 0) {
+                stateChanged = true;
+            }
+
+            // 3. Upload if there is any mismatch/change
+            if (stateChanged) {
+                await saveTicketsToSupabase();
             } else {
-                // If remote has no tickets but local has, push local to remote
-                if (csvRecords.value.length > 0) {
-                    await saveTicketsToSupabase();
-                } else {
-                    syncStatus.value = 'synced';
-                }
+                syncStatus.value = 'synced';
             }
         }
     } catch (e) {
-        console.warn('Lỗi khi tải danh sách phiếu cân từ Supabase:', e);
+        console.warn('Lỗi khi tải dữ liệu từ Supabase:', e);
         syncStatus.value = 'error';
     }
 }
@@ -725,7 +760,8 @@ async function saveTicketsToSupabase() {
         const currentSettings = current?.settings || {};
         const updatedSettings = {
             ...currentSettings,
-            allocator_tickets: csvRecords.value
+            allocator_tickets: csvRecords.value,
+            allocator_history_trips: existingTrips.value
         };
 
         const { error: updateError } = await supabase
@@ -737,7 +773,7 @@ async function saveTicketsToSupabase() {
         
         syncStatus.value = 'synced';
     } catch (e) {
-        console.error('Lỗi khi lưu danh sách phiếu cân lên Supabase:', e);
+        console.error('Lỗi khi lưu dữ liệu lên Supabase:', e);
         syncStatus.value = 'error';
         addToast('Lỗi đồng bộ dữ liệu đám mây!', 'error');
     }
@@ -1126,6 +1162,7 @@ function saveToHistory() {
 function clearHistory() {
     if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong Sổ Theo Dõi không? Hành động này không thể hoàn tác!')) {
         existingTrips.value = [];
+        saveTicketsToSupabase();
         addToast('Đã xóa sạch lịch sử Sổ Theo Dõi!', 'info');
     }
 }
