@@ -2322,7 +2322,8 @@ const clearTrucks = async () => {
 
 // Vietnamese Number-to-Words Converter
 function DocSoThanhChu(so: number): string {
-    if (so === 0) return "Không ki-lô-gam";
+    const rounded = Math.round(so);
+    if (rounded === 0) return "Không ki-lô-gam";
     const ChuSo = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
     
     function docXetChuc(chuc: number, donvi: number, KetQua: string) {
@@ -2362,7 +2363,7 @@ function DocSoThanhChu(so: number): string {
         return KetQua;
     }
 
-    let strSo = String(Math.abs(so));
+    let strSo = String(Math.abs(rounded));
     let sochech = strSo.length % 3;
     if (sochech === 1) strSo = "00" + strSo;
     else if (sochech === 2) strSo = "0" + strSo;
