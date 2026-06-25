@@ -1335,7 +1335,7 @@ async function exportSourceTickets() {
 
 // Execute Excel update and download
 async function compileAndDownload() {
-    const dataToExport = activeDataTab.value === 'template' ? generatedTrips.value : existingTrips.value;
+    const dataToExport = activeDataTab.value === 'template' ? filteredTrips.value : filteredHistoryTrips.value;
     if (dataToExport.length === 0) {
         addToast(activeDataTab.value === 'template' ? 'Không có dữ liệu phân bổ để xuất!' : 'Không có dữ liệu lịch sử để xuất!', 'info');
         return;
@@ -2059,9 +2059,9 @@ async function compileAndDownload() {
             <div v-if="activeDataTab === 'template'" class="flex flex-col gap-4">
                 <!-- Search Filter Row -->
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex items-center gap-3 flex-wrap">
+                    <div class="flex items-center gap-2">
                         <!-- Search input -->
-                        <div class="relative w-full max-w-[320px] flex items-center">
+                        <div class="relative w-[280px] sm:w-[320px] flex items-center shrink-0">
                             <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
                             <input 
                                 type="text" 
