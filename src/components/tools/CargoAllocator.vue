@@ -1144,15 +1144,46 @@ const generatedTrips = computed<SplitTrip[]>(() => {
     return finalTrips;
 });
 
+const selectedCustomer = ref('');
+
+const uniqueCustomers = computed(() => {
+    const customers = generatedTrips.value
+        .map(t => t.customer)
+        .filter((c): c is string => typeof c === 'string' && c.trim() !== '');
+    return Array.from(new Set(customers)).sort();
+});
+
+watch(selectedCustomer, () => {
+    currentPage.value = 1;
+});
+
+watch(generatedTrips, () => {
+    if (selectedCustomer.value && !uniqueCustomers.value.includes(selectedCustomer.value)) {
+        selectedCustomer.value = '';
+    }
+});
+
 // Computed: Filtered trips for preview search
 const filteredTrips = computed(() => {
-    if (!searchQuery.value.trim()) return generatedTrips.value;
-    const q = searchQuery.value.toLowerCase();
-    return generatedTrips.value.filter(t => 
-        t.plateNumber.toLowerCase().includes(q) || 
-        t.ticketNo.toLowerCase().includes(q) || 
-        t.cargoType.toLowerCase().includes(q)
-    );
+    let list = generatedTrips.value;
+    
+    // Filter by customer dropdown
+    if (selectedCustomer.value) {
+        list = list.filter(t => t.customer === selectedCustomer.value);
+    }
+    
+    // Filter by search query text
+    if (searchQuery.value.trim()) {
+        const q = searchQuery.value.toLowerCase();
+        list = list.filter(t => 
+            t.plateNumber.toLowerCase().includes(q) || 
+            t.ticketNo.toLowerCase().includes(q) || 
+            t.cargoType.toLowerCase().includes(q) ||
+            (t.customer && t.customer.toLowerCase().includes(q))
+        );
+    }
+    
+    return list;
 });
 
 // Computed: Total split weight tons
@@ -2027,22 +2058,46 @@ async function compileAndDownload() {
             <!-- Tab Content: Detail Template (Theo dõi) -->
             <div v-if="activeDataTab === 'template'" class="flex flex-col gap-4">
                 <!-- Search Filter Row -->
-                <div class="flex items-center justify-between gap-4">
-                    <div class="relative w-full max-w-[320px] flex items-center">
-                        <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
-                        <input 
-                            type="text" 
-                            v-model="searchQuery" 
-                            placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
-                            class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
-                        >
-                        <button 
-                            v-if="searchQuery" 
-                            @click="searchQuery = ''" 
-                            class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
-                        >
-                            <span class="material-symbols-outlined text-xs">close</span>
-                        </button>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <!-- Search input -->
+                        <div class="relative w-full max-w-[320px] flex items-center">
+                            <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                            <input 
+                                type="text" 
+                                v-model="searchQuery" 
+                                placeholder="Tìm theo biển số, số phiếu, loại hàng..." 
+                                class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                            >
+                            <button 
+                                v-if="searchQuery" 
+                                @click="searchQuery = ''" 
+                                class="absolute right-3 text-gray-400 hover:text-primary flex items-center"
+                            >
+                                <span class="material-symbols-outlined text-xs">close</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Customer Dropdown Filter -->
+                        <div class="flex items-center gap-1.5">
+                            <select 
+                                v-model="selectedCustomer"
+                                class="px-3 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary transition-all cursor-pointer min-w-[150px] shadow-sm text-gray-700"
+                            >
+                                <option value="">Tất cả khách hàng</option>
+                                <option v-for="customer in uniqueCustomers" :key="customer" :value="customer">
+                                    {{ customer }}
+                                </option>
+                            </select>
+                            <button 
+                                v-if="selectedCustomer"
+                                @click="selectedCustomer = ''"
+                                class="size-6 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-primary flex items-center justify-center transition-colors border border-gray-100"
+                                title="Xóa lọc khách hàng"
+                            >
+                                <span class="material-symbols-outlined text-xs">close</span>
+                            </button>
+                        </div>
                     </div>
                     
                     <span class="text-[10px] font-bold text-gray-400">
