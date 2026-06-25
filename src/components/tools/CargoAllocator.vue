@@ -1603,55 +1603,46 @@ async function compileAndDownload() {
                     <span class="material-symbols-outlined text-base">shield</span>
                     Hạn mức tải trọng tiêu chuẩn
                 </h4>
-                <p class="text-[10px] text-gray-500 -mt-2">Cấu hình tải trọng tiêu chuẩn áp dụng khi chia tải:</p>
 
-                <div class="flex flex-col gap-3">
+                <div class="flex flex-col gap-3.5">
+                    <!-- Trọng tải cho phép -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép tiêu chuẩn (tấn)</label>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép (tấn)</label>
                         <input 
                             type="number" 
                             v-model.number="standardTTTPLimit" 
                             step="0.1"
                             class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
                         >
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            Tổng tải trọng tối đa cho phép của phương tiện (gồm cả xác xe và hàng hóa).
-                        </span>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Xác xe tiêu chuẩn (tấn)</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="flex flex-col gap-1">
-                                <span class="text-[9px] font-bold text-gray-400 text-center">Tối thiểu</span>
-                                <input 
-                                    type="number" 
-                                    v-model.number="standardCurbMin" 
-                                    step="0.1"
-                                    class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
-                                >
-                            </div>
-                            <div class="flex flex-col gap-1">
-                                <span class="text-[9px] font-bold text-gray-400 text-center">Tối đa</span>
-                                <input 
-                                    type="number" 
-                                    v-model.number="standardCurbMax" 
-                                    step="0.1"
-                                    class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
-                                >
-                            </div>
-                        </div>
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            Phạm vi xác xe ngẫu nhiên được trừ từ tổng tải trọng cho phép.
-                        </span>
                     </div>
 
+                    <!-- Xác xe -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn mức hàng tiêu chuẩn (tấn)</label>
-                        <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-[12px] text-xs font-bold text-gray-600 select-none font-mono text-center">
-                            Ngẫu nhiên: [{{ Math.max(0, standardTTTPLimit - standardCurbMax).toFixed(1) }} - {{ Math.max(0, standardTTTPLimit - standardCurbMin).toFixed(1) }}] t
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Xác xe tiêu chuẩn (tấn)</label>
+                        <div class="flex items-center gap-2">
+                            <input 
+                                type="number" 
+                                v-model.number="standardCurbMin" 
+                                step="0.1"
+                                placeholder="Min"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                            >
+                            <span class="text-gray-400 text-xs font-bold">~</span>
+                            <input 
+                                type="number" 
+                                v-model.number="standardCurbMax" 
+                                step="0.1"
+                                placeholder="Max"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                            >
                         </div>
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            Bằng Trọng tải cho phép tiêu chuẩn trừ xác xe ngẫu nhiên.
+                    </div>
+
+                    <!-- Hạn mức hàng -->
+                    <div class="mt-1 pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
+                        <span class="font-bold uppercase tracking-wider text-[9px]">Hạn mức hàng:</span>
+                        <span class="font-bold text-primary font-mono bg-primary/5 px-2.5 py-1 rounded-lg">
+                            {{ Math.max(0, standardTTTPLimit - standardCurbMax).toFixed(1) }} - {{ Math.max(0, standardTTTPLimit - standardCurbMin).toFixed(1) }} tấn
                         </span>
                     </div>
                 </div>
