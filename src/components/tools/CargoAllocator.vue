@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
 import { supabase } from '@/supabase';
@@ -64,6 +64,43 @@ function triggerTicketFileInput() {
 }
 const csvRecords = ref<CSVRecord[]>([]);
 const existingTrips = ref<SplitTrip[]>([]);
+
+// Types & Channel Sync
+const syncChannel = new BroadcastChannel('allocator_sync_channel');
+let isSyncingFromChannel = false;
+
+syncChannel.onmessage = async (event) => {
+    try {
+        isSyncingFromChannel = true;
+        if (event.data.type === 'tickets') {
+            const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
+            if (saved && Array.isArray(saved)) {
+                if (JSON.stringify(csvRecords.value) !== JSON.stringify(saved)) {
+                    csvRecords.value = saved;
+                }
+            }
+        } else if (event.data.type === 'history') {
+            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
+            if (savedHistory && Array.isArray(savedHistory)) {
+                if (JSON.stringify(existingTrips.value) !== JSON.stringify(savedHistory)) {
+                    existingTrips.value = savedHistory;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Lỗi khi đồng bộ giữa các tab:', e);
+    } finally {
+        isSyncingFromChannel = false;
+    }
+};
+
+onUnmounted(() => {
+    try {
+        syncChannel.close();
+    } catch (e) {
+        console.error('Lỗi khi đóng sync channel:', e);
+    }
+});
 
 const loadingCSV = ref(false);
 const compiling = ref(false);
@@ -815,8 +852,10 @@ onMounted(async () => {
 
 // Auto-save tickets on change
 watch(csvRecords, async (newVal) => {
+    if (isSyncingFromChannel) return;
     try {
         await dbContext.set('allocator_tickets', newVal);
+        syncChannel.postMessage({ type: 'tickets' });
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phiếu cân vào IndexedDB:', e);
     }
@@ -824,8 +863,10 @@ watch(csvRecords, async (newVal) => {
 
 // Auto-save history on change
 watch(existingTrips, async (newVal) => {
+    if (isSyncingFromChannel) return;
     try {
         await dbContext.set('allocator_history_trips', newVal);
+        syncChannel.postMessage({ type: 'history' });
     } catch (e) {
         console.error('Lỗi khi lưu lịch sử chuyến xe vào IndexedDB:', e);
     }
