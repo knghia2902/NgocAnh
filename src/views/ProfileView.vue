@@ -192,7 +192,7 @@ const handleLogout = () => {
                 <!-- Change Password Header -->
                 <div class="text-left mb-2">
                     <h3 class="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm">key</span> Thay đổi mật khẩu
+                        Thay đổi mật khẩu
                     </h3>
                     <p class="text-[10px] text-gray-400">Nhập mật khẩu mới nếu muốn thay đổi, nếu không hãy để trống</p>
                 </div>
