@@ -1545,19 +1545,15 @@ async function compileAndDownload() {
         <!-- Settings Section -->
 
         <!-- 3-Column Settings & Capacities configs -->
-        <!-- Unified Settings Panel -->
-        <div class="bg-white rounded-[24px] p-6 soft-shadow border border-primary/5 flex flex-col gap-5">
-            <h4 class="text-xs font-black text-primary flex items-center gap-1.5 border-b border-primary/5 pb-2">
-                <span class="material-symbols-outlined text-base">tune</span>
-                Cấu hình giải thuật & quy tắc phân bổ tải trọng
-            </h4>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Parameters configuration -->
+            <div class="lg:col-span-2 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-base">tune</span>
+                    Cấu hình giải thuật & quy tắc phân bổ
+                </h4>
                 
-                <!-- Column 1: Algorithm & Spacing Method -->
-                <div class="flex flex-col gap-4">
-                    <div class="text-[9px] uppercase font-black tracking-widest text-primary/50">1. Giải thuật phân chia</div>
-                    
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Distribution Strategy -->
                     <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Chiến lược chia trọng lượng</label>
@@ -1583,25 +1579,6 @@ async function compileAndDownload() {
                             {{ spacingStrategy === 'even' ? 'Thời gian các chuyến được chia đều trong khoảng từ lúc xe vào trạm đến lúc xe ra.' : 'Mỗi chuyến xe sau được xếp cách chuyến xe trước một khoảng thời gian cố định.' }}
                         </span>
                     </div>
-                </div>
-
-                <!-- Column 2: Gross Capacity & Spacing parameters -->
-                <div class="flex flex-col gap-4">
-                    <div class="text-[9px] uppercase font-black tracking-widest text-primary/50">2. Định mức tổng tải & Giãn cách</div>
-
-                    <!-- Trọng tải cho phép tiêu chuẩn -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép tiêu chuẩn (tấn)</label>
-                        <input 
-                            type="number" 
-                            v-model.number="standardTTTPLimit" 
-                            step="0.1"
-                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
-                        >
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            Tổng tải trọng tối đa cho phép của phương tiện (gồm cả xác xe và hàng hóa).
-                        </span>
-                    </div>
 
                     <!-- Time Interval (Used if forward/backward) -->
                     <div v-if="spacingStrategy !== 'even'" class="flex flex-col gap-1.5">
@@ -1618,12 +1595,29 @@ async function compileAndDownload() {
                         </span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Column 3: Curb & Cargo Limits -->
-                <div class="flex flex-col gap-4">
-                    <div class="text-[9px] uppercase font-black tracking-widest text-primary/50">3. Xác xe & Hạn mức hàng</div>
+            <!-- General Capacity standards config -->
+            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-base">shield</span>
+                    Hạn mức tải trọng tiêu chuẩn
+                </h4>
+                <p class="text-[10px] text-gray-500 -mt-2">Cấu hình tải trọng tiêu chuẩn áp dụng khi chia tải:</p>
 
-                    <!-- Xác xe tiêu chuẩn -->
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép tiêu chuẩn (tấn)</label>
+                        <input 
+                            type="number" 
+                            v-model.number="standardTTTPLimit" 
+                            step="0.1"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
+                        <span class="text-[9px] text-gray-400 leading-tight">
+                            Tổng tải trọng tối đa cho phép của phương tiện (gồm cả xác xe và hàng hóa).
+                        </span>
+                    </div>
                     <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Xác xe tiêu chuẩn (tấn)</label>
                         <div class="grid grid-cols-2 gap-2">
@@ -1651,7 +1645,6 @@ async function compileAndDownload() {
                         </span>
                     </div>
 
-                    <!-- Hạn mức hàng tiêu chuẩn -->
                     <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hạn mức hàng tiêu chuẩn (tấn)</label>
                         <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-[12px] text-xs font-bold text-gray-600 select-none font-mono text-center">
@@ -1662,7 +1655,6 @@ async function compileAndDownload() {
                         </span>
                     </div>
                 </div>
-
             </div>
         </div>
 
