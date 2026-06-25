@@ -709,77 +709,43 @@ async function loadTicketsFromSupabase() {
         if (error) throw error;
         
         if (data?.settings) {
-            let stateChanged = false;
+            isSyncingFromChannel = true; // disable watch writes during supabase load
 
-            // 1. Merge tickets
+            // 1. Overwrite tickets
             const remoteTickets = data.settings.allocator_tickets;
             if (Array.isArray(remoteTickets)) {
-                const merged = [...csvRecords.value];
-                let ticketsChanged = false;
-                
-                remoteTickets.forEach((r: any) => {
-                    const exists = merged.some(l => l.id === r.id || (l.ticketNo && l.ticketNo === r.ticketNo));
-                    if (!exists) {
-                        merged.push(r);
-                        ticketsChanged = true;
-                    }
-                });
-                
-                if (ticketsChanged || csvRecords.value.length < remoteTickets.length) {
-                    csvRecords.value = merged;
-                    await dbContext.set('allocator_tickets', merged);
-                    stateChanged = true;
-                } else if (csvRecords.value.length > remoteTickets.length) {
-                    stateChanged = true;
+                if (JSON.stringify(csvRecords.value) !== JSON.stringify(remoteTickets)) {
+                    csvRecords.value = remoteTickets;
+                    await dbContext.set('allocator_tickets', remoteTickets);
                 }
-            } else if (csvRecords.value.length > 0) {
-                stateChanged = true;
+            } else {
+                if (csvRecords.value.length > 0) {
+                    csvRecords.value = [];
+                    await dbContext.set('allocator_tickets', []);
+                }
             }
 
-            // 2. Merge history trips
+            // 2. Overwrite history trips
             const remoteHistory = data.settings.allocator_history_trips;
             if (Array.isArray(remoteHistory)) {
-                const mergedHistory = [...existingTrips.value];
-                let historyChanged = false;
-                
-                remoteHistory.forEach((r: any) => {
-                    const exists = mergedHistory.some(l => {
-                        if (r.ticketNo && l.ticketNo && r.ticketNo === l.ticketNo) {
-                            return true;
-                        }
-                        return l.plateNumber === r.plateNumber && 
-                               l.timeStr === r.timeStr && 
-                               Math.abs(l.weightTons - r.weightTons) < 0.001;
-                    });
-                    if (!exists) {
-                        mergedHistory.push(r);
-                        historyChanged = true;
-                    }
-                });
-                
-                if (historyChanged || existingTrips.value.length < remoteHistory.length) {
-                    // Sort merged history by STT
-                    mergedHistory.sort((a, b) => (a.stt || 0) - (b.stt || 0));
-                    existingTrips.value = mergedHistory;
-                    await dbContext.set('allocator_history_trips', mergedHistory);
-                    stateChanged = true;
-                } else if (existingTrips.value.length > remoteHistory.length) {
-                    stateChanged = true;
+                if (JSON.stringify(existingTrips.value) !== JSON.stringify(remoteHistory)) {
+                    existingTrips.value = remoteHistory;
+                    await dbContext.set('allocator_history_trips', remoteHistory);
                 }
-            } else if (existingTrips.value.length > 0) {
-                stateChanged = true;
+            } else {
+                if (existingTrips.value.length > 0) {
+                    existingTrips.value = [];
+                    await dbContext.set('allocator_history_trips', []);
+                }
             }
 
-            // 3. Upload if there is any mismatch/change
-            if (stateChanged) {
-                await saveTicketsToSupabase();
-            } else {
-                syncStatus.value = 'synced';
-            }
+            syncStatus.value = 'synced';
         }
     } catch (e) {
         console.warn('Lỗi khi tải dữ liệu từ Supabase:', e);
         syncStatus.value = 'error';
+    } finally {
+        isSyncingFromChannel = false;
     }
 }
 
