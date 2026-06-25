@@ -146,5 +146,86 @@ export const ContentService = {
             contentStore.stats.visitors = newStats.visitors;
         }
         return !error;
+    },
+
+    // Accounts management
+    async loadAccounts(): Promise<any[]> {
+        try {
+            const { data, error } = await supabase
+                .from('content')
+                .select('settings')
+                .eq('id', 'main')
+                .single();
+            if (error || !data?.settings) return [];
+            return data.settings.accounts || [];
+        } catch (e) {
+            console.error('Error loading accounts', e);
+            return [];
+        }
+    },
+
+    async saveAccounts(accounts: any[]): Promise<boolean> {
+        try {
+            const { data: current, error: fetchError } = await supabase
+                .from('content')
+                .select('settings')
+                .eq('id', 'main')
+                .single();
+            if (fetchError || !current?.settings) return false;
+            
+            const newSettings = {
+                ...current.settings,
+                accounts
+            };
+            const { error } = await supabase
+                .from('content')
+                .update({ settings: newSettings })
+                .eq('id', 'main');
+            return !error;
+        } catch (e) {
+            console.error('Error saving accounts', e);
+            return false;
+        }
+    },
+
+    async loadStaffTools(): Promise<string[]> {
+        try {
+            const { data, error } = await supabase
+                .from('content')
+                .select('settings')
+                .eq('id', 'main')
+                .single();
+            if (error || !data?.settings) return ['converter', 'merger', 'weighbridge', 'allocator', 'ocr'];
+            return data.settings.staff_tools || ['converter', 'merger', 'weighbridge', 'allocator', 'ocr'];
+        } catch (e) {
+            console.error('Error loading staff tools config', e);
+            return ['converter', 'merger', 'weighbridge', 'allocator', 'ocr'];
+        }
+    },
+
+    async saveStaffTools(tools: string[]): Promise<boolean> {
+        try {
+            const { data: current, error: fetchError } = await supabase
+                .from('content')
+                .select('settings')
+                .eq('id', 'main')
+                .single();
+            if (fetchError || !current?.settings) return false;
+            
+            const newSettings = {
+                ...current.settings,
+                staff_tools: tools
+            };
+            const { error } = await supabase
+                .from('content')
+                .update({ settings: newSettings })
+                .eq('id', 'main');
+            return !error;
+        } catch (e) {
+            console.error('Error saving staff tools config', e);
+            return false;
+        }
     }
 };
+
+

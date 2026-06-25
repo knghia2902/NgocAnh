@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { login } from '../stores/auth';
+import { login, authStore } from '../stores/auth';
 
 const router = useRouter();
 const username = ref('');
@@ -16,7 +16,11 @@ const handleLogin = async () => {
     try {
         const success = await login(username.value, password.value);
         if (success) {
-            router.push('/admin');
+            if (authStore.role === 'admin') {
+                router.push('/admin');
+            } else {
+                router.push('/tools');
+            }
         } else {
             error.value = 'Tên đăng nhập hoặc mật khẩu không đúng!';
         }
@@ -40,9 +44,10 @@ const handleLogin = async () => {
                  <div class="size-20 bg-soft-rose rounded-full flex items-center justify-center text-white glow-primary mx-auto mb-4">
                     <span class="material-symbols-outlined text-4xl">magic_button</span>
                 </div>
-                <h1 class="text-3xl font-display font-bold text-primary">Admin Login</h1>
-                <p class="text-[#1b0d11]/50 mt-2 font-medium">Welcome back to your magical corner!</p>
+                <h1 class="text-3xl font-display font-bold text-primary">Đăng Nhập</h1>
+                <p class="text-[#1b0d11]/50 mt-2 font-medium">Chào mừng bạn quay trở lại góc nhỏ! ✨</p>
             </div>
+
 
             <form @submit.prevent="handleLogin" class="space-y-6 relative z-10">
                 <div class="space-y-2 text-left">

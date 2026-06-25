@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import FormatConverter from '../components/tools/FormatConverter.vue';
 import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
 import WeighbridgePrinter from '../components/tools/WeighbridgePrinter.vue';
 import CargoAllocator from '../components/tools/CargoAllocator.vue';
+import { authStore } from '../stores/auth';
+import { ContentService } from '../services/ContentService';
 
 const activeToolId = ref<string | null>(null);
 const weighbridgeRef = ref<any>(null);
+const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', 'allocator', 'ocr']);
 
-const toolsList = [
+onMounted(async () => {
+    allowedStaffTools.value = await ContentService.loadStaffTools();
+});
+
+
+const allTools = [
   {
     id: 'converter',
     name: 'Chuyển Đổi Định Dạng File',
@@ -52,9 +60,17 @@ const toolsList = [
   }
 ];
 
-const activeToolMetadata = computed(() => {
-  return toolsList.find(t => t.id === activeToolId.value) || null;
+const toolsList = computed(() => {
+  if (authStore.role === 'admin') {
+    return allTools;
+  }
+  return allTools.filter(t => allowedStaffTools.value.includes(t.id));
 });
+
+const activeToolMetadata = computed(() => {
+  return toolsList.value.find(t => t.id === activeToolId.value) || null;
+});
+
 
 const openTool = (id: string) => {
   if (id === 'weighbridge') {

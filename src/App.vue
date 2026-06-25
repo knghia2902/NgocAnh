@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { RouterView, RouterLink } from 'vue-router'
+import { RouterView, RouterLink, useRouter } from 'vue-router'
 import { contentStore } from './stores/content';
 import { ContentService } from './services/ContentService';
 import { onMounted } from 'vue';
 import { VisitorTracker } from './services/VisitorTracker';
+import { authStore, logout } from './stores/auth';
 import ToastNotification from './components/ui/ToastNotification.vue';
+
+const router = useRouter();
+
+const handleHeaderLogout = () => {
+    logout();
+    router.push('/');
+};
 
 onMounted(async () => {
     // Load all content from Supabase
@@ -14,6 +22,7 @@ onMounted(async () => {
     await VisitorTracker.trackVisit(() => ContentService.incrementVisitors());
 });
 </script>
+
 
 <template>
   <div class="layout-container flex h-full grow flex-col min-h-screen">
@@ -33,15 +42,24 @@ onMounted(async () => {
         <router-link to="/tools" class="text-sm font-bold text-[#4a2c32]/80 hover:text-primary transition-colors border-b-2 border-transparent hover:border-primary" active-class="text-primary border-primary">Tools</router-link>
         <router-link to="/contact" class="text-sm font-bold text-[#4a2c32]/80 hover:text-primary transition-colors border-b-2 border-transparent hover:border-primary" active-class="text-primary border-primary">About</router-link>
       </nav>
-      <div class="flex items-center gap-4">
-        <router-link to="/admin" 
+      <div class="flex items-center gap-3">
+        <span v-if="authStore.isAuthenticated" class="text-xs font-bold text-[#4a2c32]/60 hidden sm:inline">
+            Chào, {{ authStore.displayName }}
+        </span>
+        <router-link :to="!authStore.isAuthenticated ? '/login' : (authStore.role === 'admin' ? '/admin' : '/tools')" 
           class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 border-2 border-pastel-pink cursor-pointer hover:border-primary transition-colors flex items-center justify-center overflow-hidden" 
           :style="{ backgroundImage: `url(${contentStore.hero.avatar || 'https://ngocanhcute.vercel.app/avatar.jpg'})` }"
+          :title="authStore.isAuthenticated ? `Tài khoản: ${authStore.displayName} (${authStore.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'})` : 'Đăng nhập'"
         >
           <img v-if="contentStore.hero.avatar" :src="contentStore.hero.avatar" class="hidden" @error="(e: any) => e.target.parentElement.style.backgroundImage = 'url(https://ngocanhcute.vercel.app/avatar.jpg)'" />
         </router-link>
+        <button v-if="authStore.isAuthenticated" @click="handleHeaderLogout" class="size-9 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors shadow-sm" title="Đăng xuất">
+            <span class="material-symbols-outlined text-sm">logout</span>
+        </button>
       </div>
+
     </header>
+
 
     <RouterView />
 

@@ -23,7 +23,8 @@ const router = createRouter({
         {
             path: '/tools',
             name: 'tools',
-            component: ToolsView
+            component: ToolsView,
+            meta: { requiresAuth: true }
         },
         {
             path: '/contact',
@@ -54,9 +55,12 @@ router.beforeEach((to, _from, next) => {
         next('/login');
     } else if (to.path === '/admin' && authStore.isFirstLogin) {
         next('/change-password');
+    } else if (to.path === '/admin' && authStore.role !== 'admin') {
+        next('/tools');
     } else {
         next();
     }
 });
 
 export default router
+

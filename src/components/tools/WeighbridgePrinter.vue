@@ -13,6 +13,13 @@ const props = withDefaults(defineProps<{
 const isOpen = ref(false);
 const activeTab = ref<'data' | 'config'>('data');
 
+watch(() => authStore.role, (newRole) => {
+    if (newRole !== 'admin') {
+        activeTab.value = 'data';
+    }
+});
+
+
 // Form default layout helper
 const getDefaultPrintFields = (): CustomFieldConfig[] => [
     { id: 'plateNumber', label: 'Số xe', visible: true, column: 'left', order: 1 },
@@ -2540,7 +2547,7 @@ onUnmounted(() => {
                                 </div>
                                 
                                 <!-- Vessel Actions -->
-                                <div class="flex items-center gap-0.5" @click.stopPropagation>
+                                <div v-if="authStore.role === 'admin'" class="flex items-center gap-0.5" @click.stopPropagation>
                                     <button @click="addBarge(vessel.id)" class="size-6 rounded-full hover:bg-white flex items-center justify-center text-primary/70 hover:text-primary transition-colors" title="Thêm sà lan">
                                         <span class="material-symbols-outlined text-xs">add</span>
                                     </button>
@@ -2569,7 +2576,7 @@ onUnmounted(() => {
                                         <span class="truncate">{{ barge.name }}</span>
                                         <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white/90' : 'text-red-500'" title="Sà lan đang bị khóa">lock</span>
                                     </div>
-                                    <div class="flex items-center gap-0.5" @click.stopPropagation>
+                                    <div v-if="authStore.role === 'admin'" class="flex items-center gap-0.5" @click.stopPropagation>
                                         <button @click="renameBarge(barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-primary'" title="Đổi tên">
                                             <span class="material-symbols-outlined text-[10px]">edit</span>
                                         </button>
@@ -2583,7 +2590,7 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Sidebar Footer -->
-                    <div class="p-3 border-t border-primary/10 bg-gray-50">
+                    <div v-if="authStore.role === 'admin'" class="p-3 border-t border-primary/10 bg-gray-50">
                         <button 
                             @click="addVessel" 
                             class="w-full py-2 bg-white border border-primary/20 hover:border-primary text-primary font-bold rounded-[12px] text-xs flex items-center justify-center gap-1.5 hover:bg-primary/5 transition-all shadow-sm"
@@ -2592,6 +2599,7 @@ onUnmounted(() => {
                             Thêm tàu mới
                         </button>
                     </div>
+
                 </aside>
 
                 <!-- Workspace (right) -->
@@ -2944,13 +2952,14 @@ onUnmounted(() => {
                                 <span class="material-symbols-outlined text-sm">local_shipping</span>
                                 Danh sách xe & In ấn
                             </button>
-                            <button 
+                            <button v-if="authStore.role === 'admin'"
                                 @click="activeTab = 'config'"
                                 :class="['px-4 py-1.5 rounded-[12px] font-bold text-xs transition-all flex items-center gap-1', activeTab === 'config' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
                             >
                                 <span class="material-symbols-outlined text-sm">settings</span>
                                 Cấu hình mẫu phiếu
                             </button>
+
                         </div>
 
                         <!-- TAB 1: DATA & PRINT -->

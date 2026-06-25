@@ -3,8 +3,10 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
 import { supabase } from '@/supabase';
+import { authStore } from '@/stores/auth';
 
 const { addToast } = useToast();
+
 
 // Types
 interface CSVRecord {
@@ -1693,7 +1695,7 @@ async function compileAndDownload() {
                     <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center">
                         KL lịch sử: {{ historyTotalWeightTons.toFixed(2) }}t
                     </div>
-                    <button 
+                    <button v-if="authStore.role === 'admin'"
                         @click="clearHistory"
                         :disabled="existingTrips.length === 0"
                         class="h-7 px-3 bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold rounded-[8px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1701,6 +1703,7 @@ async function compileAndDownload() {
                         <span class="material-symbols-outlined text-[14px]">delete_forever</span>
                         Xóa lịch sử
                     </button>
+
                     <button 
                         @click="compileAndDownload"
                         :disabled="existingTrips.length === 0 || compiling"

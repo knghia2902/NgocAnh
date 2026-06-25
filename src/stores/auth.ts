@@ -4,16 +4,21 @@ import { authService } from '../services/storage/AuthService';
 interface AuthState {
     isAuthenticated: boolean;
     user: string | null;
+    role: 'admin' | 'staff' | null;
+    displayName: string | null;
     isFirstLogin: boolean;
 }
 
 const STORAGE_KEY = 'auth_session';
 
 const savedState = localStorage.getItem(STORAGE_KEY);
-const initialState: AuthState = savedState ? JSON.parse(savedState) : {
-    isAuthenticated: false,
-    user: null,
-    isFirstLogin: false
+const saved = savedState ? JSON.parse(savedState) : null;
+const initialState: AuthState = {
+    isAuthenticated: saved?.isAuthenticated ?? false,
+    user: saved?.user ?? null,
+    role: saved?.role ?? (saved?.isAuthenticated ? 'admin' : null),
+    displayName: saved?.displayName ?? (saved?.isAuthenticated ? 'Admin' : null),
+    isFirstLogin: saved?.isFirstLogin ?? false
 };
 
 export const authStore = reactive<AuthState>(initialState);
@@ -25,9 +30,11 @@ watch(authStore, (state) => {
 
 export const login = async (username: string, pass: string) => {
     const res = await authService.login(username, pass);
-    if (res.success) {
+    if (res.success && res.user) {
         authStore.isAuthenticated = true;
-        authStore.user = username;
+        authStore.user = res.user.username;
+        authStore.role = res.user.role;
+        authStore.displayName = res.user.displayName || res.user.username;
         authStore.isFirstLogin = res.isFirstLogin || false;
         return true;
     }
@@ -37,5 +44,8 @@ export const login = async (username: string, pass: string) => {
 export const logout = () => {
     authStore.isAuthenticated = false;
     authStore.user = null;
+    authStore.role = null;
+    authStore.displayName = null;
     authStore.isFirstLogin = false;
 };
+

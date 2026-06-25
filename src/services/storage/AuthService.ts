@@ -2,19 +2,51 @@ import { supabase } from '../../supabase';
 
 export interface User {
     username: string;
-    role: 'admin';
+    role: 'admin' | 'staff';
+    displayName?: string;
+}
+
+export async function sha256(message: string): Promise<string> {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export class AuthService {
-    async login(username: string, password: string): Promise<{ success: boolean; isFirstLogin?: boolean }> {
+    async login(username: string, password: string): Promise<{ success: boolean; user?: User; isFirstLogin?: boolean }> {
         const { data, error } = await supabase.from('content').select('settings').eq('id', 'main').single();
 
         if (error || !data?.settings) return { success: false };
 
         const settings = data.settings;
+        
+        // 1. Check primary legacy admin account
         if (username === settings.username && password === settings.password) {
-            return { success: true, isFirstLogin: settings.is_first };
+            return { 
+                success: true, 
+                user: { username, role: 'admin', displayName: 'Admin' },
+                isFirstLogin: settings.is_first 
+            };
         }
+
+        // 2. Check secondary accounts list inside settings.accounts
+        const accounts = settings.accounts || [];
+        const hashedInputPassword = await sha256(password);
+        
+        const matchedAccount = accounts.find((acc: any) => acc.username === username && acc.password === hashedInputPassword);
+        if (matchedAccount) {
+            return {
+                success: true,
+                user: { 
+                    username: matchedAccount.username, 
+                    role: matchedAccount.role || 'staff', 
+                    displayName: matchedAccount.displayName || matchedAccount.username 
+                },
+                isFirstLogin: false
+            };
+        }
+
         return { success: false };
     }
 
@@ -43,3 +75,4 @@ export class AuthService {
 }
 
 export const authService = new AuthService();
+

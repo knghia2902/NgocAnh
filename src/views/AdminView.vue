@@ -5,6 +5,9 @@ import { contentStore } from '../stores/content';
 import { logout } from '../stores/auth';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/storage/StorageService';
+import { sha256 } from '../services/storage/AuthService';
+import { supabase } from '../supabase';
+
 
 const router = useRouter();
 const currentTab = ref('dashboard');
@@ -225,10 +228,160 @@ const triggerToast = (msg: string) => {
     setTimeout(() => showToast.value = false, 3000);
 };
 
+// Accounts State
+const accountsList = ref<any[]>([]);
+const showAccountModal = ref(false);
+const showResetPasswordModal = ref(false);
+
+const accountForm = ref({
+    username: '',
+    password: '',
+    displayName: '',
+    role: 'staff' as 'admin' | 'staff'
+});
+
+const resetPasswordForm = ref({
+    username: '',
+    newPassword: ''
+});
+
+const loadAccounts = async () => {
+    accountsList.value = await ContentService.loadAccounts();
+};
+
+const openCreateAccountModal = () => {
+    accountForm.value = {
+        username: '',
+        password: '',
+        displayName: '',
+        role: 'staff'
+    };
+    showAccountModal.value = true;
+};
+
+const handleCreateAccount = async () => {
+    const usernameClean = accountForm.value.username.trim().toLowerCase();
+    if (!usernameClean) {
+        triggerToast('Tên đăng nhập không được để trống!');
+        return;
+    }
+    if (!accountForm.value.password) {
+        triggerToast('Mật khẩu không được để trống!');
+        return;
+    }
+    const { data: currentSettings } = await supabase.from('content').select('settings').eq('id', 'main').single();
+    const settings = currentSettings?.settings || {};
+    
+    if (usernameClean === settings.username) {
+        triggerToast('Trùng với tên đăng nhập của Admin chính!');
+        return;
+    }
+    
+    const exists = accountsList.value.some(acc => acc.username === usernameClean);
+    if (exists) {
+        triggerToast('Tên đăng nhập này đã tồn tại!');
+        return;
+    }
+    
+    const passwordHash = await sha256(accountForm.value.password);
+    
+    const newAcc = {
+        username: usernameClean,
+        password: passwordHash,
+        displayName: accountForm.value.displayName.trim() || usernameClean,
+        role: accountForm.value.role
+    };
+    
+    const updatedAccounts = [...accountsList.value, newAcc];
+    const success = await ContentService.saveAccounts(updatedAccounts);
+    if (success) {
+        accountsList.value = updatedAccounts;
+        showAccountModal.value = false;
+        triggerToast('Tạo tài khoản thành công! ✨');
+    } else {
+        triggerToast('Có lỗi xảy ra khi lưu tài khoản.');
+    }
+};
+
+const deleteAccount = async (username: string) => {
+    if (confirm(`Bạn có chắc chắn muốn xóa tài khoản "${username}"?`)) {
+        const updatedAccounts = accountsList.value.filter(acc => acc.username !== username);
+        const success = await ContentService.saveAccounts(updatedAccounts);
+        if (success) {
+            accountsList.value = updatedAccounts;
+            triggerToast('Xóa tài khoản thành công! 🗑️');
+        } else {
+            triggerToast('Có lỗi xảy ra khi xóa tài khoản.');
+        }
+    }
+};
+
+const openResetPasswordModal = (account: any) => {
+    resetPasswordForm.value = {
+        username: account.username,
+        newPassword: ''
+    };
+    showResetPasswordModal.value = true;
+};
+
+const handleResetPassword = async () => {
+    if (!resetPasswordForm.value.newPassword) {
+        triggerToast('Mật khẩu mới không được để trống!');
+        return;
+    }
+    
+    const passwordHash = await sha256(resetPasswordForm.value.newPassword);
+    const updatedAccounts = accountsList.value.map(acc => {
+        if (acc.username === resetPasswordForm.value.username) {
+            return {
+                ...acc,
+                password: passwordHash
+            };
+        }
+        return acc;
+    });
+    
+    const success = await ContentService.saveAccounts(updatedAccounts);
+    if (success) {
+        accountsList.value = updatedAccounts;
+        showResetPasswordModal.value = false;
+        triggerToast('Đặt lại mật khẩu thành công! ✨');
+    } else {
+        triggerToast('Có lỗi xảy ra khi đặt lại mật khẩu.');
+    }
+};
+
+const allTools = [
+  { id: 'converter', name: 'Chuyển Đổi Định Dạng File' },
+  { id: 'merger', name: 'Gộp Excel Thông Minh' },
+  { id: 'weighbridge', name: 'In Phiếu Cân Xe 🚢' },
+  { id: 'allocator', name: 'Phân Bổ Tải Trọng 🚛' },
+  { id: 'ocr', name: 'Trích Xuất PDF & OCR' }
+];
+
+const staffToolsConfig = ref<string[]>([]);
+
+const loadStaffToolsConfig = async () => {
+    staffToolsConfig.value = await ContentService.loadStaffTools();
+};
+
+const handleSaveStaffTools = async () => {
+    const success = await ContentService.saveStaffTools(staffToolsConfig.value);
+    if (success) {
+        triggerToast('Cập nhật phân quyền hiển thị công cụ thành công! 🛠️');
+    } else {
+        triggerToast('Có lỗi xảy ra khi lưu cấu hình.');
+    }
+};
+
 onMounted(async () => {
     await ContentService.loadAll();
+    await loadAccounts();
+    await loadStaffToolsConfig();
 });
 </script>
+
+
 
 <template>
     <div class="min-h-screen bg-[#FDF2F5] flex font-display text-[#1b0d11] p-6 gap-6">
@@ -245,14 +398,19 @@ onMounted(async () => {
             </div>
 
             <nav class="flex-1 space-y-2">
-                <button v-for="tab in ['dashboard', 'projects', 'about', 'messages']" :key="tab"
+                <button v-for="tab in ['dashboard', 'projects', 'about', 'messages', 'accounts']" :key="tab"
                     @click="currentTab = tab"
                     :class="['w-full text-left px-5 py-3 rounded-2xl font-bold transition-all flex items-center gap-3', currentTab === tab ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-400 hover:bg-soft-pink/10 hover:text-primary']"
                 >
-                    <span class="material-symbols-outlined text-xl">{{ tab === 'dashboard' ? 'grid_view' : tab === 'projects' ? 'folder' : tab === 'about' ? 'person' : 'mail' }}</span>
-                    <span class="capitalize">{{ tab === 'about' ? 'About Me' : tab }}</span>
+                    <span class="material-symbols-outlined text-xl">
+                        {{ tab === 'dashboard' ? 'grid_view' : tab === 'projects' ? 'folder' : tab === 'about' ? 'person' : tab === 'messages' ? 'mail' : 'group' }}
+                    </span>
+                    <span class="capitalize">
+                        {{ tab === 'about' ? 'About Me' : tab === 'accounts' ? 'Tài Khoản' : tab }}
+                    </span>
                 </button>
             </nav>
+
 
             <button @click="logout(); router.push('/login')" class="mt-auto px-5 py-3 rounded-2xl font-bold text-red-300 hover:bg-red-50 flex items-center gap-3 transition-all">
                 <span class="material-symbols-outlined">logout</span> Logout
@@ -522,7 +680,85 @@ onMounted(async () => {
                     <p class="text-[15px] font-medium leading-relaxed italic text-gray-600 bg-[#fcf8f9] p-8 rounded-[2rem] border border-white/40 shadow-inner">"{{ m.content }}"</p>
                 </div>
             </div>
+
+            <div v-else-if="currentTab === 'accounts'" class="max-w-5xl mx-auto space-y-8 animate-fade-in">
+                 <div class="flex justify-between items-center">
+                    <h3 class="text-2xl font-black text-primary">Quản Lý Tài Khoản</h3>
+                    <button @click="openCreateAccountModal" class="bg-primary text-white px-8 py-3 rounded-full font-black text-sm shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined">person_add</span> Thêm Tài Khoản
+                    </button>
+                </div>
+                
+                <div class="bg-white rounded-[3rem] p-8 card-shadow border border-white/40 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-primary/10 text-gray-400 text-xs font-black uppercase tracking-wider">
+                                    <th class="pb-4 pl-4">Tên hiển thị</th>
+                                    <th class="pb-4">Tên đăng nhập</th>
+                                    <th class="pb-4">Vai trò</th>
+                                    <th class="pb-4 text-right pr-4">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-primary/5">
+                                <tr v-if="accountsList.length === 0">
+                                    <td colspan="4" class="py-12 text-center text-gray-400 italic font-medium">Chưa có tài khoản phụ nào được tạo.</td>
+                                </tr>
+                                <tr v-for="(acc, idx) in accountsList" :key="idx" class="hover:bg-soft-pink/5 transition-colors">
+                                    <td class="py-4 pl-4 font-bold text-sm text-primary">{{ acc.displayName }}</td>
+                                    <td class="py-4 font-bold text-sm text-[#4a2c32]">{{ acc.username }}</td>
+                                    <td class="py-4">
+                                        <span class="px-3 py-1 text-[9px] font-black uppercase rounded-full"
+                                            :class="acc.role === 'admin' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'"
+                                        >
+                                            {{ acc.role || 'staff' }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 text-right pr-4 space-x-4">
+                                        <button @click="openResetPasswordModal(acc)" class="text-xs font-black text-primary hover:underline">Đổi mật khẩu</button>
+                                        <button @click="deleteAccount(acc.username)" class="text-xs font-black text-red-400 hover:text-red-600 hover:underline">Xóa</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Phân Quyền Công Cụ Cho Staff Card -->
+                <div class="bg-white rounded-[3rem] p-8 card-shadow border border-white/40 flex flex-col gap-6">
+                    <div>
+                        <h4 class="text-lg font-black text-[#4a2c32] flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">settings_accessibility</span>
+                            Phân Quyền Công Cụ Cho Nhân Viên (Staff)
+                        </h4>
+                        <p class="text-xs font-bold text-gray-400 mt-1">Chọn các công cụ/module hiển thị cho các tài khoản có vai trò Staff.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div v-for="t in allTools" :key="t.id" class="p-4 bg-[#fcf8f9] rounded-2xl flex items-center justify-between border border-transparent hover:border-primary/10 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <div class="size-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center shadow-soft">
+                                    <span class="material-symbols-outlined text-sm">
+                                        {{ t.id === 'converter' ? 'swap_horiz' : t.id === 'merger' ? 'layers' : t.id === 'weighbridge' ? 'print' : t.id === 'allocator' ? 'shuffle' : 'document_scanner' }}
+                                    </span>
+                                </div>
+                                <span class="font-bold text-xs text-[#4a2c32] group-hover:text-primary transition-colors">{{ t.name }}</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer scale-90">
+                                <input type="checkbox" :value="t.id" v-model="staffToolsConfig" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-2 border-t border-dashed border-primary/10">
+                        <button @click="handleSaveStaffTools" class="bg-primary text-white px-8 py-2.5 rounded-full font-black text-xs shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all">Lưu phân quyền công cụ</button>
+                    </div>
+                </div>
+            </div>
         </main>
+
+
 
         <!-- Modals: Toolkit Config -->
         <div v-if="showToolkitManager" class="fixed inset-0 bg-black/40 backdrop-blur-md z-[100] flex items-center justify-center p-4">
@@ -619,12 +855,76 @@ onMounted(async () => {
             </div>
         </div>
 
+        <!-- Create Account Modal -->
+        <div v-if="showAccountModal" class="fixed inset-0 bg-black/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+             <div class="bg-white w-full max-w-xl rounded-[4rem] p-12 card-shadow space-y-8 animate-scale-up relative overflow-hidden">
+                <header class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-3xl font-black text-primary">Tạo Tài Khoản</h3>
+                        <p class="text-[10px] font-bold text-gray-400">Tạo thêm tài khoản mới cho nhân viên ✨</p>
+                    </div>
+                    <button @click="showAccountModal = false" class="size-12 bg-[#fcf8f9] rounded-full flex items-center justify-center text-gray-400 hover:text-red-400">
+                         <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <div class="space-y-6">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-1">
+                            <label class="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Tên đăng nhập</label>
+                            <input v-model="accountForm.username" placeholder="Ví dụ: nguyenvana" class="w-full bg-[#fcf8f9] p-5 rounded-2xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Tên hiển thị</label>
+                            <input v-model="accountForm.displayName" placeholder="Ví dụ: Nguyễn Văn A" class="w-full bg-[#fcf8f9] p-5 rounded-2xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-1">
+                            <label class="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Mật khẩu</label>
+                            <input v-model="accountForm.password" type="password" placeholder="••••••••" class="w-full bg-[#fcf8f9] p-5 rounded-2xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Vai trò</label>
+                            <select v-model="accountForm.role" class="w-full bg-[#fcf8f9] p-5 rounded-2xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20 shadow-sm">
+                                <option value="staff">Staff (Nhân viên)</option>
+                                <option value="admin">Admin (Quản trị viên)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button @click="handleCreateAccount" class="w-full py-5 bg-primary text-white rounded-[2rem] font-black shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all text-sm">Xác Nhận Tạo ✨</button>
+                </div>
+             </div>
+        </div>
+
+        <!-- Reset Password Modal -->
+        <div v-if="showResetPasswordModal" class="fixed inset-0 bg-black/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+             <div class="bg-white w-full max-w-md rounded-[4rem] p-12 card-shadow space-y-8 animate-scale-up relative overflow-hidden">
+                <header class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-3xl font-black text-primary">Đặt Lại Mật Khẩu</h3>
+                        <p class="text-[10px] font-bold text-gray-400">Đặt lại mật khẩu cho tài khoản: <span class="text-primary font-black">{{ resetPasswordForm.username }}</span></p>
+                    </div>
+                    <button @click="showResetPasswordModal = false" class="size-12 bg-[#fcf8f9] rounded-full flex items-center justify-center text-gray-400 hover:text-red-400">
+                         <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <div class="space-y-6">
+                    <div class="space-y-1">
+                        <label class="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-2">Mật khẩu mới</label>
+                        <input v-model="resetPasswordForm.newPassword" type="password" placeholder="••••••••" class="w-full bg-[#fcf8f9] p-5 rounded-2xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
+                    </div>
+                    <button @click="handleResetPassword" class="w-full py-5 bg-primary text-white rounded-[2rem] font-black shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all text-sm">Đặt Lại Mật Khẩu ✨</button>
+                </div>
+             </div>
+        </div>
+
         <!-- Toast -->
         <div v-if="showToast" class="fixed bottom-12 left-1/2 -translate-x-1/2 bg-[#1b0d11] text-white px-10 py-5 rounded-full font-black text-xs shadow-2xl z-[300] animate-bounce-short tracking-wide border border-white/10 backdrop-blur-xl">
             {{ toastMessage }}
         </div>
     </div>
 </template>
+
 
 <style scoped>
 .card-shadow { box-shadow: 0 20px 60px -15px rgba(255, 133, 162, 0.15); }
