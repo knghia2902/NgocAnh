@@ -189,6 +189,48 @@ function splitWeightRandomly(weightTons: number, numTrips: number, tripLimit: nu
 }
 const timeIntervalMinutes = ref(90);
 
+const ticketPrefix = ref('');
+const ticketSuffix = ref('/26B');
+const ticketStart = ref(1);
+const ticketPadding = ref(6);
+const useAutoTicketNo = ref(true);
+
+const previewTicketNo = computed(() => {
+    const num = String(ticketStart.value).padStart(ticketPadding.value, '0');
+    return ticketPrefix.value + num + ticketSuffix.value;
+});
+
+watch(ticketPrefix, async (newVal) => {
+    try {
+        await dbContext.set('allocator_ticket_prefix', newVal);
+    } catch (e) {}
+});
+
+watch(ticketSuffix, async (newVal) => {
+    try {
+        await dbContext.set('allocator_ticket_suffix', newVal);
+    } catch (e) {}
+});
+
+watch(ticketStart, async (newVal) => {
+    try {
+        await dbContext.set('allocator_ticket_start', newVal);
+    } catch (e) {}
+});
+
+watch(ticketPadding, async (newVal) => {
+    try {
+        await dbContext.set('allocator_ticket_padding', newVal);
+    } catch (e) {}
+});
+
+watch(useAutoTicketNo, async (newVal) => {
+    try {
+        await dbContext.set('allocator_use_auto_ticket', newVal);
+    } catch (e) {}
+});
+
+
 watch(standardTTTPLimit, async (newVal) => {
     vehicleLimitCache.clear();
     try {
@@ -857,6 +899,22 @@ onMounted(async () => {
         const savedInterval = await dbContext.get<number>('allocator_time_interval');
         if (savedInterval) timeIntervalMinutes.value = savedInterval;
 
+        const savedPrefix = await dbContext.get<string>('allocator_ticket_prefix');
+        if (savedPrefix !== undefined && savedPrefix !== null) ticketPrefix.value = savedPrefix;
+
+        const savedSuffix = await dbContext.get<string>('allocator_ticket_suffix');
+        if (savedSuffix !== undefined && savedSuffix !== null) ticketSuffix.value = savedSuffix;
+
+        const savedStart = await dbContext.get<number>('allocator_ticket_start');
+        if (savedStart !== undefined && savedStart !== null) ticketStart.value = savedStart;
+
+        const savedPadding = await dbContext.get<number>('allocator_ticket_padding');
+        if (savedPadding !== undefined && savedPadding !== null) ticketPadding.value = savedPadding;
+
+        const savedUseAuto = await dbContext.get<boolean>('allocator_use_auto_ticket');
+        if (savedUseAuto !== undefined && savedUseAuto !== null) useAutoTicketNo.value = savedUseAuto;
+
+
         const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
         if (saved && Array.isArray(saved)) {
             csvRecords.value = saved;
@@ -1132,8 +1190,17 @@ const generatedTrips = computed<SplitTrip[]>(() => {
         const { dateObj, durationMs, ...rest } = t;
         const tripDate2 = dateObj;
         const tripDate1 = new Date(dateObj.getTime() - durationMs);
+        
+        let finalTicketNo = t.ticketNo;
+        if (useAutoTicketNo.value) {
+            const ticketNumVal = ticketStart.value + idx;
+            const paddedNum = String(ticketNumVal).padStart(ticketPadding.value, '0');
+            finalTicketNo = ticketPrefix.value + paddedNum + ticketSuffix.value;
+        }
+        
         return {
             ...rest,
+            ticketNo: finalTicketNo,
             stt: startSTT + idx,
             timeStr: sortedTimeStrings[idx] || '',
             date1Obj: tripDate1,
@@ -1624,6 +1691,73 @@ async function compileAndDownload() {
                         <span class="text-[9px] text-gray-400 leading-tight">
                             Thời gian tối thiểu giãn cách giữa hai chuyến xe liên tiếp.
                         </span>
+                    </div>
+                </div>
+
+                <!-- Cấu hình số phiếu cân -->
+                <div class="border-t border-gray-100 pt-4 mt-2">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-base">tag</span>
+                            Cấu hình số phiếu cân tự động
+                        </h4>
+                        <label class="flex items-center gap-1.5 cursor-pointer text-xs font-bold select-none">
+                            <input type="checkbox" v-model="useAutoTicketNo" class="rounded border-gray-300 text-primary focus:ring-primary">
+                            Kích hoạt số phiếu tự động
+                        </label>
+                    </div>
+                    
+                    <div v-if="useAutoTicketNo" class="grid grid-cols-1 md:grid-cols-4 gap-3 animate-fade-in">
+                        <!-- Tiền tố -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tiền tố số phiếu</label>
+                            <input 
+                                type="text" 
+                                v-model="ticketPrefix" 
+                                placeholder="Ví dụ: PC-"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                            >
+                        </div>
+
+                        <!-- Số bắt đầu -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số phiếu bắt đầu</label>
+                            <input 
+                                type="number" 
+                                v-model.number="ticketStart" 
+                                min="0"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                            >
+                        </div>
+
+                        <!-- Số lượng số 0 (Padding) -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số chữ số (Padding)</label>
+                            <input 
+                                type="number" 
+                                v-model.number="ticketPadding" 
+                                min="1" 
+                                max="10"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                            >
+                        </div>
+
+                        <!-- Hậu tố -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hậu tố số phiếu</label>
+                            <input 
+                                type="text" 
+                                v-model="ticketSuffix" 
+                                placeholder="Ví dụ: /26B"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                            >
+                        </div>
+                    </div>
+                    
+                    <!-- Xem trước định dạng số phiếu -->
+                    <div v-if="useAutoTicketNo" class="mt-2 text-[10px] text-gray-400 font-semibold italic flex items-center gap-1 select-none">
+                        <span class="material-symbols-outlined text-[12px]">visibility</span>
+                        Xem trước mẫu số phiếu: <span class="font-bold text-teal-600 font-mono">{{ previewTicketNo }}</span>
                     </div>
                 </div>
             </div>

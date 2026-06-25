@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 import { coordinateSorter } from '../CoordinateSorter';
 import { documentBuilder } from '../DocumentBuilder';
 import type { TextElement } from '@/types/pdf';
