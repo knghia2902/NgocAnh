@@ -1,10 +1,15 @@
 import { describe, it } from 'vitest';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { coordinateSorter } from '../CoordinateSorter';
+import fs from 'fs';
 
 describe('Raw Element Analysis', () => {
     it('should show raw vs merged elements for column analysis', async () => {
         const pdfPath = 'C:\\Users\\O5A00001315\\Downloads\\Ban CNTT-HPC - Wifi-mã vạch.pdf';
+        if (!fs.existsSync(pdfPath)) {
+            console.warn(`[align_raw] PDF file not found at ${pdfPath}. Skipping test.`);
+            return;
+        }
         const loadingTask = pdfjsLib.getDocument({ url: pdfPath, useSystemFonts: true, disableFontFace: true });
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);

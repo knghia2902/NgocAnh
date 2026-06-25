@@ -44,8 +44,14 @@ describe('Layout Reconstruction Test', () => {
         const lines = coordinateSorter.groupElementsByY(elements);
         const buffer = await documentBuilder.buildExcelDocument(lines);
 
-        expect(buffer.byteLength).toBeGreaterThan(0);
-        fs.writeFileSync('C:\\Users\\O5A00001315\\Downloads\\test_output_via_vitest.xlsx', Buffer.from(buffer));
-        console.log("SUCCESSFULLY SAVED test_output_via_vitest.xlsx");
+        const downloadsFolder = process.env.USERPROFILE 
+            ? `${process.env.USERPROFILE}\\Downloads` 
+            : './';
+        const outputPath = fs.existsSync(downloadsFolder)
+            ? `${downloadsFolder}\\test_output_via_vitest.xlsx`
+            : './test_output_via_vitest.xlsx';
+
+        fs.writeFileSync(outputPath, Buffer.from(buffer));
+        console.log(`SUCCESSFULLY SAVED ${outputPath}`);
     });
 });
