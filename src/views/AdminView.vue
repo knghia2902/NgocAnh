@@ -355,7 +355,7 @@ const allTools = [
   { id: 'converter', name: 'Chuyển Đổi Định Dạng File' },
   { id: 'merger', name: 'Gộp Excel Thông Minh' },
   { id: 'weighbridge', name: 'In Phiếu Cân Xe 🚢' },
-  { id: 'allocator', name: 'Phân Bổ Tải Trọng 🚛' },
+  { id: 'allocator', name: 'Báo cáo cân hàng 🚛' },
   { id: 'ocr', name: 'Trích Xuất PDF & OCR' }
 ];
 

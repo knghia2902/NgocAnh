@@ -5,12 +5,14 @@ import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
 import WeighbridgePrinter from '../components/tools/WeighbridgePrinter.vue';
 import CargoAllocator from '../components/tools/CargoAllocator.vue';
+import VehicleManager from '../components/tools/VehicleManager.vue';
 import { authStore } from '../stores/auth';
 import { ContentService } from '../services/ContentService';
 
 const activeToolId = ref<string | null>(null);
 const weighbridgeRef = ref<any>(null);
 const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', 'allocator', 'ocr']);
+const allocatorSubView = ref<'report' | 'vehicles'>('report');
 
 onMounted(async () => {
     allowedStaffTools.value = await ContentService.loadStaffTools();
@@ -44,7 +46,7 @@ const allTools = [
   },
   {
     id: 'allocator',
-    name: 'Phân Bổ Tải Trọng 🚛',
+    name: 'Báo cáo cân hàng 🚛',
     desc: 'Hỗ trợ phân rã tải trọng tổng hợp của phiếu cân gốc thành các chuyến xe ngẫu nhiên tự nhiên và xáo trộn giờ xuất bến khoa học.',
     icon: 'shuffle',
     bgIcon: 'bg-emerald-500/10 text-emerald-600',
@@ -79,6 +81,9 @@ const openTool = (id: string) => {
     }
   } else {
     activeToolId.value = id;
+    if (id === 'allocator') {
+      allocatorSubView.value = 'report';
+    }
   }
 };
 
@@ -92,6 +97,9 @@ const handleSidebarSwitch = (id: string) => {
     }, 150);
   } else {
     activeToolId.value = id;
+    if (id === 'allocator') {
+      allocatorSubView.value = 'report';
+    }
   }
 };
 </script>
@@ -204,19 +212,39 @@ const handleSidebarSwitch = (id: string) => {
         <!-- Sidebar: quick navigation to other tools -->
         <aside class="w-64 bg-white border-r border-primary/10 flex flex-col shrink-0">
           <div class="p-3 border-b border-primary/5 flex items-center justify-between">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Danh sách công cụ</span>
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+              {{ activeToolId === 'allocator' ? 'Chức năng' : 'Danh sách công cụ' }}
+            </span>
           </div>
 
           <div class="flex-1 overflow-y-auto p-2 space-y-1">
-            <button 
-              v-for="tool in toolsList" 
-              :key="tool.id"
-              @click="handleSidebarSwitch(tool.id)"
-              :class="['w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs font-bold transition-all', activeToolId === tool.id ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
-            >
-              <span class="material-symbols-outlined text-sm">{{ tool.icon }}</span>
-              <span class="truncate">{{ tool.name }}</span>
-            </button>
+            <template v-if="activeToolId === 'allocator'">
+              <button 
+                @click="allocatorSubView = 'report'"
+                :class="['w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs font-bold transition-all', allocatorSubView === 'report' ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
+              >
+                <span class="material-symbols-outlined text-sm">shuffle</span>
+                <span>Báo cáo cân hàng</span>
+              </button>
+              <button 
+                @click="allocatorSubView = 'vehicles'"
+                :class="['w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs font-bold transition-all', allocatorSubView === 'vehicles' ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
+              >
+                <span class="material-symbols-outlined text-sm">local_shipping</span>
+                <span>Danh sách xe</span>
+              </button>
+            </template>
+            <template v-else>
+              <button 
+                v-for="tool in toolsList" 
+                :key="tool.id"
+                @click="handleSidebarSwitch(tool.id)"
+                :class="['w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs font-bold transition-all', activeToolId === tool.id ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
+              >
+                <span class="material-symbols-outlined text-sm">{{ tool.icon }}</span>
+                <span class="truncate">{{ tool.name }}</span>
+              </button>
+            </template>
           </div>
 
           <!-- Back button -->
@@ -237,7 +265,10 @@ const handleSidebarSwitch = (id: string) => {
             <FormatConverter v-if="activeToolId === 'converter'" />
             <ExcelMerger v-else-if="activeToolId === 'merger'" />
             <PdfOcrTools v-else-if="activeToolId === 'ocr'" />
-            <CargoAllocator v-else-if="activeToolId === 'allocator'" />
+            <template v-else-if="activeToolId === 'allocator'">
+              <CargoAllocator v-show="allocatorSubView === 'report'" />
+              <VehicleManager v-if="allocatorSubView === 'vehicles'" />
+            </template>
           </div>
         </main>
       </div>
