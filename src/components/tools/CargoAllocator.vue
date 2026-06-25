@@ -1616,9 +1616,6 @@ async function compileAndDownload() {
 
                 <!-- Stats summary badges for Tab 2 (Template / Phân bổ) -->
                 <div v-if="activeDataTab === 'template'" class="flex items-center gap-2 flex-wrap text-[10px] font-black text-gray-500">
-                    <div v-if="existingTrips.length > 0" class="h-7 px-2.5 bg-gray-50 rounded-[8px] border border-primary/5 flex items-center">
-                        Dòng bắt đầu: từ dòng số {{ nextSTT }}
-                    </div>
                     <div class="h-7 px-2.5 bg-primary/10 rounded-[8px] border border-transparent text-primary flex items-center">
                         Số chuyến: {{ generatedTrips.length }}
                     </div>
