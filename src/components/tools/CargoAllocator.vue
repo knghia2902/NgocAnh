@@ -112,10 +112,24 @@ const standardTTTPLimit = ref(10.0);
 const standardCurbMin = ref(1.5);
 const standardCurbMax = ref(3.0);
 
-function getRandomLimit(tttp: number): number {
+function createSeededRandom(seedStr: string) {
+    let hash = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+        hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    let seed = hash;
+    return function() {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+    };
+}
+
+function getRandomLimit(tttp: number, plate: string): number {
+    const seed = plate ? plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : 'DEFAULT';
+    const rand = createSeededRandom(seed);
     const minCurb = standardCurbMin.value;
     const maxCurb = standardCurbMax.value;
-    const curbWeight = minCurb + Math.random() * (maxCurb - minCurb);
+    const curbWeight = minCurb + rand() * (maxCurb - minCurb);
     return Math.round((tttp - curbWeight) * 100) / 100;
 }
 
@@ -130,7 +144,7 @@ const distStrategy = ref<'even' | 'max' | 'random'>('random');
 const spacingStrategy = ref<'even' | 'forward' | 'backward'>('even');
 
 // Bounded random split algorithm
-function splitWeightRandomly(weightTons: number, numTrips: number, tripLimit: number): number[] {
+function splitWeightRandomly(weightTons: number, numTrips: number, tripLimit: number, rand: () => number): number[] {
     const weights: number[] = [];
     let remaining = weightTons;
     
@@ -148,13 +162,19 @@ function splitWeightRandomly(weightTons: number, numTrips: number, tripLimit: nu
         const remTrips = numTrips - 1 - i;
         
         // Mathematical limits to guarantee later trips can also be within limits:
-        const lowerBound = Math.max(minWeight, remaining - remTrips * maxWeight);
-        const upperBound = Math.min(maxWeight, remaining - remTrips * minWeight);
+        let lowerBound = Math.max(minWeight, remaining - remTrips * maxWeight);
+        let upperBound = Math.min(maxWeight, remaining - remTrips * minWeight);
+        
+        if (lowerBound > upperBound) {
+            const temp = lowerBound;
+            lowerBound = upperBound;
+            upperBound = temp;
+        }
         
         let weight = average;
         if (upperBound >= lowerBound) {
             // Triangular distribution (sum of 2 randoms) to favor center/average values
-            const r = (Math.random() + Math.random()) / 2;
+            const r = (rand() + rand()) / 2;
             weight = lowerBound + r * (upperBound - lowerBound);
         }
         
@@ -888,7 +908,7 @@ function getVehicleCapacity(plate: string): CapacityConfig {
     }
     
     // Fallback default
-    const limit = getRandomLimit(fallbackTTTP);
+    const limit = getRandomLimit(fallbackTTTP, plate);
     vehicleLimitCache.set(norm, { tttp: fallbackTTTP, limit });
     return { code: 0, tttp: fallbackTTTP, limit };
 }
@@ -942,10 +962,14 @@ const generatedTrips = computed<SplitTrip[]>(() => {
         const tripLimit = capacity.limit;
         const numTrips = Math.ceil(weightTons / tripLimit);
         
+        // Seed based on ticket number or ticket properties for deterministic generation
+        const seed = record.ticketNo || `${record.plateNumber}_${record.weightNet}_${record.timeInStr}`;
+        const rand = createSeededRandom(seed);
+        
         // Weight split strategy
         let weights: number[] = [];
         if (distStrategy.value === 'random') {
-            weights = splitWeightRandomly(weightTons, numTrips, tripLimit);
+            weights = splitWeightRandomly(weightTons, numTrips, tripLimit, rand);
         } else if (distStrategy.value === 'even') {
             const baseWeight = Math.round((weightTons / numTrips) * 100) / 100;
             let sum = 0;
@@ -989,8 +1013,8 @@ const generatedTrips = computed<SplitTrip[]>(() => {
                 tripTime = new Date(dateOut.getTime() - (numTrips - 1 - j) * timeIntervalMinutes.value * 60 * 1000);
             }
             
-            // Add a small random jitter (+/- 10 minutes) to tripTime to make it look more natural
-            const jitterMs = (Math.random() * 20 - 10) * 60 * 1000;
+            // Add a small deterministic seeded jitter (+/- 10 minutes) to tripTime to make it look more natural
+            const jitterMs = (rand() * 20 - 10) * 60 * 1000;
             tripTime = new Date(tripTime.getTime() + jitterMs);
             
             const tripWeightTons = weights[j] || 0;
@@ -998,9 +1022,9 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             
             // Xác xe (tare weight) được tính bằng Trọng tải cho phép (TTTP) - Hạn mức hàng (tính theo kg)
             // Đảm bảo xác xe luôn dao động trong khoảng tiêu chuẩn từ 1.5t - 2.5t (1,500 - 2,500 kg)
-            // Thêm jitter ngẫu nhiên ±150kg để số cân không bao giờ tròn chẵn
+            // Thêm jitter ngẫu nhiên ±150kg để số cân không bao giờ tròn chẵn (sử dụng seeded random)
             const baseTare = (capacity.tttp - capacity.limit) * 1000;
-            const tareJitter = Math.round((Math.random() * 300 - 150) + (Math.random() * 10 - 5));
+            const tareJitter = Math.round((rand() * 300 - 150) + (rand() * 10 - 5));
             const tareWeight = Math.round(baseTare + tareJitter);
             
             // Phân bổ cân lần 1 và lần 2 dựa trên hướng Xuất/Nhập
