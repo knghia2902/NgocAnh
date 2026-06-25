@@ -49,3 +49,8 @@ export const logout = () => {
     authStore.isFirstLogin = false;
 };
 
+export const updateStoreProfile = (displayName: string) => {
+    authStore.displayName = displayName;
+};
+
+

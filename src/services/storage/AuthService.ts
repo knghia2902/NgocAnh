@@ -25,7 +25,7 @@ export class AuthService {
         if (username === settings.username && password === settings.password) {
             return { 
                 success: true, 
-                user: { username, role: 'admin', displayName: 'Admin' },
+                user: { username, role: 'admin', displayName: settings.displayName || 'Admin' },
                 isFirstLogin: settings.is_first 
             };
         }
@@ -68,6 +68,61 @@ export class AuthService {
         return !error;
     }
 
+    async updateProfile(username: string, displayName: string, newPassword?: string): Promise<boolean> {
+        const { data: current, error: fetchError } = await supabase.from('content').select('settings').eq('id', 'main').single();
+        if (fetchError || !current?.settings) return false;
+
+        const settings = current.settings;
+        let isUpdated = false;
+
+        // If the user is the primary admin
+        if (username === settings.username) {
+            const newSettings = { ...settings };
+            if (displayName) {
+                newSettings.displayName = displayName;
+            }
+            if (newPassword) {
+                newSettings.password = newPassword;
+                newSettings.is_first = false;
+            }
+            const { error } = await supabase
+                .from('content')
+                .update({ settings: newSettings })
+                .eq('id', 'main');
+            return !error;
+        }
+
+        // If the user is a staff account (or other secondary admin account)
+        const accounts = settings.accounts || [];
+        const updatedAccounts = await Promise.all(accounts.map(async (acc: any) => {
+            if (acc.username === username) {
+                isUpdated = true;
+                const updatedAcc = { ...acc };
+                if (displayName) {
+                    updatedAcc.displayName = displayName;
+                }
+                if (newPassword) {
+                    updatedAcc.password = await sha256(newPassword);
+                }
+                return updatedAcc;
+            }
+            return acc;
+        }));
+
+        if (!isUpdated) return false;
+
+        const newSettings = {
+            ...settings,
+            accounts: updatedAccounts
+        };
+        
+        const { error } = await supabase
+            .from('content')
+            .update({ settings: newSettings })
+            .eq('id', 'main');
+        return !error;
+    }
+
     async isAuthenticated(): Promise<boolean> {
         // Simplified for this demo - in a real app, use Supabase Auth session
         return true;
@@ -75,4 +130,5 @@ export class AuthService {
 }
 
 export const authService = new AuthService();
+
 

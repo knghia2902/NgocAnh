@@ -46,11 +46,12 @@ onMounted(async () => {
         <span v-if="authStore.isAuthenticated" class="text-xs font-bold text-[#4a2c32]/60 hidden sm:inline">
             Chào, {{ authStore.displayName }}
         </span>
-        <router-link :to="!authStore.isAuthenticated ? '/login' : (authStore.role === 'admin' ? '/admin' : '/tools')" 
+        <router-link :to="!authStore.isAuthenticated ? '/login' : '/profile'" 
           class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-11 border-2 border-pastel-pink cursor-pointer hover:border-primary transition-colors flex items-center justify-center overflow-hidden" 
           :style="{ backgroundImage: `url(${contentStore.hero.avatar || 'https://ngocanhcute.vercel.app/avatar.jpg'})` }"
           :title="authStore.isAuthenticated ? `Tài khoản: ${authStore.displayName} (${authStore.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'})` : 'Đăng nhập'"
         >
+
           <img v-if="contentStore.hero.avatar" :src="contentStore.hero.avatar" class="hidden" @error="(e: any) => e.target.parentElement.style.backgroundImage = 'url(https://ngocanhcute.vercel.app/avatar.jpg)'" />
         </router-link>
         <button v-if="authStore.isAuthenticated" @click="handleHeaderLogout" class="size-9 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors shadow-sm" title="Đăng xuất">
