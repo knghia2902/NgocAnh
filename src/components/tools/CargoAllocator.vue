@@ -80,6 +80,7 @@ interface SplitTrip {
 // Local State
 const csvFile = ref<File | null>(null);
 const ticketFileInput = ref<HTMLInputElement | null>(null);
+const importOrderNo = ref('');
 
 function triggerTicketFileInput() {
     ticketFileInput.value?.click();
@@ -318,7 +319,7 @@ const itemsPerPage = 20;
 const searchQuery = ref('');
 
 // Parse CSV text safely
-function parseCSVText(text: string): CSVRecord[] {
+function parseCSVText(text: string, manualOrderNo: string = ''): CSVRecord[] {
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
     
@@ -387,7 +388,7 @@ function parseCSVText(text: string): CSVRecord[] {
             bargeName: (idxBarge !== -1 ? parts[idxBarge] : '') || '',
             driverName: (idxDriver !== -1 ? parts[idxDriver] : '') || '',
             notes: (idxNotes !== -1 ? parts[idxNotes] : '') || '',
-            orderNo: (idxOrderNo !== -1 ? parts[idxOrderNo] : '') || ''
+            orderNo: manualOrderNo.trim() || ((idxOrderNo !== -1 ? parts[idxOrderNo] : '') || '')
         });
     }
     return records;
@@ -523,7 +524,7 @@ async function handleTicketImport(event: Event) {
         loadingCSV.value = true;
         try {
             const text = await file.text();
-            const newRecords = parseCSVText(text);
+            const newRecords = parseCSVText(text, importOrderNo.value);
             const { added, updated, skipped } = mergeTickets(newRecords);
             addToast(`Import CSV: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
         } catch (error) {
@@ -533,14 +534,14 @@ async function handleTicketImport(event: Event) {
             loadingCSV.value = false;
         }
     } else if (ext === 'xlsx') {
-        await handleTicketExcelUpload(file);
+        await handleTicketExcelUpload(file, importOrderNo.value);
     } else {
         addToast('Định dạng tệp không được hỗ trợ (chỉ hỗ trợ .csv, .xlsx)', 'error');
     }
 }
 
 // Handle Excel tickets file upload
-async function handleTicketExcelUpload(file: File) {
+async function handleTicketExcelUpload(file: File, manualOrderNo: string = '') {
     loadingCSV.value = true;
     try {
         const ExcelJS = await import('exceljs');
@@ -639,7 +640,7 @@ async function handleTicketExcelUpload(file: File) {
                 bargeName: getVal(idxBarge),
                 driverName: getVal(idxDriver),
                 notes: getVal(idxNotes),
-                orderNo: getVal(idxOrderNo)
+                orderNo: manualOrderNo.trim() || getVal(idxOrderNo)
             });
         }
         
@@ -1955,6 +1956,16 @@ async function compileAndDownload() {
                         @change="handleTicketImport" 
                         class="hidden"
                     >
+                    <!-- Input Số lệnh trước khi Import -->
+                    <div class="flex items-center gap-1.5 bg-white border border-gray-200 rounded-[8px] px-2 h-7 shadow-sm">
+                        <span class="text-[9px] font-black text-gray-400 uppercase select-none">Số lệnh:</span>
+                        <input 
+                            type="text" 
+                            v-model="importOrderNo" 
+                            placeholder="Nhập số lệnh..." 
+                            class="bg-transparent border-none text-[10px] font-bold focus:outline-none w-[95px] placeholder:text-gray-300"
+                        />
+                    </div>
                     <button 
                         @click="triggerTicketFileInput"
                         class="h-7 px-3 bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold rounded-[8px] hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center gap-1.5"
@@ -2564,6 +2575,17 @@ async function compileAndDownload() {
                                 v-model="dialogTicket.customer" 
                                 type="text" 
                                 placeholder="Tên khách hàng..." 
+                                class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
+                            >
+                        </div>
+
+                        <!-- Order Number (Số lệnh) -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số lệnh xuất / nhận</label>
+                            <input 
+                                v-model="dialogTicket.orderNo" 
+                                type="text" 
+                                placeholder="Ví dụ: L12345..." 
                                 class="px-3.5 py-2.5 rounded-[12px] border border-gray-200 text-xs font-semibold focus:outline-none focus:border-primary"
                             >
                         </div>

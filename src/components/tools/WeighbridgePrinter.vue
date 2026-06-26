@@ -2874,6 +2874,9 @@ onUnmounted(() => {
                                     <div class="flex items-center gap-1.5 truncate">
                                         <span class="material-symbols-outlined text-sm">layers</span>
                                         <span class="truncate">{{ barge.name }}</span>
+                                        <span v-if="barge.config?.orderNo" :class="['ml-1.5 px-1 py-0.2 text-[8px] border rounded font-black uppercase tracking-wider', activeBargeId === barge.id ? 'bg-white/20 text-white border-white/30' : 'bg-teal-50 text-teal-600 border-teal-200']">
+                                            Lệnh: {{ barge.config.orderNo }}
+                                        </span>
                                         <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white/90' : 'text-red-500'" title="Sà lan đang bị khóa">lock</span>
                                     </div>
                                     <div v-if="authStore.role === 'admin'" class="flex items-center gap-0.5" @click.stopPropagation>

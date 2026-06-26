@@ -47,6 +47,7 @@ export interface BargeConfig {
     phupham: number | string;
     ketluan: string;
     locked?: boolean;
+    orderNo?: string;
     printFields?: CustomFieldConfig[];
     printElements?: PrintElement[];
     companyName?: string;
