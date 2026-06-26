@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
+import { supabase } from '@/supabase';
 
 const { addToast } = useToast();
 
@@ -19,6 +20,75 @@ const plateInput = ref('');
 const moocInput = ref('');
 const editingIndex = ref<number | null>(null);
 
+const syncStatus = ref<'synced' | 'saving' | 'error'>('synced');
+const loadingCloud = ref(false);
+
+async function loadVehiclesFromSupabase() {
+    loadingCloud.value = true;
+    try {
+        const { data, error } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+        if (error) throw error;
+        
+        if (data?.settings) {
+            const remoteVehicles = data.settings.allocator_vehicles;
+            if (Array.isArray(remoteVehicles)) {
+                if (JSON.stringify(vehicles.value) !== JSON.stringify(remoteVehicles)) {
+                    vehicles.value = remoteVehicles;
+                    await dbContext.set('allocator_vehicles', remoteVehicles);
+                }
+                syncStatus.value = 'synced';
+            } else {
+                if (vehicles.value.length > 0) {
+                    await saveVehiclesToSupabase();
+                } else {
+                    syncStatus.value = 'synced';
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Lỗi khi tải danh sách xe từ Supabase:', e);
+        syncStatus.value = 'error';
+    } finally {
+        loadingCloud.value = false;
+    }
+}
+
+async function saveVehiclesToSupabase() {
+    syncStatus.value = 'saving';
+    try {
+        const { data: current, error: fetchError } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+        
+        if (fetchError) throw fetchError;
+        
+        const currentSettings = current?.settings || {};
+        const updatedSettings = {
+            ...currentSettings,
+            allocator_vehicles: vehicles.value
+        };
+
+        const { error: updateError } = await supabase
+            .from('content')
+            .update({ settings: updatedSettings })
+            .eq('id', 'main');
+
+        if (updateError) throw updateError;
+        
+        syncStatus.value = 'synced';
+    } catch (e) {
+        console.error('Lỗi khi lưu danh sách xe lên Supabase:', e);
+        syncStatus.value = 'error';
+        addToast('Lỗi đồng bộ dữ liệu đám mây!', 'error');
+    }
+}
+
 // Load vehicles on mount
 onMounted(async () => {
     try {
@@ -26,6 +96,7 @@ onMounted(async () => {
         if (saved && Array.isArray(saved)) {
             vehicles.value = saved;
         }
+        await loadVehiclesFromSupabase();
     } catch (e) {
         console.error('Lỗi khi tải danh sách xe:', e);
     }
@@ -35,6 +106,7 @@ onMounted(async () => {
 const saveVehicles = async () => {
     try {
         await dbContext.set('allocator_vehicles', vehicles.value);
+        await saveVehiclesToSupabase();
     } catch (e) {
         console.error('Lỗi khi lưu danh sách xe:', e);
         addToast('Lỗi khi lưu dữ liệu xe!', 'error');
@@ -253,6 +325,15 @@ const handleExportExcel = async () => {
                 <h3 class="text-lg font-black text-primary flex items-center gap-2">
                     <span class="material-symbols-outlined text-xl">local_shipping</span>
                     Danh sách xe
+                    <span v-if="syncStatus === 'synced'" class="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[10px] font-bold">cloud_done</span> Đã đồng bộ
+                    </span>
+                    <span v-else-if="syncStatus === 'saving'" class="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full flex items-center gap-1 animate-pulse">
+                        <span class="material-symbols-outlined text-[10px] font-bold animate-spin">sync</span> Đang đồng bộ...
+                    </span>
+                    <span v-else class="text-[10px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-full flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[10px] font-bold">cloud_off</span> Lỗi đồng bộ
+                    </span>
                 </h3>
                 <p class="text-[11px] text-gray-500 font-semibold mt-1">
                     Quản lý danh sách biển số xe và số mooc tương ứng. Tổng cộng: 

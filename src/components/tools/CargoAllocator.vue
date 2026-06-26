@@ -7,6 +7,24 @@ import { authStore } from '@/stores/auth';
 
 const { addToast } = useToast();
 
+const props = defineProps<{
+    activeSubView?: string;
+}>();
+
+watch(() => props.activeSubView, async (newVal) => {
+    if (newVal === 'report') {
+        try {
+            const savedVehicles = await dbContext.get<any[]>('allocator_vehicles');
+            if (savedVehicles && Array.isArray(savedVehicles)) {
+                vehiclesList.value = savedVehicles;
+            }
+            await loadTicketsFromSupabase();
+        } catch (e) {
+            console.error('Lỗi khi tải danh sách xe:', e);
+        }
+    }
+});
+
 
 // Types
 interface CSVRecord {
@@ -66,6 +84,7 @@ function triggerTicketFileInput() {
 }
 const csvRecords = ref<CSVRecord[]>([]);
 const existingTrips = ref<SplitTrip[]>([]);
+const vehiclesList = ref<{ plateNumber: string; moocNumber: string; }[]>([]);
 
 // Types & Channel Sync
 const syncChannel = new BroadcastChannel('allocator_sync_channel');
@@ -371,14 +390,43 @@ function normalizePlate(plate: string): string {
 // Format plate numbers to standard display: e.g. "61H-16907"
 function formatPlate(plate: string): string {
     let clean = plate.trim().toUpperCase().replace(/\s+/g, '');
-    if (clean.includes('-')) {
-        return clean;
+    
+    // If it already contains a slash, extract the main plate number and existing mooc
+    let mainPlate = clean;
+    let existingMooc = '';
+    if (clean.includes('/')) {
+        const parts = clean.split('/');
+        mainPlate = parts[0] || '';
+        existingMooc = parts[1] || '';
     }
-    const match = clean.match(/^([0-9]{2}[A-Z]{1,2})([0-9]+)$/);
-    if (match) {
-        return match[1] + '-' + match[2];
+    
+    let formattedMain = mainPlate;
+    if (!mainPlate.includes('-')) {
+        const match = mainPlate.match(/^([0-9]{2}[A-Z]{1,2})([0-9]+)$/);
+        if (match) {
+            formattedMain = match[1] + '-' + match[2];
+        }
     }
-    return clean;
+    
+    // Look up mooc in vehiclesList
+    const normalized = normalizePlate(mainPlate);
+    const vehicle = vehiclesList.value.find(v => normalizePlate(v.plateNumber) === normalized);
+    
+    const targetMooc = (vehicle && vehicle.moocNumber) ? vehicle.moocNumber : existingMooc;
+    
+    if (targetMooc) {
+        const cleanMooc = targetMooc.trim().toUpperCase().replace(/\s+/g, '');
+        let formattedMooc = cleanMooc;
+        if (!cleanMooc.includes('-')) {
+            const match = cleanMooc.match(/^([0-9]{2}[A-Z]{1,2})([0-9]+)$/);
+            if (match) {
+                formattedMooc = match[1] + '-' + match[2];
+            }
+        }
+        return `${formattedMain}/${formattedMooc}`;
+    }
+    
+    return formattedMain;
 }
 
 // Convert DD/MM/YYYY and HH:mm:ss strings to Date object
@@ -825,6 +873,15 @@ async function loadTicketsFromSupabase() {
                 }
             }
 
+            // 3. Overwrite vehicles list
+            const remoteVehicles = data.settings.allocator_vehicles;
+            if (Array.isArray(remoteVehicles)) {
+                if (JSON.stringify(vehiclesList.value) !== JSON.stringify(remoteVehicles)) {
+                    vehiclesList.value = remoteVehicles;
+                    await dbContext.set('allocator_vehicles', remoteVehicles);
+                }
+            }
+
             syncStatus.value = 'synced';
         }
     } catch (e) {
@@ -923,6 +980,11 @@ onMounted(async () => {
         const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
         if (savedHistory && Array.isArray(savedHistory)) {
             existingTrips.value = savedHistory;
+        }
+
+        const savedVehicles = await dbContext.get<any[]>('allocator_vehicles');
+        if (savedVehicles && Array.isArray(savedVehicles)) {
+            vehiclesList.value = savedVehicles;
         }
 
         // Đồng bộ dữ liệu từ đám mây
@@ -1361,7 +1423,7 @@ async function exportSourceTickets() {
             const row = sheet.getRow(idx + 2);
             row.getCell(1).value = idx + 1;
             row.getCell(2).value = r.ticketNo;
-            row.getCell(3).value = r.plateNumber;
+            row.getCell(3).value = formatPlate(r.plateNumber);
             row.getCell(4).value = r.customer;
             row.getCell(5).value = r.weight1;
             row.getCell(6).value = r.weight2;
@@ -1477,7 +1539,7 @@ async function compileAndDownload() {
             dataToExport.forEach(trip => {
                 const row = dsSheet.getRow(currentRowIdx);
                 row.getCell(1).value = trip.ticketNo;
-                row.getCell(2).value = trip.plateNumber;
+                row.getCell(2).value = formatPlate(trip.plateNumber);
                 row.getCell(3).value = trip.customer;
                 row.getCell(4).value = trip.weight1;
                 row.getCell(5).value = trip.weight2;
@@ -1567,7 +1629,7 @@ async function compileAndDownload() {
                 const row = dsSheet.getRow(currentRowIdx);
                 row.getCell(2).value = currentSTT;             // Col B: STT
                 row.getCell(3).value = trip.timeStr;           // Col C: Date/Time
-                row.getCell(4).value = trip.plateNumber;       // Col D: Plate
+                row.getCell(4).value = formatPlate(trip.plateNumber);       // Col D: Plate
                 row.getCell(5).value = trip.tttp;              // Col E: TTTP
                 row.getCell(6).value = trip.limit;             // Col F: Allowed Cargo
                 row.getCell(7).value = trip.ticketNo;          // Col G: Ticket No
@@ -2129,7 +2191,7 @@ async function compileAndDownload() {
                                 </td>
                                 <td class="py-2 px-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
                                 <td class="py-2 px-3 font-bold text-gray-900 flex items-center gap-2">
-                                    <span class="whitespace-nowrap">{{ trip.plateNumber }}</span>
+                                    <span class="whitespace-nowrap">{{ formatPlate(trip.plateNumber) }}</span>
                                     <span 
                                         class="text-[8px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-600 font-black border border-teal-200 uppercase tracking-wide select-none"
                                     >
@@ -2268,7 +2330,7 @@ async function compileAndDownload() {
                                 class="hover:bg-gray-50 transition-colors"
                             >
                                 <td class="py-[14px] px-3 font-bold text-gray-800">{{ trip.ticketNo }}</td>
-                                <td class="py-[14px] px-3 font-bold text-gray-900 whitespace-nowrap">{{ trip.plateNumber }}</td>
+                                <td class="py-[14px] px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(trip.plateNumber) }}</td>
                                 <td class="py-[14px] px-3 max-w-[150px] truncate text-gray-500" :title="trip.customer">{{ trip.customer }}</td>
                                 <td class="py-[14px] px-3 text-right font-mono text-gray-600">{{ trip.weight1.toLocaleString() }}</td>
                                 <td class="py-[14px] px-3 text-right font-mono text-gray-600">{{ trip.weight2.toLocaleString() }}</td>

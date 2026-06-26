@@ -266,7 +266,7 @@ const handleSidebarSwitch = (id: string) => {
             <ExcelMerger v-else-if="activeToolId === 'merger'" />
             <PdfOcrTools v-else-if="activeToolId === 'ocr'" />
             <template v-else-if="activeToolId === 'allocator'">
-              <CargoAllocator v-show="allocatorSubView === 'report'" />
+              <CargoAllocator v-show="allocatorSubView === 'report'" :active-sub-view="allocatorSubView" />
               <VehicleManager v-if="allocatorSubView === 'vehicles'" />
             </template>
           </div>
