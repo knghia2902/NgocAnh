@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { authStore } from '@/stores/auth';
+import { supabase } from '@/supabase';
 import { excelService } from '@/services/excel/ExcelService';
 import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig, type PrintElement } from '@/services/excel/WeighbridgeService';
 const props = withDefaults(defineProps<{
@@ -1813,6 +1814,269 @@ const deleteBarge = async (_vesselId: number, id: number, name: string) => {
     }
 };
 
+// Smart name normalization and matching for allocator sync
+function normalizeBargeName(name: string): string {
+    if (!name) return '';
+    return name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // remove Vietnamese accents
+        .replace(/đ/g, 'd')
+        .replace(/[^a-z0-9]/g, ''); // keep only alphanumeric
+}
+
+function isBargeMatch(nameA: string, nameB: string): boolean {
+    const normA = normalizeBargeName(nameA);
+    const normB = normalizeBargeName(nameB);
+    if (!normA || !normB) return false;
+    if (normA === normB) return true;
+    if (normA.includes(normB) || normB.includes(normA)) return true;
+    
+    // Check if numbers match (e.g. SL 09 and Sà lan 09)
+    const numA = normA.replace(/[^0-9]/g, '');
+    const numB = normB.replace(/[^0-9]/g, '');
+    if (numA && numB && numA === numB) return true;
+    
+    return false;
+}
+
+// Sync allocator trips for a single active barge
+const syncFromAllocatorActiveBarge = async () => {
+    const bargeId = activeBargeId.value;
+    if (!bargeId || !activeBarge.value) {
+        showToast('Vui lòng chọn một sà lan trước!', 'error');
+        return;
+    }
+    if (cfgForm.locked) {
+        showToast('Sà lan đang bị khóa! Không thể nhập dữ liệu.', 'error');
+        return;
+    }
+
+    loading.value = true;
+    try {
+        const { data, error: fetchError } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const historyTrips = data?.settings?.allocator_history_trips || [];
+        if (!Array.isArray(historyTrips) || historyTrips.length === 0) {
+            showToast('Không tìm thấy chuyến xe nào trong Sổ Theo Dõi. Hãy thực hiện phân rã và Lưu vào Sổ Theo Dõi trước!', 'error');
+            return;
+        }
+
+        const activeBargeName = activeBarge.value.name;
+        // Filter trips for this active barge
+        const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t.bargeName, activeBargeName));
+
+        if (matchedTrips.length === 0) {
+            showToast(`Không tìm thấy chuyến xe nào được phân bổ cho sà lan "${activeBargeName}" trong Sổ Theo Dõi!`, 'error');
+            return;
+        }
+
+        // Get current trucks
+        const currentTrucks = await WeighbridgeService.getTrucks(bargeId);
+        let action: 'overwrite' | 'append' = 'append';
+
+        if (currentTrucks.length > 0) {
+            const confirmMsg = `Sà lan này đang có ${currentTrucks.length} xe. Bạn muốn Ghi đè (Xóa xe cũ và thêm xe mới) hay Thêm tiếp?\n\n- Chọn OK để Ghi đè\n- Chọn Cancel để Thêm tiếp`;
+            action = confirm(confirmMsg) ? 'overwrite' : 'append';
+        }
+
+        const importedTrucks: Truck[] = matchedTrips.map((t: any, idx: number) => {
+            let dIn = '';
+            let dOut = '';
+            try {
+                if (t.date1Obj) {
+                    const date1 = new Date(t.date1Obj);
+                    if (!isNaN(date1.getTime())) {
+                        const offset = date1.getTimezoneOffset();
+                        const localDate = new Date(date1.getTime() - (offset * 60 * 1000));
+                        dIn = localDate.toISOString().slice(0, 16);
+                    }
+                }
+                if (t.date2Obj) {
+                    const date2 = new Date(t.date2Obj);
+                    if (!isNaN(date2.getTime())) {
+                        const offset = date2.getTimezoneOffset();
+                        const localDate = new Date(date2.getTime() - (offset * 60 * 1000));
+                        dOut = localDate.toISOString().slice(0, 16);
+                    }
+                }
+            } catch (e) {
+                console.warn('Error parsing date:', e);
+            }
+
+            if (!dIn) {
+                dIn = new Date().toISOString().slice(0, 16);
+            }
+            if (!dOut) {
+                const outDate = new Date();
+                outDate.setMinutes(outDate.getMinutes() + 30);
+                dOut = outDate.toISOString().slice(0, 16);
+            }
+
+            return {
+                id: Date.now() + idx,
+                barge_id: bargeId,
+                ticketNo: t.ticketNo || '',
+                plateNumber: t.plateNumber || '',
+                driver: '',
+                weight1: Number(t.weight1) || 0,
+                weight2: Number(t.weight2) || 0,
+                weightNet: Number(t.weightNet) || 0,
+                dateIn: dIn,
+                dateOut: dOut,
+                note: t.notes || ''
+            };
+        });
+
+        let allTrucks = [];
+        if (action === 'overwrite') {
+            allTrucks = importedTrucks;
+        } else {
+            allTrucks = [...currentTrucks, ...importedTrucks];
+        }
+
+        const success = await WeighbridgeService.saveTrucks(bargeId, allTrucks);
+        if (success) {
+            showToast(`Đồng bộ thành công ${importedTrucks.length} xe từ Phân rã chuyến!`);
+            trucks.value = await WeighbridgeService.getTrucks(bargeId);
+        } else {
+            showToast('Không thể lưu danh sách xe sau đồng bộ!', 'error');
+        }
+    } catch (e: any) {
+        console.error(e);
+        showToast('Lỗi khi đồng bộ dữ liệu: ' + (e.message || e), 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Sync allocator trips for all barges on active vessel
+const syncFromAllocatorAllBarges = async () => {
+    const vesselId = activeVesselId.value;
+    if (!vesselId || !activeVessel.value) {
+        showToast('Vui lòng chọn một tàu trước!', 'error');
+        return;
+    }
+
+    const bargesList = activeVessel.value.barges || [];
+    if (bargesList.length === 0) {
+        showToast('Tàu này chưa có sà lan nào!', 'error');
+        return;
+    }
+
+    const confirmSync = confirm(
+        `Bạn có chắc chắn muốn đồng bộ xe từ Phân rã chuyến cho tất cả ${bargesList.length} sà lan của tàu "${activeVessel.value.name}"?\n\nLưu ý: Tất cả các sà lan chưa bị khóa sẽ bị Ghi đè (Xóa xe cũ và thay bằng xe mới khớp từ Báo cáo cân hàng).`
+    );
+    if (!confirmSync) return;
+
+    loading.value = true;
+    try {
+        const { data, error: fetchError } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const historyTrips = data?.settings?.allocator_history_trips || [];
+        if (!Array.isArray(historyTrips) || historyTrips.length === 0) {
+            showToast('Không tìm thấy chuyến xe nào trong Sổ Theo Dõi. Hãy thực hiện phân rã và Lưu vào Sổ Theo Dõi trước!', 'error');
+            return;
+        }
+
+        let syncedBargesCount = 0;
+        let totalSyncedTrucks = 0;
+        const details: string[] = [];
+
+        for (const barge of bargesList) {
+            if (barge.config?.locked) {
+                details.push(`Sà lan "${barge.name}" đang bị khóa -> Bỏ qua`);
+                continue;
+            }
+
+            const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t.bargeName, barge.name));
+            if (matchedTrips.length === 0) {
+                continue;
+            }
+
+            const importedTrucks: Truck[] = matchedTrips.map((t: any, idx: number) => {
+                let dIn = '';
+                let dOut = '';
+                try {
+                    if (t.date1Obj) {
+                        const date1 = new Date(t.date1Obj);
+                        if (!isNaN(date1.getTime())) {
+                            const offset = date1.getTimezoneOffset();
+                            const localDate = new Date(date1.getTime() - (offset * 60 * 1000));
+                            dIn = localDate.toISOString().slice(0, 16);
+                        }
+                    }
+                    if (t.date2Obj) {
+                        const date2 = new Date(t.date2Obj);
+                        if (!isNaN(date2.getTime())) {
+                            const offset = date2.getTimezoneOffset();
+                            const localDate = new Date(date2.getTime() - (offset * 60 * 1000));
+                            dOut = localDate.toISOString().slice(0, 16);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error parsing date:', e);
+                }
+
+                if (!dIn) {
+                    dIn = new Date().toISOString().slice(0, 16);
+                }
+                if (!dOut) {
+                    const outDate = new Date();
+                    outDate.setMinutes(outDate.getMinutes() + 30);
+                    dOut = outDate.toISOString().slice(0, 16);
+                }
+
+                return {
+                    id: Date.now() + idx + Math.floor(Math.random() * 1000),
+                    barge_id: barge.id,
+                    ticketNo: t.ticketNo || '',
+                    plateNumber: t.plateNumber || '',
+                    driver: '',
+                    weight1: Number(t.weight1) || 0,
+                    weight2: Number(t.weight2) || 0,
+                    weightNet: Number(t.weightNet) || 0,
+                    dateIn: dIn,
+                    dateOut: dOut,
+                    note: t.notes || ''
+                };
+            });
+
+            const success = await WeighbridgeService.saveTrucks(barge.id, importedTrucks);
+            if (success) {
+                syncedBargesCount++;
+                totalSyncedTrucks += importedTrucks.length;
+                details.push(`Sà lan "${barge.name}": Đã đồng bộ ${importedTrucks.length} xe`);
+            }
+        }
+
+        if (syncedBargesCount > 0) {
+            showToast(`Đã đồng bộ thành công ${totalSyncedTrucks} xe cho ${syncedBargesCount} sà lan!`);
+            alert(`Kết quả đồng bộ:\n\n${details.join('\n')}`);
+            await loadVessels();
+        } else {
+            showToast('Không có sà lan nào được đồng bộ (hoặc tất cả sà lan khớp đều đã bị khóa)!', 'success');
+        }
+    } catch (e: any) {
+        console.error(e);
+        showToast('Lỗi khi đồng bộ toàn bộ sà lan: ' + (e.message || e), 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
 // Excel Upload and Analysis
 const handleExcelFile = async (file: File) => {
     if (!activeBargeId.value) {
@@ -2786,6 +3050,14 @@ onUnmounted(() => {
                             
                             <div class="flex items-center gap-2">
                                 <button 
+                                    @click="syncFromAllocatorAllBarges"
+                                    class="px-4 py-2 bg-primary text-white font-bold text-xs rounded-[12px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                                    :disabled="loading"
+                                >
+                                    <span class="material-symbols-outlined text-sm">sync_alt</span>
+                                    Đồng bộ từ Phân rã chuyến
+                                </button>
+                                <button 
                                     v-if="filteredVesselBarges.length > 0"
                                     @click="exportVesselSummaryExcel"
                                     class="px-4 py-2 bg-teal-600 text-white font-bold text-xs rounded-[12px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
@@ -2986,8 +3258,8 @@ onUnmounted(() => {
                         <div v-if="activeTab === 'data'" class="flex flex-col gap-4 animate-fade-in">
                             <!-- Stats & Excel Upload Side-by-Side -->
                             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                                <!-- Stats Grid (8 cols) -->
-                                <div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <!-- Stats Grid (6 cols) -->
+                                <div class="lg:col-span-6 grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div class="bg-white rounded-2xl p-3 soft-shadow border border-primary/5 flex items-center gap-3">
                                         <div class="size-9 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">local_shipping</span>
@@ -3017,11 +3289,11 @@ onUnmounted(() => {
                                     </div>
                                 </div>
 
-                                <!-- Compact Excel Upload (4 cols) -->
+                                <!-- Compact Excel Upload (3 cols) -->
                                 <div 
                                     @dragover.prevent
                                     @drop="cfgForm.locked ? null : handleExcelDrop($event)"
-                                    :class="['lg:col-span-4 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50', cfgForm.locked ? 'opacity-50 pointer-events-none' : '']"
+                                    :class="['lg:col-span-3 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50', cfgForm.locked ? 'opacity-50 pointer-events-none' : '']"
                                 >
                                     <input 
                                         type="file" 
@@ -3031,13 +3303,13 @@ onUnmounted(() => {
                                         accept=".xlsx, .xls" 
                                         :disabled="cfgForm.locked"
                                     />
-                                    <div class="flex items-center gap-2.5 min-w-0" @click="cfgForm.locked ? null : fileInput?.click()">
+                                    <div class="flex items-center gap-2 min-w-0 cursor-pointer" @click="cfgForm.locked ? null : fileInput?.click()">
                                         <div class="size-9 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">upload_file</span>
                                         </div>
                                         <div class="text-left min-w-0">
                                             <p class="text-xs font-black text-[#4a2c32] truncate">Nhập file Excel</p>
-                                            <p class="text-[9px] text-gray-400 font-bold truncate">Kéo thả hoặc Click chọn</p>
+                                            <p class="text-[9px] text-gray-400 font-bold truncate">Click chọn file</p>
                                         </div>
                                     </div>
                                     
@@ -3049,14 +3321,29 @@ onUnmounted(() => {
                                         >
                                             <span class="material-symbols-outlined text-sm">download</span>
                                         </button>
-                                        <button 
-                                            @click="fileInput?.click()"
-                                            class="px-2.5 py-1.5 bg-primary text-white text-[9px] font-black rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                            :disabled="cfgForm.locked"
-                                        >
-                                            Chọn File
-                                        </button>
                                     </div>
+                                </div>
+
+                                <!-- Direct Sync Card (3 cols) -->
+                                <div 
+                                    :class="['lg:col-span-3 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50', cfgForm.locked ? 'opacity-50 pointer-events-none' : '']"
+                                >
+                                    <div class="flex items-center gap-2 min-w-0 cursor-pointer" @click="cfgForm.locked ? null : syncFromAllocatorActiveBarge()">
+                                        <div class="size-9 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                            <span class="material-symbols-outlined text-lg">sync_alt</span>
+                                        </div>
+                                        <div class="text-left min-w-0">
+                                            <p class="text-xs font-black text-[#4a2c32] truncate">Đồng bộ từ Phân rã</p>
+                                            <p class="text-[9px] text-gray-400 font-bold truncate">Kéo từ tab Phân bổ</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        @click="syncFromAllocatorActiveBarge"
+                                        class="px-2.5 py-1.5 bg-teal-600 text-white text-[9px] font-black rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex-shrink-0"
+                                        :disabled="cfgForm.locked"
+                                    >
+                                        Đồng bộ
+                                    </button>
                                 </div>
                             </div>
 
