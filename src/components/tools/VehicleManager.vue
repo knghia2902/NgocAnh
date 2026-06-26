@@ -1,10 +1,35 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
 import { supabase } from '@/supabase';
 
 const { addToast } = useToast();
+
+const syncChannel = new BroadcastChannel('allocator_sync_channel');
+
+syncChannel.onmessage = async (event) => {
+    try {
+        if (event.data.type === 'vehicles') {
+            const saved = await dbContext.get<Vehicle[]>('allocator_vehicles');
+            if (saved && Array.isArray(saved)) {
+                if (JSON.stringify(vehicles.value) !== JSON.stringify(saved)) {
+                    vehicles.value = saved;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Lỗi khi đồng bộ danh sách xe giữa các tab:', e);
+    }
+};
+
+onUnmounted(() => {
+    try {
+        syncChannel.close();
+    } catch (e) {
+        console.error('Lỗi khi đóng sync channel:', e);
+    }
+});
 
 interface Vehicle {
     plateNumber: string;
@@ -107,6 +132,7 @@ const saveVehicles = async () => {
     try {
         await dbContext.set('allocator_vehicles', vehicles.value);
         await saveVehiclesToSupabase();
+        syncChannel.postMessage({ type: 'vehicles' });
     } catch (e) {
         console.error('Lỗi khi lưu danh sách xe:', e);
         addToast('Lỗi khi lưu dữ liệu xe!', 'error');

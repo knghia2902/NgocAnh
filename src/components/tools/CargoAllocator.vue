@@ -107,6 +107,13 @@ syncChannel.onmessage = async (event) => {
                     existingTrips.value = savedHistory;
                 }
             }
+        } else if (event.data.type === 'vehicles') {
+            const savedVehicles = await dbContext.get<any[]>('allocator_vehicles');
+            if (savedVehicles && Array.isArray(savedVehicles)) {
+                if (JSON.stringify(vehiclesList.value) !== JSON.stringify(savedVehicles)) {
+                    vehiclesList.value = savedVehicles;
+                }
+            }
         }
     } catch (e) {
         console.error('Lỗi khi đồng bộ giữa các tab:', e);
@@ -1163,7 +1170,7 @@ const generatedTrips = computed<SplitTrip[]>(() => {
             }
             
             tempTrips.push({
-                plateNumber: formatPlate(record.plateNumber),
+                plateNumber: record.plateNumber,
                 tttp: capacity.tttp,
                 limit: capacity.limit,
                 ticketNo: j === 0 ? record.ticketNo : '', // Only keep ticketNo for the first trip
