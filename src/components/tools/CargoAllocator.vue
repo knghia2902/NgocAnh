@@ -44,6 +44,7 @@ interface CSVRecord {
     bargeName: string;
     driverName: string;
     notes: string;
+    orderNo?: string;
 }
 
 interface CapacityConfig {
@@ -73,6 +74,7 @@ interface SplitTrip {
     bargeName: string;
     date1Obj: Date;
     date2Obj: Date;
+    orderNo?: string;
 }
 
 // Local State
@@ -358,6 +360,7 @@ function parseCSVText(text: string): CSVRecord[] {
     const idxBarge = headers.findIndex(h => h.toLowerCase().includes('salan') || h.toLowerCase().includes('sa lan'));
     const idxDriver = headers.findIndex(h => h.toLowerCase().includes('tai xe') || h.toLowerCase().includes('tài xế'));
     const idxNotes = headers.findIndex(h => h.toLowerCase().includes('ghi chu') || h.toLowerCase().includes('ghi chú'));
+    const idxOrderNo = headers.findIndex(h => h.toLowerCase().includes('lenh') || h.toLowerCase().includes('lệnh') || h.toLowerCase().includes('order'));
 
     const records: CSVRecord[] = [];
     for (let i = 1; i < lines.length; i++) {
@@ -383,7 +386,8 @@ function parseCSVText(text: string): CSVRecord[] {
             cargoType: (idxCargoType !== -1 ? parts[idxCargoType] : '') || '',
             bargeName: (idxBarge !== -1 ? parts[idxBarge] : '') || '',
             driverName: (idxDriver !== -1 ? parts[idxDriver] : '') || '',
-            notes: (idxNotes !== -1 ? parts[idxNotes] : '') || ''
+            notes: (idxNotes !== -1 ? parts[idxNotes] : '') || '',
+            orderNo: (idxOrderNo !== -1 ? parts[idxOrderNo] : '') || ''
         });
     }
     return records;
@@ -596,6 +600,7 @@ async function handleTicketExcelUpload(file: File) {
         const idxBarge = headers.findIndex(h => h.toLowerCase().includes('salan') || h.toLowerCase().includes('sa lan'));
         const idxDriver = headers.findIndex(h => h.toLowerCase().includes('tai xe') || h.toLowerCase().includes('tài xế'));
         const idxNotes = headers.findIndex(h => h.toLowerCase().includes('ghi chu') || h.toLowerCase().includes('ghi chú'));
+        const idxOrderNo = headers.findIndex(h => h.toLowerCase().includes('lenh') || h.toLowerCase().includes('lệnh') || h.toLowerCase().includes('order'));
         
         const newRecords: CSVRecord[] = [];
         
@@ -633,7 +638,8 @@ async function handleTicketExcelUpload(file: File) {
                 cargoType: getVal(idxCargoType),
                 bargeName: getVal(idxBarge),
                 driverName: getVal(idxDriver),
-                notes: getVal(idxNotes)
+                notes: getVal(idxNotes),
+                orderNo: getVal(idxOrderNo)
             });
         }
         
@@ -718,7 +724,8 @@ const dialogTicket = ref<CSVRecord>({
     cargoType: '',
     bargeName: '',
     driverName: '',
-    notes: ''
+    notes: '',
+    orderNo: ''
 });
 
 function openAddTicketDialog() {
@@ -1077,6 +1084,7 @@ const generatedTrips = computed<SplitTrip[]>(() => {
         durationMs: number;
         direction: string;
         bargeName: string;
+        orderNo?: string;
     }
     
     const tempTrips: TempTrip[] = [];
@@ -1185,7 +1193,8 @@ const generatedTrips = computed<SplitTrip[]>(() => {
                 weightNet: tripWeightNet,
                 durationMs: durationMs,
                 direction: record.direction,
-                bargeName: record.bargeName
+                bargeName: record.bargeName,
+                orderNo: record.orderNo || ''
             });
         }
     });

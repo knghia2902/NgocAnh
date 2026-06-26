@@ -171,6 +171,7 @@ const cfgForm = reactive<BargeConfig>({
     phupham: 0,
     ketluan: 'Chính phẩm đạt tiêu chuẩn',
     locked: false,
+    orderNo: '',
     printFields: getDefaultPrintFields(),
     printElements: getDefaultPrintElements(),
     companyName: 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC',
@@ -581,6 +582,7 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.phupham = cfg.phupham !== undefined ? cfg.phupham : 0;
         cfgForm.ketluan = cfg.ketluan || 'Chính phẩm đạt tiêu chuẩn';
         cfgForm.locked = cfg.locked || false;
+        cfgForm.orderNo = cfg.orderNo || '';
         cfgForm.printFields = cfg.printFields || getDefaultPrintFields();
         cfgForm.printElements = (cfg.printElements || savedDefaultElements || getDefaultPrintElements()).filter(el => !['lineHeader', 'lineTitle', 'lineFooter'].includes(el.id));
         cfgForm.companyName = cfg.companyName || savedCompanyDetails?.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
@@ -1825,7 +1827,21 @@ function normalizeBargeName(name: string): string {
         .replace(/[^a-z0-9]/g, ''); // keep only alphanumeric
 }
 
-function isBargeMatch(nameA: string, nameB: string): boolean {
+function isBargeMatch(trip: any, barge: Barge): boolean {
+    // 1. If barge has a configured orderNo, try to match by orderNo first
+    const bargeOrderNo = barge.config?.orderNo ? String(barge.config.orderNo).trim().toLowerCase() : '';
+    const tripOrderNo = trip.orderNo ? String(trip.orderNo).trim().toLowerCase() : '';
+    
+    if (bargeOrderNo && tripOrderNo) {
+        if (bargeOrderNo === tripOrderNo || tripOrderNo.includes(bargeOrderNo) || bargeOrderNo.includes(tripOrderNo)) {
+            return true;
+        }
+    }
+    
+    // 2. Otherwise, fall back to matching by barge name
+    const nameA = trip.bargeName || '';
+    const nameB = barge.name || '';
+    
     const normA = normalizeBargeName(nameA);
     const normB = normalizeBargeName(nameB);
     if (!normA || !normB) return false;
@@ -1869,8 +1885,8 @@ const syncFromAllocatorActiveBarge = async () => {
         }
 
         const activeBargeName = activeBarge.value.name;
-        // Filter trips for this active barge
-        const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t.bargeName, activeBargeName));
+        // Filter trips for this active barge (matches by orderNo or name)
+        const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t, activeBarge.value!));
 
         if (matchedTrips.length === 0) {
             showToast(`Không tìm thấy chuyến xe nào được phân bổ cho sà lan "${activeBargeName}" trong Sổ Theo Dõi!`, 'error');
@@ -2001,7 +2017,7 @@ const syncFromAllocatorAllBarges = async () => {
                 continue;
             }
 
-            const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t.bargeName, barge.name));
+            const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t, barge));
             if (matchedTrips.length === 0) {
                 continue;
             }
@@ -3531,6 +3547,10 @@ onUnmounted(() => {
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Số phiếu bắt đầu</label>
                                                 <input v-model="cfgForm.ticketSeed" :disabled="cfgForm.locked" @change="handleTicketConfigChange" type="text" placeholder="Ví dụ: 1 hoặc 001" class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                            </div>
+                                            <div class="flex flex-col gap-1 md:col-span-2">
+                                                <label class="text-[10px] font-bold text-gray-500">Số lệnh cấp hàng / Số lệnh xuất (Khớp tự động từ Phân bổ)</label>
+                                                <input v-model="cfgForm.orderNo" :disabled="cfgForm.locked" type="text" placeholder="Ví dụ: L12345 hoặc L-54321..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                                             </div>
                                         </div>
                                     </div>
