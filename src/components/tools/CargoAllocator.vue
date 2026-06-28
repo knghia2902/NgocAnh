@@ -4,6 +4,7 @@ import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
 import { supabase } from '@/supabase';
 import { authStore } from '@/stores/auth';
+import VehicleManager from '@/components/tools/VehicleManager.vue';
 
 const { addToast } = useToast();
 
@@ -32,7 +33,7 @@ const props = defineProps<{
 
 // Local navigation selection state
 const activeVesselId = ref<number | null>(null);
-const activeBargeId = ref<number | null>(null);
+const activeBargeId = ref<number | 'vehicles' | null>(null);
 const activeSubViewMode = ref<'dashboard' | 'vehicles'>('dashboard');
 void activeSubViewMode; // kept for parent compatibility
 
@@ -57,8 +58,19 @@ const formatNumber = (num: number): string => {
 };
 
 const activeBarge = computed(() => {
-    if (!activeBargeId.value) return null;
-    return vessels.value.flatMap(v => v.barges || []).find(b => b.id === activeBargeId.value) || null;
+    if (!activeBargeId.value || activeBargeId.value === 'vehicles') return null;
+    for (const v of vessels.value) {
+        if (v.barges) {
+            const b = v.barges.find(barge => barge.id === activeBargeId.value);
+            if (b) {
+                return {
+                    ...b,
+                    vesselName: v.name
+                };
+            }
+        }
+    }
+    return null;
 });
 
 
@@ -1555,6 +1567,107 @@ const deleteBarge = async (vesselId: number, id: number, name: string) => {
     }
 };
 
+const allBargesList = computed(() => {
+    const list: (Barge & { vesselName: string })[] = [];
+    vessels.value.forEach(v => {
+        if (v.barges) {
+            v.barges.forEach(b => {
+                list.push({
+                    ...b,
+                    vesselName: v.name
+                });
+            });
+        }
+    });
+    return list;
+});
+
+interface AddBargeDialogState {
+    show: boolean;
+    bargeName: string;
+    vesselId: number | null;
+    newVesselName: string;
+    showNewVesselInput: boolean;
+}
+
+const addBargeDialog = ref<AddBargeDialogState>({
+    show: false,
+    bargeName: '',
+    vesselId: null,
+    newVesselName: '',
+    showNewVesselInput: false
+});
+
+const openAddBargeDialog = () => {
+    addBargeDialog.value = {
+        show: true,
+        bargeName: '',
+        vesselId: vessels.value[0]?.id || null,
+        newVesselName: '',
+        showNewVesselInput: vessels.value.length === 0
+    };
+};
+
+const handleAddBargeConfirm = async () => {
+    const state = addBargeDialog.value;
+    if (!state.bargeName.trim()) {
+        addToast('Vui lòng nhập tên sà lan!', 'error');
+        return;
+    }
+
+    loading.value = true;
+    try {
+        let vId = state.vesselId;
+        
+        // Nếu người dùng chọn tạo tàu mới
+        if (state.showNewVesselInput) {
+            if (!state.newVesselName.trim()) {
+                addToast('Vui lòng nhập tên tàu mới!', 'error');
+                loading.value = false;
+                return;
+            }
+            const newV: Vessel = {
+                id: Date.now(),
+                name: state.newVesselName.trim(),
+                barges: []
+            };
+            vessels.value.push(newV);
+            await dbContext.set('allocator_vessels', vessels.value);
+            vId = newV.id;
+        }
+
+        if (!vId) {
+            addToast('Vui lòng chọn hoặc tạo tàu chủ quản!', 'error');
+            loading.value = false;
+            return;
+        }
+
+        const idx = vessels.value.findIndex(v => v.id === vId);
+        if (idx !== -1) {
+            const v = vessels.value[idx];
+            if (v) {
+                const newBarge: Barge = {
+                    id: Date.now(),
+                    name: state.bargeName.trim(),
+                    vesselId: vId,
+                    config: { locked: false, orderNo: '' }
+                };
+                if (!v.barges) v.barges = [];
+                v.barges.push(newBarge);
+                await dbContext.set('allocator_vessels', vessels.value);
+                addToast(`Đã thêm sà lan: ${newBarge.name}`);
+                await loadVessels();
+                await selectBarge(vId, newBarge.id);
+                addBargeDialog.value.show = false;
+            }
+        }
+    } catch (e) {
+        addToast('Lỗi khi thêm sà lan!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
 const toggleBargeLock = async () => {
     if (!activeBarge.value) return;
     const b = activeBarge.value;
@@ -1566,6 +1679,13 @@ const toggleBargeLock = async () => {
     addToast(b.config.locked ? 'Đã khóa sà lan' : 'Đã mở khóa sà lan');
 };
 void toggleBargeLock;
+void vesselBargesSummary;
+void activeVessel;
+void addVessel;
+void renameVessel;
+void deleteVessel;
+void selectVessel;
+void addBarge;
 
 // Loaded and synchronization logic
 onMounted(async () => {
@@ -1629,7 +1749,7 @@ watch(activeBargeId, async (newBargeId) => {
     isInitLoading.value = true;
     csvFile.value = null;
     try {
-        if (newBargeId) {
+        if (newBargeId && newBargeId !== 'vehicles') {
             const saved = await dbContext.get<CSVRecord[]>('allocator_tickets_' + newBargeId);
             csvRecords.value = saved || [];
 
@@ -2480,7 +2600,7 @@ async function compileAndDownload() {
     <div class="cargo-allocator-wrapper flex-1 flex flex-col min-h-0 overflow-hidden h-full w-full">
         <!-- Main area -->
         <div class="flex-1 flex overflow-hidden gap-4 p-4">
-            <!-- Sidebar (left): Vessels -> Barges tree -->
+            <!-- Sidebar (left) -->
             <aside class="w-72 h-full bg-white rounded-[24px] soft-shadow border border-primary/5 flex flex-col shrink-0 overflow-hidden no-print">
                 <!-- Sidebar header -->
                 <div class="p-3 border-b border-primary/5 flex items-center justify-between">
@@ -2497,82 +2617,73 @@ async function compileAndDownload() {
                     </button>
                 </div>
 
-                <!-- Tree list -->
+                <!-- Vehicles Manager Menu Item -->
+                <div class="p-2 border-b border-primary/5 bg-gray-50/50">
+                    <div 
+                        @click="activeBargeId = 'vehicles'; activeVesselId = null;"
+                        :class="['flex items-center gap-2 p-2.5 rounded-[16px] cursor-pointer transition-all text-xs font-black border', activeBargeId === 'vehicles' ? 'bg-primary text-white border-primary shadow-soft' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-100']"
+                    >
+                        <span class="material-symbols-outlined text-base">local_shipping</span>
+                        Danh sách xe (Danh mục)
+                    </div>
+                </div>
+
+                <!-- Flat Barges List -->
                 <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
-                    <div v-if="vessels.length === 0" class="text-center py-6 text-gray-400 text-xs">
-                        Chưa có dữ liệu tàu. Nhấn nút bên dưới để thêm tàu mới.
+                    <div class="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-wider mb-1">Danh sách sà lan phân bổ</div>
+                    
+                    <div v-if="allBargesList.length === 0" class="text-center py-6 text-gray-400 text-xs">
+                        Chưa có dữ liệu sà lan. Nhấn nút bên dưới để thêm sà lan mới.
                     </div>
 
-                    <div v-for="vessel in vessels" :key="vessel.id" class="border border-primary/5 rounded-[16px] overflow-hidden bg-gray-50">
-                        <!-- Vessel Header -->
-                        <div 
-                            @click="selectVessel(vessel.id); expandedVesselIds[vessel.id] = !expandedVesselIds[vessel.id]"
-                            :class="['flex items-center justify-between p-2.5 hover:bg-primary/5 cursor-pointer transition-colors', activeVesselId === vessel.id && activeBargeId === null ? 'bg-primary/10 border-l-4 border-primary' : '']"
-                        >
-                            <div class="flex items-center gap-1.5 font-bold text-xs text-[#4a2c32]">
-                                <span class="material-symbols-outlined text-primary text-base">directions_boat</span>
-                                <span class="truncate max-w-[120px]">{{ vessel.name }}</span>
+                    <div 
+                        v-for="barge in allBargesList" 
+                        :key="barge.id"
+                        @click="selectBarge(barge.vesselId, barge.id)"
+                        :class="['flex items-center justify-between p-2.5 rounded-[16px] cursor-pointer border transition-all text-xs font-bold', activeBargeId === barge.id ? 'bg-primary text-white border-primary shadow-soft' : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-100']"
+                    >
+                        <div class="flex flex-col min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-sm" :class="activeBargeId === barge.id ? 'text-white' : 'text-primary'">layers</span>
+                                <span class="truncate font-black text-xs max-w-[130px]">{{ barge.name }}</span>
+                                <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white' : 'text-red-500'" title="Sà lan bị khóa">lock</span>
                             </div>
-                            
-                            <!-- Vessel Actions -->
-                            <div class="flex items-center gap-1 onClickPrevent" @click.stop>
-                                <button @click="addBarge(vessel.id)" class="size-5 rounded-full hover:bg-black/5 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Thêm sà lan">
-                                    <span class="material-symbols-outlined text-xs">add</span>
-                                </button>
-                                <button @click="renameVessel(vessel.id, vessel.name)" class="size-5 rounded-full hover:bg-black/5 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Sửa tên tàu">
-                                    <span class="material-symbols-outlined text-xs">edit</span>
-                                </button>
-                                <button @click="deleteVessel(vessel.id, vessel.name)" class="size-5 rounded-full hover:bg-black/5 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors" title="Xóa tàu">
-                                    <span class="material-symbols-outlined text-xs">delete</span>
-                                </button>
+                            <div :class="['text-[9px] mt-0.5 truncate', activeBargeId === barge.id ? 'text-white/80' : 'text-gray-400 font-medium']">
+                                Tàu: {{ barge.vesselName }}
                             </div>
                         </div>
-
-                        <!-- Barges List (children of Vessel) -->
-                        <div v-if="expandedVesselIds[vessel.id]" class="p-1.5 bg-white border-t border-primary/5 space-y-1">
-                            <div v-if="!vessel.barges || vessel.barges.length === 0" class="text-center py-2 text-[10px] text-gray-400 italic">
-                                Chưa có sà lan nào
-                            </div>
-                            <div 
-                                v-for="barge in vessel.barges" 
-                                :key="barge.id"
-                                @click="selectBarge(vessel.id, barge.id)"
-                                :class="['flex items-center justify-between p-2 rounded-[12px] cursor-pointer transition-all text-[11px] font-bold', activeBargeId === barge.id ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
-                            >
-                                <div class="flex items-center gap-1.5 min-w-0">
-                                    <span class="material-symbols-outlined text-xs" :class="activeBargeId === barge.id ? 'text-white' : 'text-primary/70'">layers</span>
-                                    <span class="truncate">{{ barge.name }}</span>
-                                    <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white/90' : 'text-red-500'" title="Sà lan đang bị khóa">lock</span>
-                                </div>
-                                <div class="flex items-center gap-0.5 onClickPrevent" @click.stop>
-                                    <button @click="renameBarge(barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-primary'" title="Đổi tên">
-                                        <span class="material-symbols-outlined text-xs">edit</span>
-                                    </button>
-                                    <button @click="deleteBarge(vessel.id, barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-red-500'" title="Xóa sà lan">
-                                        <span class="material-symbols-outlined text-xs">delete</span>
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="flex items-center gap-0.5 onClickPrevent" @click.stop>
+                            <button @click="renameBarge(barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-primary'" title="Đổi tên">
+                                <span class="material-symbols-outlined text-xs">edit</span>
+                            </button>
+                            <button @click="deleteBarge(barge.vesselId, barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-red-500'" title="Xóa sà lan">
+                                <span class="material-symbols-outlined text-xs">delete</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Add Vessel Button -->
+                <!-- Add Flat Barge Button -->
                 <div class="p-3 border-t border-primary/5 bg-gray-50 text-center">
                     <button 
-                        @click="addVessel"
+                        @click="openAddBargeDialog"
                         class="w-full py-2 border border-primary hover:bg-primary hover:text-white text-primary font-bold rounded-[14px] text-xs flex items-center justify-center gap-1 transition-all shadow-sm"
                     >
                         <span class="material-symbols-outlined text-xs font-black">add</span>
-                        Thêm tàu mới
+                        Thêm sà lan mới
                     </button>
                 </div>
             </aside>
 
             <!-- Workspace (right) -->
             <main class="flex-1 h-full min-h-0 flex flex-col gap-4 p-0 overflow-hidden">
-                <!-- Chế độ 1: Chưa chọn tàu và sà lan (Global Dashboard) -->
-                <div v-if="!activeVesselId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
+                <!-- Chế độ 1: Quản lý danh sách xe -->
+                <div v-if="activeBargeId === 'vehicles'" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white rounded-[24px] soft-shadow border border-primary/5 p-0">
+                    <VehicleManager />
+                </div>
+
+                <!-- Chế độ 2: Chưa chọn sà lan (Global Dashboard) -->
+                <div v-else-if="!activeBargeId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
                     <!-- Welcome Header banner -->
                     <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
                         <div>
@@ -2600,7 +2711,7 @@ async function compileAndDownload() {
                             </div>
                             <div>
                                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
-                                <h4 class="text-lg font-black text-teal-600">{{ vessels.flatMap(v => v.barges || []).length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
+                                <h4 class="text-lg font-black text-teal-600">{{ allBargesList.length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
                             </div>
                         </div>
                         <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
@@ -2693,97 +2804,6 @@ async function compileAndDownload() {
                     </div>
                 </div>
 
-                <!-- Chế độ 2: Đang chọn tàu nhưng chưa chọn sà lan (Vessel Summary) -->
-                <div v-else-if="activeVesselId && !activeBargeId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
-                    <!-- Vessel Header Breadcrumbs -->
-                    <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
-                        <div class="flex items-center gap-3">
-                            <div>
-                                <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Báo cáo tàu</div>
-                                <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
-                                    <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
-                                    <span class="text-gray-300">&rsaquo;</span>
-                                    Tàu: <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-black">{{ activeVessel?.name }}</span>
-                                </h1>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Stats Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                            <div class="size-11 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-outlined text-xl">layers</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
-                                <h4 class="text-lg font-black text-[#4a2c32]">{{ vesselBargesSummary.length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                            <div class="size-11 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-outlined text-xl">local_shipping</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số chuyến xe</p>
-                                <h4 class="text-lg font-black text-teal-600">{{ formatNumber(vesselBargesSummary.reduce((sum, b) => sum + b.tripCount, 0)) }} <span class="text-xs text-gray-400 font-bold">chuyến</span></h4>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                            <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-outlined text-xl">scale</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng trọng lượng đã chia</p>
-                                <h4 class="text-lg font-black text-amber-600">{{ formatNumber(vesselBargesSummary.reduce((sum, b) => sum + b.totalWeight, 0)) }} <span class="text-xs text-gray-400 font-bold">kg</span></h4>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Barges Summary Table Card -->
-                    <div class="flex-1 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col min-h-0">
-                        <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
-                            <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-base">analytics</span>
-                                Chi tiết danh sách sà lan của tàu
-                            </h3>
-                        </div>
-
-                        <div v-if="vesselBargesSummary.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
-                            Tàu này chưa có sà lan nào. Vui lòng thêm sà lan mới ở cột bên trái.
-                        </div>
-                        <div v-else class="flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border border-gray-100">
-                            <table class="w-full text-left border-collapse text-xs font-semibold">
-                                <thead>
-                                    <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
-                                        <th class="p-3 w-12 text-center bg-gray-50">STT</th>
-                                        <th class="p-3 bg-gray-50">Tên sà lan</th>
-                                        <th class="p-3 text-right bg-gray-50">Số chuyến xe đã phân bổ</th>
-                                        <th class="p-3 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
-                                        <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
-                                    <tr v-for="(b, idx) in vesselBargesSummary" :key="b.id" class="hover:bg-gray-50 transition-colors">
-                                        <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
-                                        <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
-                                        <td class="p-3 text-right font-mono font-bold">{{ b.tripCount }} chuyến</td>
-                                        <td class="p-3 text-right font-mono font-bold text-teal-600">{{ formatNumber(b.totalWeight) }} kg</td>
-                                        <td class="p-3 text-center">
-                                            <button 
-                                                @click="selectBarge(b.vesselId, b.id)" 
-                                                class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
-                                            >
-                                                Mở phân bổ
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Chế độ 3: Đang chọn sà lan (Barge Detail Workspace) -->
                 <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 min-h-0 overflow-y-auto pr-1">
                     <!-- Breadcrumbs Header -->
@@ -2793,9 +2813,9 @@ async function compileAndDownload() {
                             <h1 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
                                 <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
                                 <span class="text-gray-300">&rsaquo;</span>
-                                Tàu: <span @click="activeBargeId = null" class="px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer rounded-full text-[10px] font-black" title="Xem báo cáo tổng hợp tàu">{{ activeVessel?.name }}</span>
-                                <span class="text-gray-300">&rsaquo;</span>
                                 Sà lan: <span class="px-2 py-0.5 bg-teal-500/10 text-teal-600 rounded-full text-[10px] font-black">{{ activeBarge?.name }}</span>
+                                <span class="text-gray-300">|</span>
+                                <span class="text-[10px] text-gray-400 font-medium">Tàu chủ quản: {{ activeBarge?.vesselName }}</span>
                             </h1>
                         </div>
                     </div>
@@ -3745,6 +3765,91 @@ async function compileAndDownload() {
                 </div> <!-- Đóng Barge Detail Workspace div -->
             </main> <!-- Đóng Workspace (right) -->
         </div> <!-- Đóng Main area (flex-1 flex overflow-hidden) -->
+
+        <!-- Advanced Add Barge Dialog -->
+        <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div 
+                v-if="addBargeDialog.show" 
+                class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4"
+                @click.self="addBargeDialog.show = false"
+            >
+                <div 
+                    class="w-full max-w-[420px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100 animate-scale-up text-xs"
+                >
+                    <h3 class="text-sm font-black text-gray-900 leading-tight">
+                        Thêm sà lan phân bổ mới
+                    </h3>
+                    
+                    <!-- Barge Name Input -->
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tên sà lan mới</label>
+                        <input 
+                            v-model="addBargeDialog.bargeName"
+                            type="text"
+                            placeholder="Ví dụ: SG 9988, HP 1022..."
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary transition-all"
+                        />
+                    </div>
+
+                    <!-- Vessel Selection -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tàu chủ quản</label>
+                            <button 
+                                @click="addBargeDialog.showNewVesselInput = !addBargeDialog.showNewVesselInput"
+                                class="text-[10px] font-bold text-primary hover:underline"
+                            >
+                                {{ addBargeDialog.showNewVesselInput ? 'Chọn tàu có sẵn' : '+ Tạo tàu mới' }}
+                            </button>
+                        </div>
+                        
+                        <!-- Select existing vessel -->
+                        <select 
+                            v-if="!addBargeDialog.showNewVesselInput"
+                            v-model="addBargeDialog.vesselId"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary transition-all cursor-pointer"
+                        >
+                            <option v-for="v in vessels" :key="v.id" :value="v.id">
+                                {{ v.name }}
+                            </option>
+                        </select>
+
+                        <!-- Input new vessel name -->
+                        <input 
+                            v-else
+                            v-model="addBargeDialog.newVesselName"
+                            type="text"
+                            placeholder="Nhập tên tàu mới..."
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary transition-all"
+                        />
+                    </div>
+                    
+                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                        <button 
+                            @click="addBargeDialog.show = false"
+                            class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                        >
+                            Hủy
+                        </button>
+                        <button 
+                            @click="handleAddBargeConfirm"
+                            class="h-9 px-5 rounded-[12px] text-xs font-bold text-white bg-primary hover:bg-primary/95 active:scale-95 transition-all"
+                        >
+                            Thêm sà lan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+        </Teleport>
 
         <!-- Custom Prompt Input Dialog -->
         <Teleport to="body">

@@ -5,14 +5,13 @@ import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
 import WeighbridgePrinter from '../components/tools/WeighbridgePrinter.vue';
 import CargoAllocator from '../components/tools/CargoAllocator.vue';
-import VehicleManager from '../components/tools/VehicleManager.vue';
 import { authStore } from '../stores/auth';
 import { ContentService } from '../services/ContentService';
 
 
 // Active tool and sub-views
 const activeToolId = ref<string | null>(null);
-const activeTab = ref<'allocator' | 'printer' | 'vehicles'>('allocator');
+const activeTab = ref<'allocator' | 'printer'>('allocator');
 const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', 'allocator', 'ocr']);
 
 
@@ -210,13 +209,6 @@ const handleSidebarSwitch = (id: string) => {
             <span class="material-symbols-outlined text-sm">print</span>
             In Phiếu Cân Xe
           </button>
-          <button 
-            @click="activeTab = 'vehicles'"
-            :class="['px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5', activeTab === 'vehicles' ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
-          >
-            <span class="material-symbols-outlined text-sm">local_shipping</span>
-            Danh sách xe
-          </button>
         </nav>
         
         <button 
@@ -295,8 +287,6 @@ const handleSidebarSwitch = (id: string) => {
                 :hide-card="true"
               />
               
-              <!-- Vehicles Manager Tab -->
-              <VehicleManager v-if="activeTab === 'vehicles'" />
             </template>
           </div>
         </main>
