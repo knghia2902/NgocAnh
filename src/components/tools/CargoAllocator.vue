@@ -7,8 +7,21 @@ import { authStore } from '@/stores/auth';
 
 const { addToast } = useToast();
 
-import { WeighbridgeService } from '@/services/excel/WeighbridgeService';
-import type { Vessel } from '@/services/excel/WeighbridgeService';
+interface Barge {
+    id: number;
+    name: string;
+    vesselId: number;
+    config?: {
+        locked?: boolean;
+        orderNo?: string;
+    };
+}
+
+interface Vessel {
+    id: number;
+    name: string;
+    barges?: Barge[];
+}
 
 const props = defineProps<{
     activeSubView?: string;
@@ -1246,11 +1259,11 @@ const activeVessel = computed(() => {
     return vessels.value.find(v => v.id === activeVesselId.value) || null;
 });
 
-// Load all vessels from WeighbridgeService
+// Load all vessels from local IndexedDB
 const loadVessels = async () => {
     loading.value = true;
     try {
-        const data = await WeighbridgeService.getVessels();
+        const data = await dbContext.get<Vessel[]>('allocator_vessels') || [];
         vessels.value = data;
         
         // Expand all vessels by default
@@ -1322,21 +1335,23 @@ function handleInputCancel() {
     inputDialog.value.show = false;
 }
 
-// CRUD Methods
+// CRUD Methods utilizing local IndexedDB
 const addVessel = async () => {
     const name = await showPrompt('Nhập tên tàu mới:');
     if (!name || !name.trim()) return;
 
     loading.value = true;
     try {
-        const data = await WeighbridgeService.createVessel(name);
-        if (data) {
-            await loadVessels();
-            expandedVesselIds.value[data.id] = true;
-            addToast(`Đã thêm tàu: ${data.name}`);
-        } else {
-            addToast('Không thể thêm tàu mới!', 'error');
-        }
+        const newVessel: Vessel = {
+            id: Date.now(),
+            name: name.trim(),
+            barges: []
+        };
+        vessels.value.push(newVessel);
+        await dbContext.set('allocator_vessels', vessels.value);
+        expandedVesselIds.value[newVessel.id] = true;
+        addToast(`Đã thêm tàu: ${newVessel.name}`);
+        await loadVessels();
     } catch (e) {
         addToast('Lỗi khi thêm tàu!', 'error');
     } finally {
@@ -1350,12 +1365,17 @@ const renameVessel = async (id: number, currentName: string) => {
 
     loading.value = true;
     try {
-        const success = await WeighbridgeService.updateVessel(id, name);
-        if (success) {
-            await loadVessels();
-            addToast(`Đã đổi tên tàu thành: ${name}`);
+        const idx = vessels.value.findIndex(v => v.id === id);
+        if (idx !== -1) {
+            const v = vessels.value[idx];
+            if (v) {
+                v.name = name.trim();
+                await dbContext.set('allocator_vessels', vessels.value);
+                addToast(`Đã đổi tên tàu thành: ${name}`);
+                await loadVessels();
+            }
         } else {
-            addToast('Không thể đổi tên tàu!', 'error');
+            addToast('Không tìm thấy tàu!', 'error');
         }
     } catch (e) {
         addToast('Lỗi khi đổi tên tàu!', 'error');
@@ -1376,17 +1396,24 @@ const deleteVessel = async (id: number, name: string) => {
 
     loading.value = true;
     try {
-        const success = await WeighbridgeService.deleteVessel(id);
-        if (success) {
-            if (activeVesselId.value === id) {
-                activeVesselId.value = null;
-                activeBargeId.value = null;
+        const vessel = vessels.value.find(v => v.id === id);
+        if (vessel && vessel.barges) {
+            for (const b of vessel.barges) {
+                await dbContext.delete('allocator_tickets_' + b.id);
+                await dbContext.delete('allocator_history_trips_' + b.id);
+                await dbContext.delete('allocator_generated_trips_' + b.id);
             }
-            await loadVessels();
-            addToast(`Đã xóa tàu: ${name}`, 'error');
-        } else {
-            addToast('Không thể xóa tàu!', 'error');
         }
+        
+        vessels.value = vessels.value.filter(v => v.id !== id);
+        await dbContext.set('allocator_vessels', vessels.value);
+        
+        if (activeVesselId.value === id) {
+            activeVesselId.value = null;
+            activeBargeId.value = null;
+        }
+        addToast(`Đã xóa tàu: ${name}`, 'error');
+        await loadVessels();
     } catch (e) {
         addToast('Lỗi khi xóa tàu!', 'error');
     } finally {
@@ -1411,13 +1438,25 @@ const addBarge = async (vesselId: number) => {
 
     loading.value = true;
     try {
-        const data = await WeighbridgeService.createBarge(vesselId, name);
-        if (data) {
-            await loadVessels();
-            await selectBarge(vesselId, data.id);
-            addToast(`Đã thêm sà lan: ${data.name}`);
+        const idx = vessels.value.findIndex(v => v.id === vesselId);
+        if (idx !== -1) {
+            const v = vessels.value[idx];
+            if (v) {
+                const newBarge: Barge = {
+                    id: Date.now(),
+                    name: name.trim(),
+                    vesselId,
+                    config: { locked: false, orderNo: '' }
+                };
+                if (!v.barges) v.barges = [];
+                v.barges.push(newBarge);
+                await dbContext.set('allocator_vessels', vessels.value);
+                addToast(`Đã thêm sà lan: ${newBarge.name}`);
+                await loadVessels();
+                await selectBarge(vesselId, newBarge.id);
+            }
         } else {
-            addToast('Không thể thêm sà lan mới!', 'error');
+            addToast('Không tìm thấy tàu để thêm sà lan!', 'error');
         }
     } catch (e) {
         addToast('Lỗi khi thêm sà lan!', 'error');
@@ -1438,15 +1477,29 @@ const renameBarge = async (id: number, currentName: string) => {
 
     loading.value = true;
     try {
-        const success = await WeighbridgeService.updateBarge(id, name);
-        if (success) {
+        let found = false;
+        for (const v of vessels.value) {
+            if (v.barges) {
+                const bIdx = v.barges.findIndex(b => b.id === id);
+                if (bIdx !== -1) {
+                    const b = v.barges[bIdx];
+                    if (b) {
+                        b.name = name.trim();
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (found) {
+            await dbContext.set('allocator_vessels', vessels.value);
+            addToast(`Đã đổi tên sà lan thành: ${name}`);
             await loadVessels();
             if (activeBargeId.value === id && activeVesselId.value) {
                 await selectBarge(activeVesselId.value, id);
             }
-            addToast(`Đã đổi tên sà lan thành: ${name}`);
         } else {
-            addToast('Không thể đổi tên sà lan!', 'error');
+            addToast('Không tìm thấy sà lan!', 'error');
         }
     } catch (e) {
         addToast('Lỗi khi đổi tên sà lan!', 'error');
@@ -1455,7 +1508,7 @@ const renameBarge = async (id: number, currentName: string) => {
     }
 };
 
-const deleteBarge = async (_vesselId: number, id: number, name: string) => {
+const deleteBarge = async (vesselId: number, id: number, name: string) => {
     const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
     if (barge?.config?.locked) {
         addToast('Sà lan đang bị khóa! Vui lòng mở khóa để xóa.', 'error');
@@ -1473,15 +1526,27 @@ const deleteBarge = async (_vesselId: number, id: number, name: string) => {
 
     loading.value = true;
     try {
-        const success = await WeighbridgeService.deleteBarge(id);
-        if (success) {
-            if (activeBargeId.value === id) {
-                activeBargeId.value = null;
+        const vIdx = vessels.value.findIndex(v => v.id === vesselId);
+        if (vIdx !== -1) {
+            const v = vessels.value[vIdx];
+            if (v && v.barges) {
+                const bIdx = v.barges.findIndex(b => b.id === id);
+                if (bIdx !== -1) {
+                    v.barges.splice(bIdx, 1);
+                    await dbContext.set('allocator_vessels', vessels.value);
+                    
+                    // Clear barge data
+                    await dbContext.delete('allocator_tickets_' + id);
+                    await dbContext.delete('allocator_history_trips_' + id);
+                    await dbContext.delete('allocator_generated_trips_' + id);
+                    
+                    if (activeBargeId.value === id) {
+                        activeBargeId.value = null;
+                    }
+                    addToast(`Đã xóa sà lan: ${name}`, 'error');
+                    await loadVessels();
+                }
             }
-            await loadVessels();
-            addToast(`Đã xóa sà lan: ${name}`, 'error');
-        } else {
-            addToast('Không thể xóa sà lan!', 'error');
         }
     } catch (e) {
         addToast('Lỗi khi xóa sà lan!', 'error');
@@ -1489,6 +1554,18 @@ const deleteBarge = async (_vesselId: number, id: number, name: string) => {
         loading.value = false;
     }
 };
+
+const toggleBargeLock = async () => {
+    if (!activeBarge.value) return;
+    const b = activeBarge.value;
+    if (!b.config) {
+        b.config = {};
+    }
+    b.config.locked = !b.config.locked;
+    await dbContext.set('allocator_vessels', vessels.value);
+    addToast(b.config.locked ? 'Đã khóa sà lan' : 'Đã mở khóa sà lan');
+};
+void toggleBargeLock;
 
 // Loaded and synchronization logic
 onMounted(async () => {
