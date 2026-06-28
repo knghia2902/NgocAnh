@@ -526,6 +526,32 @@ function formatExcelDateTimeCombined(date: any): string {
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${hour12}:${min} ${ampm}`;
 }
 
+function getHistoryDuplicates(records: CSVRecord[]): { dupRecords: CSVRecord[], description: string } {
+    const dupRecords: CSVRecord[] = [];
+    records.forEach(rec => {
+        const isDup = existingTrips.value.some(et => {
+            if (rec.ticketNo && et.ticketNo && rec.ticketNo === et.ticketNo) {
+                return true;
+            }
+            // Check by plate + weight + date
+            if (rec.plateNumber) {
+                const recDate = parseDateTime(rec.dateInStr, rec.timeInStr);
+                const etDate = ensureDate(et.date1Obj);
+                return normalizePlate(rec.plateNumber) === normalizePlate(et.plateNumber) &&
+                       rec.weightNet === et.weightNet &&
+                       formatExcelDate(recDate) === formatExcelDate(etDate);
+            }
+            return false;
+        });
+        if (isDup) {
+            dupRecords.push(rec);
+        }
+    });
+    
+    const desc = dupRecords.map(r => r.ticketNo ? `- Phiếu ${r.ticketNo} (${formatPlate(r.plateNumber)})` : `- Xe ${formatPlate(r.plateNumber)} (${r.weightNet.toLocaleString()} kg)`).join('\n');
+    return { dupRecords, description: desc };
+}
+
 // Handle Ticket Import (accepts CSV and Excel)
 async function handleTicketImport(event: Event) {
     const target = event.target as HTMLInputElement;
@@ -540,7 +566,20 @@ async function handleTicketImport(event: Event) {
         try {
             const text = await file.text();
             const newRecords = parseCSVText(text, importOrderNo.value);
-            const { added, updated, skipped } = mergeTickets(newRecords);
+            
+            let finalRecords = newRecords;
+            const { dupRecords, description } = getHistoryDuplicates(newRecords);
+            if (dupRecords.length > 0) {
+                if (confirm(`Cảnh báo: Phát hiện ${dupRecords.length} phiếu cân trong tệp tải lên đã tồn tại trong Sổ Theo Dõi:\n\n${description}\n\n- Nhấn OK: Để BỎ QUA các dòng trùng này và chỉ nhập các dòng mới.\n- Nhấn Hủy (Cancel): Để nhập TẤT CẢ các dòng.`)) {
+                    // Filter out duplicates
+                    finalRecords = newRecords.filter(r => !dupRecords.some(dr => {
+                        if (r.ticketNo && dr.ticketNo) return r.ticketNo === dr.ticketNo;
+                        return r.plateNumber === dr.plateNumber && r.weightNet === dr.weightNet && r.dateInStr === dr.dateInStr;
+                    }));
+                }
+            }
+            
+            const { added, updated, skipped } = mergeTickets(finalRecords);
             addToast(`Import CSV: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
             await saveTicketsToSupabase();
         } catch (error) {
@@ -665,7 +704,19 @@ async function handleTicketExcelUpload(file: File, manualOrderNo: string = '') {
             return;
         }
         
-        const { added, updated, skipped } = mergeTickets(newRecords);
+        let finalRecords = newRecords;
+        const { dupRecords, description } = getHistoryDuplicates(newRecords);
+        if (dupRecords.length > 0) {
+            if (confirm(`Cảnh báo: Phát hiện ${dupRecords.length} phiếu cân trong tệp tải lên đã tồn tại trong Sổ Theo Dõi:\n\n${description}\n\n- Nhấn OK: Để BỎ QUA các dòng trùng này và chỉ nhập các dòng mới.\n- Nhấn Hủy (Cancel): Để nhập TẤT CẢ các dòng.`)) {
+                // Filter out duplicates
+                finalRecords = newRecords.filter(r => !dupRecords.some(dr => {
+                    if (r.ticketNo && dr.ticketNo) return r.ticketNo === dr.ticketNo;
+                    return r.plateNumber === dr.plateNumber && r.weightNet === dr.weightNet && r.dateInStr === dr.dateInStr;
+                }));
+            }
+        }
+        
+        const { added, updated, skipped } = mergeTickets(finalRecords);
         addToast(`Import Excel: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
         await saveTicketsToSupabase();
         
@@ -1484,9 +1535,8 @@ function saveToHistory() {
     });
 
     if (duplicates.length > 0) {
-        const exampleDups = duplicates.slice(0, 3).join(', ');
-        const suffix = duplicates.length > 3 ? '...' : '';
-        if (!confirm(`Cảnh báo: Có ${duplicates.length} chuyến xe bị trùng lặp với dữ liệu đã tồn tại trong Sổ Theo Dõi (ví dụ: ${exampleDups}${suffix}).\n\nBạn có chắc chắn vẫn muốn lưu các chuyến trùng lặp này vào Sổ Theo Dõi không?`)) {
+        const fullListStr = duplicates.map(d => `- ${d}`).join('\n');
+        if (!confirm(`Cảnh báo: Có ${duplicates.length} chuyến xe bị trùng lặp với dữ liệu đã tồn tại trong Sổ Theo Dõi:\n\n${fullListStr}\n\nBạn có chắc chắn vẫn muốn lưu các chuyến trùng lặp này vào Sổ Theo Dõi không?`)) {
             return;
         }
     }
@@ -1521,6 +1571,14 @@ function deleteGeneratedTrip(trip: SplitTrip) {
             saveTicketsToSupabase();
             addToast('Đã xóa chuyến xe phân bổ thành công!', 'success');
         }
+    }
+}
+
+function clearAllGeneratedTrips() {
+    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ danh sách phân bổ ở Tab 2 không? Hành động này không thể hoàn tác!')) {
+        generatedTrips.value = [];
+        saveTicketsToSupabase();
+        addToast('Đã xóa sạch danh sách phân bổ!', 'info');
     }
 }
 
@@ -2140,6 +2198,14 @@ async function compileAndDownload() {
                     >
                         <span class="material-symbols-outlined text-[14px]">save</span>
                         Lưu vào Sổ Theo Dõi
+                    </button>
+                    <button 
+                        @click="clearAllGeneratedTrips"
+                        :disabled="generatedTrips.length === 0"
+                        class="h-7 px-3 bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold rounded-[8px] hover:bg-red-100 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <span class="material-symbols-outlined text-[14px]">delete</span>
+                        Xóa tất cả
                     </button>
                     <button 
                         @click="compileAndDownload"

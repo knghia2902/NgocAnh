@@ -585,7 +585,11 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
         cfgForm.locked = cfg.locked || false;
         cfgForm.orderNo = cfg.orderNo || '';
         cfgForm.printFields = cfg.printFields || getDefaultPrintFields();
-        cfgForm.printElements = (cfg.printElements || savedDefaultElements || getDefaultPrintElements()).filter(el => !['lineHeader', 'lineTitle', 'lineFooter'].includes(el.id));
+        let elements = cfg.printElements || savedDefaultElements || getDefaultPrintElements();
+        if (elements.length > 0 && !elements.some((el: any) => el.id === 'sig1_name')) {
+            elements = [...elements, { id: 'sig1_name', type: 'field', x: 18.5, y: 133, width: 30, height: 4, label: '', fieldId: 'operator', align: 'center', fontSize: 10, fontWeight: 'bold' }];
+        }
+        cfgForm.printElements = elements.filter(el => !['lineHeader', 'lineTitle', 'lineFooter'].includes(el.id));
         cfgForm.companyName = cfg.companyName || savedCompanyDetails?.companyName || 'CÔNG TY CỔ PHẦN DỊCH VỤ CẢNG NGUYÊN NGỌC';
         cfgForm.companyAddress = cfg.companyAddress || savedCompanyDetails?.companyAddress || 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam';
         cfgForm.companyPhone = cfg.companyPhone || savedCompanyDetails?.companyPhone || 'ĐT: 0964 258 671 / Fax:';
@@ -3942,13 +3946,14 @@ onUnmounted(() => {
                                                     <!-- Field Type element -->
                                                     <div v-if="el.type === 'field'" class="w-full h-full flex items-baseline overflow-hidden select-none pointer-events-none">
                                                         <span 
+                                                            v-if="el.label"
                                                             class="text-gray-500 shrink-0 font-sans" 
                                                             style="font-weight: inherit;"
                                                             :style="{ width: ((el.labelWidth || 20) * currentMmToPx) + 'px' }"
                                                         >
                                                             {{ el.label }}
                                                         </span>
-                                                        <span class="mr-1 shrink-0 font-sans">:</span>
+                                                        <span v-if="el.label" class="mr-1 shrink-0 font-sans">:</span>
                                                         <span 
                                                             class="grow font-sans"
                                                             :class="(el.fieldId === 'ketluan' || el.fieldId === 'note') ? 'whitespace-pre-wrap break-words' : 'truncate'"
@@ -4161,8 +4166,8 @@ onUnmounted(() => {
                     >
                         <!-- Field type element -->
                         <div v-if="el.type === 'field'" style="display: flex; align-items: baseline; width: 100%; height: 100%; overflow: hidden;">
-                            <span style="flex-shrink: 0; font-weight: inherit;" :style="{ width: (el.labelWidth || 20) + 'mm' }">{{ el.label }}</span>
-                            <span style="flex-shrink: 0; margin-right: 1mm;">:</span>
+                            <span v-if="el.label" style="flex-shrink: 0; font-weight: inherit;" :style="{ width: (el.labelWidth || 20) + 'mm' }">{{ el.label }}</span>
+                            <span v-if="el.label" style="flex-shrink: 0; margin-right: 1mm;">:</span>
                             <span 
                                 style="flex-grow: 1; font-weight: inherit;"
                                 :style="{ whiteSpace: (el.fieldId === 'ketluan' || el.fieldId === 'note') ? 'pre-wrap' : 'inherit', wordBreak: (el.fieldId === 'ketluan' || el.fieldId === 'note') ? 'break-word' : 'inherit' }"
