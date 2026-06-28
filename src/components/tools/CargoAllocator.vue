@@ -989,19 +989,9 @@ const sourceCurrentPage = ref(1);
 const sourceSearchQuery = ref('');
 
 const filteredSourceTickets = computed(() => {
-    let list = csvRecords.value;
-    if (activeBarge.value) {
-        const name = activeBarge.value.name.toLowerCase().trim();
-        const orderNo = activeBarge.value.config?.orderNo ? String(activeBarge.value.config.orderNo).toLowerCase().trim() : '';
-        list = list.filter(t => {
-            const tBarge = t.bargeName ? t.bargeName.toLowerCase().trim() : '';
-            const tOrder = t.orderNo ? String(t.orderNo).toLowerCase().trim() : '';
-            return (name && tBarge.includes(name)) || (orderNo && tOrder === orderNo);
-        });
-    }
-    if (!sourceSearchQuery.value.trim()) return list;
+    if (!sourceSearchQuery.value.trim()) return csvRecords.value;
     const q = sourceSearchQuery.value.toLowerCase();
-    return list.filter(t => 
+    return csvRecords.value.filter(t => 
         t.plateNumber.toLowerCase().includes(q) || 
         t.ticketNo.toLowerCase().includes(q) || 
         t.cargoType.toLowerCase().includes(q)
@@ -1547,19 +1537,12 @@ watch(generatedTrips, () => {
 // Computed: Filtered trips for preview search
 const filteredTrips = computed(() => {
     let list = generatedTrips.value;
-    if (activeBarge.value) {
-        const name = activeBarge.value.name.toLowerCase().trim();
-        const orderNo = activeBarge.value.config?.orderNo ? String(activeBarge.value.config.orderNo).toLowerCase().trim() : '';
-        list = list.filter(t => {
-            const tBarge = t.bargeName ? t.bargeName.toLowerCase().trim() : '';
-            const tOrder = t.orderNo ? String(t.orderNo).toLowerCase().trim() : '';
-            return (name && tBarge.includes(name)) || (orderNo && tOrder === orderNo);
-        });
-    }
+    
     // Filter by customer dropdown
     if (selectedCustomer.value) {
         list = list.filter(t => t.customer === selectedCustomer.value);
     }
+    
     // Filter by search query text
     if (searchQuery.value.trim()) {
         const q = searchQuery.value.toLowerCase();
@@ -1570,6 +1553,7 @@ const filteredTrips = computed(() => {
             (t.customer && t.customer.toLowerCase().includes(q))
         );
     }
+    
     return list;
 });
 
@@ -1599,19 +1583,9 @@ const historySearchQuery = ref('');
 const historyCurrentPage = ref(1);
 
 const filteredHistoryTrips = computed(() => {
-    let list = existingTrips.value;
-    if (activeBarge.value) {
-        const name = activeBarge.value.name.toLowerCase().trim();
-        const orderNo = activeBarge.value.config?.orderNo ? String(activeBarge.value.config.orderNo).toLowerCase().trim() : '';
-        list = list.filter(t => {
-            const tBarge = t.bargeName ? t.bargeName.toLowerCase().trim() : '';
-            const tOrder = t.orderNo ? String(t.orderNo).toLowerCase().trim() : '';
-            return (name && tBarge.includes(name)) || (orderNo && tOrder === orderNo);
-        });
-    }
-    if (!historySearchQuery.value.trim()) return list;
+    if (!historySearchQuery.value.trim()) return existingTrips.value;
     const q = historySearchQuery.value.toLowerCase();
-    return list.filter(t => 
+    return existingTrips.value.filter(t => 
         t.plateNumber.toLowerCase().includes(q) || 
         t.ticketNo.toLowerCase().includes(q) || 
         t.cargoType.toLowerCase().includes(q)
@@ -2047,12 +2021,7 @@ async function compileAndDownload() {
 </script>
 
 <template>
-    <div v-if="!activeBargeId" class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-4 items-center justify-center py-20 text-gray-400">
-        <span class="material-symbols-outlined text-5xl text-primary animate-pulse">info</span>
-        <h3 class="text-base font-black text-[#4a2c32] mt-2">Vui lòng chọn Tàu & Sà lan ở danh mục bên trái để bắt đầu phân bổ</h3>
-        <p class="text-xs text-gray-500">Mọi thao tác phân bổ sà lan sẽ được tự động đồng bộ theo sà lan tương ứng.</p>
-    </div>
-    <div v-else class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
+    <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
         <!-- Header Banner -->
         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
             <div>

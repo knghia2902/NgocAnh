@@ -477,7 +477,7 @@ const toggleVessel = (vesselId: number) => {
       <div class="flex-1 flex overflow-hidden">
         
         <!-- Left Sidebar: Vessel / Barge hierarchy selection for Weighbridge, standard list for other tools -->
-        <aside class="w-64 bg-white border-r border-primary/10 flex flex-col shrink-0">
+        <aside v-if="activeToolId !== 'weighbridge' || activeTab === 'printer'" class="w-64 bg-white border-r border-primary/10 flex flex-col shrink-0">
           <div class="p-3 border-b border-primary/5 flex items-center justify-between">
             <span class="text-[10px] font-black text-gray-400 uppercase tracking-wider">
               {{ activeToolId === 'weighbridge' ? 'Danh mục Tàu / Sà lan' : 'Danh sách công cụ' }}
