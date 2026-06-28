@@ -287,7 +287,7 @@ const handleSidebarSwitch = (id: string) => {
               <!-- Cargo Allocator Tab -->
               <CargoAllocator 
                 v-show="activeTab === 'allocator'" 
-                :active-sub-view="activeTab" 
+                :active-sub-view="'report'" 
               />
               
               <!-- Weighbridge Printer Tab -->
