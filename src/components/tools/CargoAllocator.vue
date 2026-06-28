@@ -2503,12 +2503,12 @@ async function compileAndDownload() {
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="py-2 px-3 w-12 text-center bg-gray-50 font-bold">STT</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Mã lệnh</th>
                                 <th class="py-2 px-3 bg-gray-50 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
                                 <th class="py-2 px-3 bg-gray-55 font-bold">Số xe</th>
                                 <th class="py-2 px-3 text-center bg-gray-50 font-bold">TTTP (tấn)</th>
                                 <th class="py-2 px-3 text-center bg-gray-55 font-bold">Trọng lượng hàng CP (tấn)</th>
                                 <th class="py-2 px-3 bg-gray-50 font-bold">Số phiếu</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Mã lệnh</th>
                                 <th class="py-2 px-3 text-center w-28 bg-gray-55 font-bold">Loại hàng</th>
                                 <th class="py-2 px-3 text-right bg-gray-50 font-bold">Khối lượng (tấn)</th>
                                 <th class="py-2 px-3 text-center w-16 bg-gray-55 font-bold">Trạng thái</th>
@@ -2526,6 +2526,7 @@ async function compileAndDownload() {
                                         {{ trip.stt }}
                                     </span>
                                 </td>
+                                <td class="py-2 px-3 font-semibold text-teal-600 font-mono">{{ trip.orderNo || '-' }}</td>
                                 <td class="py-2 px-3 whitespace-pre-line font-mono text-[10px] leading-tight text-gray-500">{{ trip.timeStr }}</td>
                                 <td class="py-2 px-3 font-bold text-gray-900 flex items-center gap-2">
                                     <span class="whitespace-nowrap">{{ formatPlate(trip.plateNumber) }}</span>
@@ -2538,7 +2539,6 @@ async function compileAndDownload() {
                                 <td class="py-2 px-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
                                 <td class="py-2 px-3 text-center">{{ trip.limit.toFixed(1) }}</td>
                                 <td class="py-2 px-3 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
-                                <td class="py-2 px-3 font-semibold text-teal-600 font-mono">{{ trip.orderNo || '-' }}</td>
                                 <td class="py-2 px-3 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
                                 <td class="py-2 px-3 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
                                 <td class="py-2 px-3 text-center">
