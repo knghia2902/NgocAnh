@@ -2942,6 +2942,8 @@ async function compileAndDownload() {
                     </button>
                 </div>
             </div>
+        </div>
+
         <!-- Premium Custom Confirm Modal -->
         <Transition
             enter-active-class="transition duration-200 ease-out"
@@ -3014,7 +3016,6 @@ async function compileAndDownload() {
             </div>
         </Transition>
     </div>
-</div>
 </template>
 
 <style scoped>
