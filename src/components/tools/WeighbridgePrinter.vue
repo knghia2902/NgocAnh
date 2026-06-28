@@ -14,6 +14,12 @@ const props = withDefaults(defineProps<{
 const isOpen = ref(false);
 const activeTab = ref<'data' | 'config' | 'goods'>('data');
 
+watch(() => props.hideCard, (newVal) => {
+    if (newVal) {
+        isOpen.value = true;
+    }
+}, { immediate: true });
+
 watch(() => authStore.role, (newRole) => {
     if (newRole !== 'admin') {
         activeTab.value = 'data';
@@ -2883,9 +2889,9 @@ onUnmounted(() => {
         </div>
 
         <!-- Fullscreen Workspace Overlay -->
-        <div v-if="isOpen" class="fixed inset-0 bg-cute-gradient z-[100] flex flex-col overflow-hidden no-print animate-fade-in font-display">
+        <div v-if="isOpen" :class="[hideCard ? 'flex-1 flex flex-col overflow-hidden' : 'fixed inset-0 bg-cute-gradient z-[100] flex flex-col overflow-hidden no-print animate-fade-in font-display']">
             <!-- Header bar of Workspace -->
-            <header class="bg-white px-6 py-2.5 border-b border-primary/10 flex items-center justify-between shadow-sm">
+            <header v-if="!hideCard" class="bg-white px-6 py-2.5 border-b border-primary/10 flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-2.5">
                     <div class="size-9 bg-primary rounded-full flex items-center justify-center text-white shadow-soft">
                         <span class="material-symbols-outlined text-lg">print</span>
