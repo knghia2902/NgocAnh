@@ -266,14 +266,14 @@ const handleSidebarSwitch = (id: string) => {
         <!-- Main Content Area -->
         <main 
           :class="[
-            activeToolId === 'weighbridge' && activeTab === 'printer'
+            activeToolId === 'weighbridge'
               ? 'flex-1 overflow-hidden flex flex-col bg-cute-gradient' 
               : 'flex-1 overflow-y-auto p-6 bg-cute-gradient flex flex-col items-center'
           ]"
         >
           <div 
             :class="[
-              activeToolId === 'weighbridge' && activeTab === 'printer'
+              activeToolId === 'weighbridge'
                 ? 'w-full h-full flex flex-col overflow-hidden' 
                 : 'w-full max-w-[1200px] h-full flex flex-col'
             ]"
@@ -287,7 +287,6 @@ const handleSidebarSwitch = (id: string) => {
               <!-- Cargo Allocator Tab -->
               <CargoAllocator 
                 v-show="activeTab === 'allocator'" 
-                :active-sub-view="'report'" 
               />
               
               <!-- Weighbridge Printer Tab -->

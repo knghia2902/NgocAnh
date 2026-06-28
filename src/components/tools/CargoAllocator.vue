@@ -7,6 +7,7 @@ import { authStore } from '@/stores/auth';
 
 const { addToast } = useToast();
 
+import { WeighbridgeService } from '@/services/excel/WeighbridgeService';
 import type { Vessel } from '@/services/excel/WeighbridgeService';
 
 const props = defineProps<{
@@ -16,23 +17,35 @@ const props = defineProps<{
     vesselsList?: Vessel[];
 }>();
 
-const activeBarge = computed(() => {
-    if (!props.activeBargeId || !props.vesselsList) return null;
-    return props.vesselsList.flatMap(v => v.barges || []).find(b => b.id === props.activeBargeId) || null;
-});
+// Local navigation selection state
+const activeVesselId = ref<number | null>(null);
+const activeBargeId = ref<number | null>(null);
+const activeSubViewMode = ref<'dashboard' | 'vehicles'>('dashboard');
+void activeSubViewMode; // kept for parent compatibility
 
-watch(() => props.activeSubView, async (newVal) => {
-    if (newVal === 'report') {
-        try {
-            const savedVehicles = await dbContext.get<any[]>('allocator_vehicles');
-            if (savedVehicles && Array.isArray(savedVehicles)) {
-                vehiclesList.value = savedVehicles;
-            }
-            await loadTicketsFromSupabase();
-        } catch (e) {
-            console.error('Lỗi khi tải danh sách xe:', e);
-        }
+const formatDateTimeStr = (isoString: string): string => {
+    if (!isoString) return '';
+    try {
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return isoString;
+        const d = String(date.getDate()).padStart(2, '0');
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const y = date.getFullYear();
+        const h = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        return `${h}:${min} ${d}/${m}/${y}`;
+    } catch(e) {
+        return isoString;
     }
+};
+
+const formatNumber = (num: number): string => {
+    return Number(num).toLocaleString('en-US');
+};
+
+const activeBarge = computed(() => {
+    if (!activeBargeId.value) return null;
+    return vessels.value.flatMap(v => v.barges || []).find(b => b.id === activeBargeId.value) || null;
 });
 
 
@@ -168,15 +181,20 @@ let isSyncingFromChannel = false;
 syncChannel.onmessage = async (event) => {
     try {
         isSyncingFromChannel = true;
+        // Only sync if the sync event targets the currently selected barge
+        if (event.data.bargeId !== activeBargeId.value) return;
+
         if (event.data.type === 'tickets') {
-            const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
+            const key = activeBargeId.value ? 'allocator_tickets_' + activeBargeId.value : 'allocator_tickets';
+            const saved = await dbContext.get<CSVRecord[]>(key);
             if (saved && Array.isArray(saved)) {
                 if (JSON.stringify(csvRecords.value) !== JSON.stringify(saved)) {
                     csvRecords.value = saved;
                 }
             }
         } else if (event.data.type === 'history') {
-            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
+            const key = activeBargeId.value ? 'allocator_history_trips_' + activeBargeId.value : 'allocator_history_trips';
+            const savedHistory = await dbContext.get<SplitTrip[]>(key);
             if (savedHistory && Array.isArray(savedHistory)) {
                 if (JSON.stringify(existingTrips.value) !== JSON.stringify(savedHistory)) {
                     existingTrips.value = savedHistory;
@@ -1119,7 +1137,360 @@ async function saveTicketsToSupabase() {
     }
 }
 
-// Mounted hook to load settings and tickets from IndexedDB
+// Core state for sidebar
+const vessels = ref<Vessel[]>([]);
+const expandedVesselIds = ref<Record<number, boolean>>({});
+const loading = ref(false);
+const saving = ref(false);
+void saving;
+void loadTicketsFromSupabase;
+
+interface BargeSummary {
+    id: number;
+    name: string;
+    vesselId: number;
+    vesselName: string;
+    tripCount: number;
+    totalWeight: number;
+    dateStart: string | null;
+    dateEnd: string | null;
+    locked: boolean;
+}
+
+const allBargesSummary = ref<BargeSummary[]>([]);
+const loadingGlobalSummary = ref(false);
+const globalBargeSearchQuery = ref('');
+const globalFilterMonth = ref('');
+
+// Month list from date strings
+const availableGlobalMonths = computed(() => {
+    const months = new Set<string>();
+    allBargesSummary.value.forEach(b => {
+        if (b.dateStart) {
+            const m = b.dateStart.split('/')[1] || b.dateStart.split('-')[1];
+            if (m) months.add(m);
+        }
+    });
+    return Array.from(months).sort();
+});
+
+const filteredAllBarges = computed(() => {
+    let list = allBargesSummary.value;
+    
+    if (globalBargeSearchQuery.value) {
+        const q = globalBargeSearchQuery.value.toLowerCase().trim();
+        list = list.filter(b => b.name.toLowerCase().includes(q) || b.vesselName.toLowerCase().includes(q));
+    }
+    
+    if (globalFilterMonth.value) {
+        list = list.filter(b => {
+            if (!b.dateStart) return false;
+            const m = b.dateStart.split('/')[1] || b.dateStart.split('-')[1];
+            return m === globalFilterMonth.value;
+        });
+    }
+    
+    return list;
+});
+
+// Load summary of all barges based on their split history in IndexedDB
+const refreshGlobalBargesSummary = async () => {
+    loadingGlobalSummary.value = true;
+    try {
+        const summaries: BargeSummary[] = [];
+        for (const vessel of vessels.value) {
+            for (const barge of (vessel.barges || [])) {
+                // Read allocator history for this barge
+                const trips = await dbContext.get<SplitTrip[]>('allocator_history_trips_' + barge.id) || [];
+                let totalWeight = 0;
+                let minDate: any = null;
+                let maxDate: any = null;
+                
+                trips.forEach(t => {
+                    totalWeight += (t.weightNet || (t.weightTons * 1000) || 0);
+                    // Parse date
+                    const d1 = t.date1Obj ? new Date(t.date1Obj) : null;
+                    if (d1 && !isNaN(d1.getTime())) {
+                        if (!minDate || d1 < minDate) minDate = d1;
+                        if (!maxDate || d1 > maxDate) maxDate = d1;
+                    }
+                });
+                
+                summaries.push({
+                    id: barge.id,
+                    name: barge.name,
+                    vesselId: vessel.id,
+                    vesselName: vessel.name,
+                    tripCount: trips.length,
+                    totalWeight,
+                    dateStart: minDate ? formatDateTimeStr(minDate.toISOString()) : null,
+                    dateEnd: maxDate ? formatDateTimeStr(maxDate.toISOString()) : null,
+                    locked: barge.config?.locked || false
+                });
+            }
+        }
+        allBargesSummary.value = summaries;
+    } catch (e) {
+        console.error('Lỗi khi tải báo cáo tổng hợp sà lan:', e);
+    } finally {
+        loadingGlobalSummary.value = false;
+    }
+};
+
+// Vessel specific summary
+const vesselBargesSummary = computed(() => {
+    return allBargesSummary.value.filter(b => b.vesselId === activeVesselId.value);
+});
+
+const activeVessel = computed(() => {
+    return vessels.value.find(v => v.id === activeVesselId.value) || null;
+});
+
+// Load all vessels from WeighbridgeService
+const loadVessels = async () => {
+    loading.value = true;
+    try {
+        const data = await WeighbridgeService.getVessels();
+        vessels.value = data;
+        
+        // Expand all vessels by default
+        data.forEach(v => {
+            if (expandedVesselIds.value[v.id] === undefined) {
+                expandedVesselIds.value[v.id] = true;
+            }
+        });
+        
+        await refreshGlobalBargesSummary();
+    } catch (e) {
+        addToast('Không thể tải danh sách tàu!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Dialog Prompt for CRUD
+interface InputDialogState {
+    show: boolean;
+    title: string;
+    placeholder: string;
+    value: string;
+    okText?: string;
+    cancelText?: string;
+    resolve?: (val: string | null) => void;
+}
+
+const inputDialog = ref<InputDialogState>({
+    show: false,
+    title: '',
+    placeholder: '',
+    value: ''
+});
+
+const inputPromptRef = ref<HTMLInputElement | null>(null);
+
+function showPrompt(title: string, defaultValue: string = '', placeholder: string = ''): Promise<string | null> {
+    return new Promise((resolve) => {
+        inputDialog.value = {
+            show: true,
+            title,
+            placeholder,
+            value: defaultValue,
+            okText: 'Xác nhận',
+            cancelText: 'Hủy',
+            resolve
+        };
+        nextTick(() => {
+            inputPromptRef.value?.focus();
+            if (inputPromptRef.value) {
+                inputPromptRef.value.select();
+            }
+        });
+    });
+}
+
+function handleInputOk() {
+    if (inputDialog.value.resolve) {
+        inputDialog.value.resolve(inputDialog.value.value);
+    }
+    inputDialog.value.show = false;
+}
+
+function handleInputCancel() {
+    if (inputDialog.value.resolve) {
+        inputDialog.value.resolve(null);
+    }
+    inputDialog.value.show = false;
+}
+
+// CRUD Methods
+const addVessel = async () => {
+    const name = await showPrompt('Nhập tên tàu mới:');
+    if (!name || !name.trim()) return;
+
+    loading.value = true;
+    try {
+        const data = await WeighbridgeService.createVessel(name);
+        if (data) {
+            await loadVessels();
+            expandedVesselIds.value[data.id] = true;
+            addToast(`Đã thêm tàu: ${data.name}`);
+        } else {
+            addToast('Không thể thêm tàu mới!', 'error');
+        }
+    } catch (e) {
+        addToast('Lỗi khi thêm tàu!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+const renameVessel = async (id: number, currentName: string) => {
+    const name = await showPrompt('Đổi tên tàu:', currentName);
+    if (!name || !name.trim() || name.trim() === currentName) return;
+
+    loading.value = true;
+    try {
+        const success = await WeighbridgeService.updateVessel(id, name);
+        if (success) {
+            await loadVessels();
+            addToast(`Đã đổi tên tàu thành: ${name}`);
+        } else {
+            addToast('Không thể đổi tên tàu!', 'error');
+        }
+    } catch (e) {
+        addToast('Lỗi khi đổi tên tàu!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+const deleteVessel = async (id: number, name: string) => {
+    const confirm = await showConfirm({
+        title: 'Xóa tàu',
+        message: `Bạn có chắc chắn muốn xóa tàu "${name}" cùng toàn bộ sà lan và dữ liệu phân bổ của nó không? Hành động này không thể hoàn tác.`,
+        type: 'danger',
+        okText: 'Xóa tàu',
+        cancelText: 'Hủy'
+    });
+    if (!confirm) return;
+
+    loading.value = true;
+    try {
+        const success = await WeighbridgeService.deleteVessel(id);
+        if (success) {
+            if (activeVesselId.value === id) {
+                activeVesselId.value = null;
+                activeBargeId.value = null;
+            }
+            await loadVessels();
+            addToast(`Đã xóa tàu: ${name}`, 'error');
+        } else {
+            addToast('Không thể xóa tàu!', 'error');
+        }
+    } catch (e) {
+        addToast('Lỗi khi xóa tàu!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+const selectVessel = async (vesselId: number) => {
+    activeVesselId.value = vesselId;
+    activeBargeId.value = null;
+    await refreshGlobalBargesSummary();
+};
+
+const selectBarge = async (vesselId: number, bargeId: number) => {
+    activeVesselId.value = vesselId;
+    activeBargeId.value = bargeId;
+};
+
+const addBarge = async (vesselId: number) => {
+    const name = await showPrompt('Nhập tên sà lan mới:');
+    if (!name || !name.trim()) return;
+
+    loading.value = true;
+    try {
+        const data = await WeighbridgeService.createBarge(vesselId, name);
+        if (data) {
+            await loadVessels();
+            await selectBarge(vesselId, data.id);
+            addToast(`Đã thêm sà lan: ${data.name}`);
+        } else {
+            addToast('Không thể thêm sà lan mới!', 'error');
+        }
+    } catch (e) {
+        addToast('Lỗi khi thêm sà lan!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+const renameBarge = async (id: number, currentName: string) => {
+    const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
+    if (barge?.config?.locked) {
+        addToast('Sà lan đang bị khóa! Vui lòng mở khóa để đổi tên.', 'error');
+        return;
+    }
+
+    const name = await showPrompt('Đổi tên sà lan:', currentName);
+    if (!name || !name.trim() || name.trim() === currentName) return;
+
+    loading.value = true;
+    try {
+        const success = await WeighbridgeService.updateBarge(id, name);
+        if (success) {
+            await loadVessels();
+            if (activeBargeId.value === id && activeVesselId.value) {
+                await selectBarge(activeVesselId.value, id);
+            }
+            addToast(`Đã đổi tên sà lan thành: ${name}`);
+        } else {
+            addToast('Không thể đổi tên sà lan!', 'error');
+        }
+    } catch (e) {
+        addToast('Lỗi khi đổi tên sà lan!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+const deleteBarge = async (_vesselId: number, id: number, name: string) => {
+    const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
+    if (barge?.config?.locked) {
+        addToast('Sà lan đang bị khóa! Vui lòng mở khóa để xóa.', 'error');
+        return;
+    }
+
+    const confirm = await showConfirm({
+        title: 'Xóa sà lan',
+        message: `Bạn có chắc chắn muốn xóa sà lan "${name}" cùng toàn bộ dữ liệu phân bổ của nó không? Hành động này không thể hoàn tác.`,
+        type: 'danger',
+        okText: 'Xóa sà lan',
+        cancelText: 'Hủy'
+    });
+    if (!confirm) return;
+
+    loading.value = true;
+    try {
+        const success = await WeighbridgeService.deleteBarge(id);
+        if (success) {
+            if (activeBargeId.value === id) {
+                activeBargeId.value = null;
+            }
+            await loadVessels();
+            addToast(`Đã xóa sà lan: ${name}`, 'error');
+        } else {
+            addToast('Không thể xóa sà lan!', 'error');
+        }
+    } catch (e) {
+        addToast('Lỗi khi xóa sà lan!', 'error');
+    } finally {
+        loading.value = false;
+    }
+};
+
+// Loaded and synchronization logic
 onMounted(async () => {
     try {
         const savedLimit = await dbContext.get<number>('allocator_standard_limit');
@@ -1165,46 +1536,51 @@ onMounted(async () => {
         const savedUseAuto = await dbContext.get<boolean>('allocator_use_auto_ticket');
         if (savedUseAuto !== undefined && savedUseAuto !== null) useAutoTicketNo.value = savedUseAuto;
 
-
-        isInitLoading.value = true;
-        const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
-        if (saved && Array.isArray(saved)) {
-            csvRecords.value = saved;
-        }
-
-        const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
-        if (savedHistory && Array.isArray(savedHistory)) {
-            existingTrips.value = savedHistory;
-        }
-
-        const savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips');
-        if (savedGenerated && Array.isArray(savedGenerated)) {
-            generatedTrips.value = savedGenerated;
-        } else {
-            regenerateAllocatedTrips();
-        }
-
         const savedVehicles = await dbContext.get<any[]>('allocator_vehicles');
         if (savedVehicles && Array.isArray(savedVehicles)) {
             vehiclesList.value = savedVehicles;
         }
-
-        isInitLoading.value = false;
-
-        // Đồng bộ dữ liệu từ đám mây
-        await loadTicketsFromSupabase();
+        
+        await loadVessels();
     } catch (e) {
-        console.error('Lỗi khi nạp dữ liệu từ IndexedDB:', e);
-        isInitLoading.value = false;
+        console.error('Lỗi khi nạp cấu hình từ IndexedDB:', e);
     }
 });
 
+// Watch activeBargeId: load the tickets, history and generated lists for this barge
+watch(activeBargeId, async (newBargeId) => {
+    isInitLoading.value = true;
+    csvFile.value = null;
+    try {
+        if (newBargeId) {
+            const saved = await dbContext.get<CSVRecord[]>('allocator_tickets_' + newBargeId);
+            csvRecords.value = saved || [];
+
+            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips_' + newBargeId);
+            existingTrips.value = savedHistory || [];
+
+            const savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips_' + newBargeId);
+            generatedTrips.value = savedGenerated || [];
+        } else {
+            csvRecords.value = [];
+            existingTrips.value = [];
+            generatedTrips.value = [];
+        }
+    } catch (e) {
+        console.error('Lỗi khi tải dữ liệu sà lan:', e);
+    } finally {
+        isInitLoading.value = false;
+    }
+}, { immediate: true });
+
 // Auto-save tickets on change
 watch(csvRecords, async (newVal) => {
-    if (isSyncingFromChannel) return;
+    if (isSyncingFromChannel || isInitLoading.value) return;
     try {
-        await dbContext.set('allocator_tickets', newVal);
-        syncChannel.postMessage({ type: 'tickets' });
+        const key = activeBargeId.value ? 'allocator_tickets_' + activeBargeId.value : 'allocator_tickets';
+        await dbContext.set(key, newVal);
+        syncChannel.postMessage({ type: 'tickets', bargeId: activeBargeId.value });
+        await refreshGlobalBargesSummary();
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phiếu cân vào IndexedDB:', e);
     }
@@ -1212,10 +1588,12 @@ watch(csvRecords, async (newVal) => {
 
 // Auto-save history on change
 watch(existingTrips, async (newVal) => {
-    if (isSyncingFromChannel) return;
+    if (isSyncingFromChannel || isInitLoading.value) return;
     try {
-        await dbContext.set('allocator_history_trips', newVal);
-        syncChannel.postMessage({ type: 'history' });
+        const key = activeBargeId.value ? 'allocator_history_trips_' + activeBargeId.value : 'allocator_history_trips';
+        await dbContext.set(key, newVal);
+        syncChannel.postMessage({ type: 'history', bargeId: activeBargeId.value });
+        await refreshGlobalBargesSummary();
     } catch (e) {
         console.error('Lỗi khi lưu lịch sử chuyến xe vào IndexedDB:', e);
     }
@@ -1225,8 +1603,9 @@ watch(existingTrips, async (newVal) => {
 watch(generatedTrips, async (newVal) => {
     if (isSyncingFromChannel || isInitLoading.value) return;
     try {
-        await dbContext.set('allocator_generated_trips', newVal);
-        syncChannel.postMessage({ type: 'generated' });
+        const key = activeBargeId.value ? 'allocator_generated_trips_' + activeBargeId.value : 'allocator_generated_trips';
+        await dbContext.set(key, newVal);
+        syncChannel.postMessage({ type: 'generated', bargeId: activeBargeId.value });
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phân bổ vào IndexedDB:', e);
     }
@@ -2021,7 +2400,330 @@ async function compileAndDownload() {
 </script>
 
 <template>
-    <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
+    <div class="cargo-allocator-wrapper flex-1 flex flex-col min-h-0 overflow-hidden h-full w-full">
+        <!-- Main area -->
+        <div class="flex-1 flex overflow-hidden gap-4 p-4">
+            <!-- Sidebar (left): Vessels -> Barges tree -->
+            <aside class="w-72 h-full bg-white rounded-[24px] soft-shadow border border-primary/5 flex flex-col shrink-0 overflow-hidden no-print">
+                <!-- Sidebar header -->
+                <div class="p-3 border-b border-primary/5 flex items-center justify-between">
+                    <span 
+                        @click="activeVesselId = null; activeBargeId = null" 
+                        class="text-xs font-black text-gray-500 hover:text-primary cursor-pointer uppercase tracking-wider transition-colors flex items-center gap-1"
+                        title="Quay lại Trang tổng quan"
+                    >
+                        <span class="material-symbols-outlined text-sm">home</span>
+                        Tổng quan
+                    </span>
+                    <button @click="loadVessels" class="size-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Tải lại danh sách">
+                        <span class="material-symbols-outlined text-lg" :class="{'animate-spin': loading}">refresh</span>
+                    </button>
+                </div>
+
+                <!-- Tree list -->
+                <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+                    <div v-if="vessels.length === 0" class="text-center py-6 text-gray-400 text-xs">
+                        Chưa có dữ liệu tàu. Nhấn nút bên dưới để thêm tàu mới.
+                    </div>
+
+                    <div v-for="vessel in vessels" :key="vessel.id" class="border border-primary/5 rounded-[16px] overflow-hidden bg-gray-50">
+                        <!-- Vessel Header -->
+                        <div 
+                            @click="selectVessel(vessel.id); expandedVesselIds[vessel.id] = !expandedVesselIds[vessel.id]"
+                            :class="['flex items-center justify-between p-2.5 hover:bg-primary/5 cursor-pointer transition-colors', activeVesselId === vessel.id && activeBargeId === null ? 'bg-primary/10 border-l-4 border-primary' : '']"
+                        >
+                            <div class="flex items-center gap-1.5 font-bold text-xs text-[#4a2c32]">
+                                <span class="material-symbols-outlined text-primary text-base">directions_boat</span>
+                                <span class="truncate max-w-[120px]">{{ vessel.name }}</span>
+                            </div>
+                            
+                            <!-- Vessel Actions -->
+                            <div class="flex items-center gap-1 onClickPrevent" @click.stop>
+                                <button @click="addBarge(vessel.id)" class="size-5 rounded-full hover:bg-black/5 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Thêm sà lan">
+                                    <span class="material-symbols-outlined text-xs">add</span>
+                                </button>
+                                <button @click="renameVessel(vessel.id, vessel.name)" class="size-5 rounded-full hover:bg-black/5 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Sửa tên tàu">
+                                    <span class="material-symbols-outlined text-xs">edit</span>
+                                </button>
+                                <button @click="deleteVessel(vessel.id, vessel.name)" class="size-5 rounded-full hover:bg-black/5 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors" title="Xóa tàu">
+                                    <span class="material-symbols-outlined text-xs">delete</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Barges List (children of Vessel) -->
+                        <div v-if="expandedVesselIds[vessel.id]" class="p-1.5 bg-white border-t border-primary/5 space-y-1">
+                            <div v-if="!vessel.barges || vessel.barges.length === 0" class="text-center py-2 text-[10px] text-gray-400 italic">
+                                Chưa có sà lan nào
+                            </div>
+                            <div 
+                                v-for="barge in vessel.barges" 
+                                :key="barge.id"
+                                @click="selectBarge(vessel.id, barge.id)"
+                                :class="['flex items-center justify-between p-2 rounded-[12px] cursor-pointer transition-all text-[11px] font-bold', activeBargeId === barge.id ? 'bg-primary text-white shadow-soft' : 'text-gray-600 hover:bg-gray-100']"
+                            >
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="material-symbols-outlined text-xs" :class="activeBargeId === barge.id ? 'text-white' : 'text-primary/70'">layers</span>
+                                    <span class="truncate">{{ barge.name }}</span>
+                                    <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white/90' : 'text-red-500'" title="Sà lan đang bị khóa">lock</span>
+                                </div>
+                                <div class="flex items-center gap-0.5 onClickPrevent" @click.stop>
+                                    <button @click="renameBarge(barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-primary'" title="Đổi tên">
+                                        <span class="material-symbols-outlined text-xs">edit</span>
+                                    </button>
+                                    <button @click="deleteBarge(vessel.id, barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-red-500'" title="Xóa sà lan">
+                                        <span class="material-symbols-outlined text-xs">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Vessel Button -->
+                <div class="p-3 border-t border-primary/5 bg-gray-50 text-center">
+                    <button 
+                        @click="addVessel"
+                        class="w-full py-2 border border-primary hover:bg-primary hover:text-white text-primary font-bold rounded-[14px] text-xs flex items-center justify-center gap-1 transition-all shadow-sm"
+                    >
+                        <span class="material-symbols-outlined text-xs font-black">add</span>
+                        Thêm tàu mới
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Workspace (right) -->
+            <main class="flex-1 h-full min-h-0 flex flex-col gap-4 p-0 overflow-hidden">
+                <!-- Chế độ 1: Chưa chọn tàu và sà lan (Global Dashboard) -->
+                <div v-if="!activeVesselId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
+                    <!-- Welcome Header banner -->
+                    <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
+                        <div>
+                            <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Báo cáo cân hàng</div>
+                            <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
+                                Báo cáo tổng quan hệ thống
+                            </h1>
+                        </div>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                            <div class="size-11 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-xl">directions_boat</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số tàu</p>
+                                <h4 class="text-lg font-black text-[#4a2c32]">{{ vessels.length }} <span class="text-xs text-gray-400 font-bold">tàu</span></h4>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                            <div class="size-11 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-xl">layers</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
+                                <h4 class="text-lg font-black text-teal-600">{{ vessels.flatMap(v => v.barges || []).length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                            <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-xl">cloud_done</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trạng thái dữ liệu</p>
+                                <h4 class="text-lg font-black text-amber-600">Sẵn sàng <span class="text-xs text-gray-400 font-bold">offline</span></h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All Barges Table Card -->
+                    <div class="flex-1 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col min-h-0">
+                        <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
+                            <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">analytics</span>
+                                Danh sách quản lý phân bổ sà lan
+                            </h3>
+                        </div>
+                        
+                        <!-- Filters Row -->
+                        <div v-if="filteredAllBarges.length > 0 || globalBargeSearchQuery" class="flex flex-col md:flex-row gap-3 mb-4 p-3 bg-gray-50 rounded-[16px] border border-primary/5">
+                            <div class="relative flex-1 flex items-center">
+                                <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
+                                <input 
+                                    v-model="globalBargeSearchQuery"
+                                    type="text"
+                                    placeholder="Tìm kiếm nhanh tên sà lan hoặc tên tàu..."
+                                    class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div v-if="availableGlobalMonths.length > 0" class="relative min-w-[200px] flex items-center">
+                                <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">calendar_month</span>
+                                <select 
+                                    v-model="globalFilterMonth" 
+                                    class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary cursor-pointer appearance-none"
+                                >
+                                    <option value="">Tất cả các tháng (Thời gian)</option>
+                                    <option v-for="month in availableGlobalMonths" :key="month" :value="month">
+                                        Tháng {{ month }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div v-if="loadingGlobalSummary" class="text-center py-10 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
+                            <span class="material-symbols-outlined text-2xl animate-spin text-primary">sync</span>
+                            Đang tính toán dữ liệu sà lan...
+                        </div>
+                        <div v-else-if="filteredAllBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                            Chưa có sà lan nào được tạo hoặc không tìm thấy kết quả.
+                        </div>
+                        <div v-else class="flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border border-gray-100">
+                            <table class="w-full text-left border-collapse text-xs font-semibold">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                        <th class="p-3 w-12 text-center bg-gray-50">STT</th>
+                                        <th class="p-3 bg-gray-50">Tên sà lan</th>
+                                        <th class="p-3 bg-gray-50">Thuộc Tàu</th>
+                                        <th class="p-3 text-right bg-gray-50">Số chuyến xe đã phân bổ</th>
+                                        <th class="p-3 text-right bg-gray-50">Khối lượng phân bổ (Net - kg)</th>
+                                        <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                                    <tr v-for="(b, idx) in filteredAllBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
+                                        <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
+                                        <td class="p-3">
+                                            <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black">
+                                                {{ b.vesselName }}
+                                            </span>
+                                        </td>
+                                        <td class="p-3 text-right font-mono font-bold">{{ b.tripCount }} chuyến</td>
+                                        <td class="p-3 text-right font-mono font-bold text-teal-600">{{ formatNumber(b.totalWeight) }} kg</td>
+                                        <td class="p-3 text-center">
+                                            <button 
+                                                @click="selectBarge(b.vesselId, b.id)" 
+                                                class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
+                                            >
+                                                Mở phân bổ
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chế độ 2: Đang chọn tàu nhưng chưa chọn sà lan (Vessel Summary) -->
+                <div v-else-if="activeVesselId && !activeBargeId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
+                    <!-- Vessel Header Breadcrumbs -->
+                    <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
+                        <div class="flex items-center gap-3">
+                            <div>
+                                <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Báo cáo tàu</div>
+                                <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
+                                    <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
+                                    <span class="text-gray-300">&rsaquo;</span>
+                                    Tàu: <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-black">{{ activeVessel?.name }}</span>
+                                </h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                            <div class="size-11 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-xl">layers</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
+                                <h4 class="text-lg font-black text-[#4a2c32]">{{ vesselBargesSummary.length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                            <div class="size-11 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-xl">local_shipping</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số chuyến xe</p>
+                                <h4 class="text-lg font-black text-teal-600">{{ formatNumber(vesselBargesSummary.reduce((sum, b) => sum + b.tripCount, 0)) }} <span class="text-xs text-gray-400 font-bold">chuyến</span></h4>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
+                            <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
+                                <span class="material-symbols-outlined text-xl">scale</span>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng trọng lượng đã chia</p>
+                                <h4 class="text-lg font-black text-amber-600">{{ formatNumber(vesselBargesSummary.reduce((sum, b) => sum + b.totalWeight, 0)) }} <span class="text-xs text-gray-400 font-bold">kg</span></h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barges Summary Table Card -->
+                    <div class="flex-1 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col min-h-0">
+                        <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
+                            <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">analytics</span>
+                                Chi tiết danh sách sà lan của tàu
+                            </h3>
+                        </div>
+
+                        <div v-if="vesselBargesSummary.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
+                            Tàu này chưa có sà lan nào. Vui lòng thêm sà lan mới ở cột bên trái.
+                        </div>
+                        <div v-else class="flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border border-gray-100">
+                            <table class="w-full text-left border-collapse text-xs font-semibold">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
+                                        <th class="p-3 w-12 text-center bg-gray-50">STT</th>
+                                        <th class="p-3 bg-gray-50">Tên sà lan</th>
+                                        <th class="p-3 text-right bg-gray-50">Số chuyến xe đã phân bổ</th>
+                                        <th class="p-3 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
+                                        <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
+                                    <tr v-for="(b, idx) in vesselBargesSummary" :key="b.id" class="hover:bg-gray-50 transition-colors">
+                                        <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
+                                        <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
+                                        <td class="p-3 text-right font-mono font-bold">{{ b.tripCount }} chuyến</td>
+                                        <td class="p-3 text-right font-mono font-bold text-teal-600">{{ formatNumber(b.totalWeight) }} kg</td>
+                                        <td class="p-3 text-center">
+                                            <button 
+                                                @click="selectBarge(b.vesselId, b.id)" 
+                                                class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
+                                            >
+                                                Mở phân bổ
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chế độ 3: Đang chọn sà lan (Barge Detail Workspace) -->
+                <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 min-h-0 overflow-y-auto pr-1">
+                    <!-- Breadcrumbs Header -->
+                    <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-3 px-4 soft-shadow border border-primary/5 gap-3">
+                        <div>
+                            <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Phân bổ tải trọng</div>
+                            <h1 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
+                                <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
+                                <span class="text-gray-300">&rsaquo;</span>
+                                Tàu: <span @click="activeBargeId = null" class="px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer rounded-full text-[10px] font-black" title="Xem báo cáo tổng hợp tàu">{{ activeVessel?.name }}</span>
+                                <span class="text-gray-300">&rsaquo;</span>
+                                Sà lan: <span class="px-2 py-0.5 bg-teal-500/10 text-teal-600 rounded-full text-[10px] font-black">{{ activeBarge?.name }}</span>
+                            </h1>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
         <!-- Header Banner -->
         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
             <div>
@@ -2961,6 +3663,63 @@ async function compileAndDownload() {
                 </div>
             </div>
         </div>
+
+                    </div> <!-- Đóng div cũ của Allocator -->
+                </div> <!-- Đóng Barge Detail Workspace div -->
+            </main> <!-- Đóng Workspace (right) -->
+        </div> <!-- Đóng Main area (flex-1 flex overflow-hidden) -->
+
+        <!-- Custom Prompt Input Dialog -->
+        <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div 
+                v-if="inputDialog.show" 
+                class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4"
+                @click.self="handleInputCancel"
+            >
+                <div 
+                    class="w-full max-w-[420px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100 animate-scale-up"
+                >
+                    <h3 class="text-sm font-black text-gray-900 leading-tight">
+                        {{ inputDialog.title }}
+                    </h3>
+                    
+                    <div class="relative">
+                        <input 
+                            ref="inputPromptRef"
+                            v-model="inputDialog.value"
+                            type="text"
+                            :placeholder="inputDialog.placeholder"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary transition-all"
+                            @keyup.enter="handleInputOk"
+                        />
+                    </div>
+                    
+                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                        <button 
+                            @click="handleInputCancel"
+                            class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                        >
+                            {{ inputDialog.cancelText }}
+                        </button>
+                        <button 
+                            @click="handleInputOk"
+                            class="h-9 px-5 rounded-[12px] text-xs font-bold text-white bg-primary hover:bg-primary/95 active:scale-95 transition-all"
+                        >
+                            {{ inputDialog.okText }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+        </Teleport>
 
         <!-- Premium Custom Confirm Modal -->
         <Teleport to="body">
