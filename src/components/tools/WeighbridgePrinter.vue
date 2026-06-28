@@ -23,20 +23,6 @@ const emit = defineEmits<{
     (e: 'update-vessels'): void;
 }>();
 
-watch(() => props.activeVesselId, (newVal) => {
-    activeVesselId.value = newVal;
-}, { immediate: true });
-
-watch(() => props.activeBargeId, (newVal) => {
-    activeBargeId.value = newVal;
-}, { immediate: true });
-
-watch(() => props.vesselsList, (newVal) => {
-    if (newVal && newVal.length > 0) {
-        vessels.value = newVal;
-    }
-}, { immediate: true, deep: true });
-
 // Fullscreen state
 const isOpen = ref(false);
 const activeTab = ref<'data' | 'config' | 'goods'>('data');
@@ -119,6 +105,20 @@ const activeBargeId = ref<number | null>(null);
 const trucks = ref<Truck[]>([]);
 const loading = ref(false);
 const saving = ref(false);
+
+watch(() => props.activeVesselId, (newVal) => {
+    activeVesselId.value = newVal;
+}, { immediate: true });
+
+watch(() => props.activeBargeId, (newVal) => {
+    activeBargeId.value = newVal;
+}, { immediate: true });
+
+watch(() => props.vesselsList, (newVal) => {
+    if (newVal && newVal.length > 0) {
+        vessels.value = newVal;
+    }
+}, { immediate: true, deep: true });
 
 // Filters and sorting state
 const vesselFilterMonth = ref<string>('');
