@@ -55,6 +55,7 @@ export interface BargeConfig {
     companyPhone?: string;
     ticketTitle?: string;
     signatures?: string[];
+    goodsList?: string[];
     updatedAt?: number;
 }
 

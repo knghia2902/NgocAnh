@@ -230,8 +230,11 @@ const cfgForm = reactive<BargeConfig>({
     companyAddress: 'Địa chỉ: Số 167, tổ 78, Đường Đê Bao, Khu phố 9, Phường Phú An, TP. Hồ Chí Minh, Việt Nam',
     companyPhone: 'ĐT: 0964 258 671 / Fax:',
     ticketTitle: 'PHIẾU CÂN XE',
-    signatures: ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ']
+    signatures: ['NV TRẠM CÂN', 'BẢO VỆ', 'CHỦ HÀNG', 'THỦ KHO', 'TÀI XẾ'],
+    goodsList: []
 });
+
+const newGoodsItem = ref('');
 
 const dialogTruck = reactive({
     id: 0,
@@ -3619,11 +3622,67 @@ onUnmounted(() => {
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên hàng hóa (mặc định)</label>
-                                                <input v-model="cfgForm.goods" :disabled="cfgForm.locked" type="text" placeholder="Đất sét nguyên liệu..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <select 
+                                                    v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0"
+                                                    v-model="cfgForm.goods" 
+                                                    :disabled="cfgForm.locked" 
+                                                    class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <option value="">-- Chọn hàng hóa --</option>
+                                                    <option v-for="g in cfgForm.goodsList" :key="g" :value="g">{{ g }}</option>
+                                                </select>
+                                                <input 
+                                                    v-else
+                                                    v-model="cfgForm.goods" 
+                                                    :disabled="cfgForm.locked" 
+                                                    type="text" 
+                                                    placeholder="Thêm danh sách hàng hóa bên dưới..." 
+                                                    class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Mã hàng hóa</label>
                                                 <input v-model="cfgForm.goodsCode" :disabled="cfgForm.locked" type="text" placeholder="Mã hàng..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                            </div>
+
+                                            <!-- Goods List Manager -->
+                                            <div class="flex flex-col gap-1.5 md:col-span-2">
+                                                <label class="text-[10px] font-bold text-gray-500">Danh sách hàng hóa</label>
+                                                <div class="flex gap-1.5">
+                                                    <input 
+                                                        v-model="newGoodsItem" 
+                                                        :disabled="cfgForm.locked" 
+                                                        type="text" 
+                                                        placeholder="Nhập tên hàng hóa mới..." 
+                                                        class="flex-1 px-3 py-1.5 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        @keyup.enter="() => { if (newGoodsItem.trim() && !cfgForm.locked) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
+                                                    >
+                                                    <button 
+                                                        :disabled="cfgForm.locked || !newGoodsItem.trim()"
+                                                        @click="() => { if (newGoodsItem.trim()) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
+                                                        class="px-3 py-1.5 bg-primary text-white rounded-[8px] text-[10px] font-bold hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                                    >
+                                                        <span class="material-symbols-outlined text-xs">add</span>
+                                                        Thêm
+                                                    </button>
+                                                </div>
+                                                <div v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0" class="flex flex-wrap gap-1.5 mt-1">
+                                                    <span 
+                                                        v-for="(item, idx) in cfgForm.goodsList" 
+                                                        :key="idx" 
+                                                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-lg text-[10px] font-bold text-[#4a2c32] group"
+                                                    >
+                                                        {{ item }}
+                                                        <button 
+                                                            v-if="!cfgForm.locked"
+                                                            @click="cfgForm.goodsList!.splice(idx, 1)"
+                                                            class="size-4 rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <span class="material-symbols-outlined text-[10px]">close</span>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                                <p v-else class="text-[10px] text-gray-400 italic">Chưa có hàng hóa nào. Thêm tên hàng hóa ở trên.</p>
                                             </div>
                                             <div class="flex flex-col gap-1 md:col-span-2">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên chủ hàng (mặc định)</label>
