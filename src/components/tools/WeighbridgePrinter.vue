@@ -124,6 +124,45 @@ const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     }, 3000);
 };
 
+interface ConfirmDialogState {
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'warning' | 'danger' | 'info' | 'success';
+    okText?: string;
+    cancelText?: string;
+    onOk?: () => void;
+    onCancel?: () => void;
+}
+
+const confirmDialog = ref<ConfirmDialogState>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info'
+});
+
+function showConfirm(options: Omit<ConfirmDialogState, 'show'>) {
+    return new Promise<boolean>((resolve) => {
+        confirmDialog.value = {
+            show: true,
+            title: options.title,
+            message: options.message,
+            type: options.type,
+            okText: options.okText || 'Xác nhận',
+            cancelText: options.cancelText || 'Hủy',
+            onOk: () => {
+                confirmDialog.value.show = false;
+                resolve(true);
+            },
+            onCancel: () => {
+                confirmDialog.value.show = false;
+                resolve(false);
+            }
+        };
+    });
+}
+
 // Excel Upload pending data
 interface ExcelColumn {
     index: number;
@@ -922,7 +961,13 @@ const applyLayoutToAllBarges = async () => {
         return;
     }
 
-    const confirmApply = confirm('Bạn có chắc chắn muốn áp dụng thiết kế mẫu in hiện tại cho TẤT CẢ sà lan khác trên hệ thống? Thiết kế cũ của các sà lan khác sẽ bị ghi đè.');
+    const confirmApply = await showConfirm({
+        title: 'Áp dụng thiết kế cho tất cả sà lan',
+        message: 'Bạn có chắc chắn muốn áp dụng thiết kế mẫu in hiện tại cho TẤT CẢ sà lan khác trên hệ thống? Thiết kế cũ của các sà lan khác sẽ bị ghi đè.',
+        type: 'warning',
+        okText: 'Áp dụng hết',
+        cancelText: 'Hủy'
+    });
     if (!confirmApply) return;
 
     saving.value = true;
@@ -1359,21 +1404,19 @@ const startDrag = (event: MouseEvent, el: PrintElement) => {
     document.addEventListener('mouseup', handleDragEnd);
 };
 
-const handleKeyDown = (event: KeyboardEvent) => {
+const handleKeyDown = async (event: KeyboardEvent) => {
     if (!isOpen.value || activeTab.value !== 'config' || cfgForm.locked || authStore.role !== 'admin' || selectedElementIds.value.length === 0) return;
     
     // Ignore Arrow and Delete key movements when user is typing in inputs/textareas/selects
     const activeEl = document.activeElement;
-    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+    if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) {
         return;
     }
     
-    let step = 0.5;
-    if (event.shiftKey) step = 1;
-    let handled = false;
-    
     let deltaX = 0;
     let deltaY = 0;
+    const step = event.shiftKey ? 1.0 : 0.2; // Shift key for larger steps (1mm vs 0.2mm)
+    let handled = false;
     
     if (event.key === 'ArrowUp') {
         deltaY = -step;
@@ -1390,7 +1433,13 @@ const handleKeyDown = (event: KeyboardEvent) => {
     } else if (event.key === 'Delete' || event.key === 'Backspace') {
         const toDeleteIds = [...selectedElementIds.value];
         if (toDeleteIds.length > 0) {
-            const confirmDelete = confirm(`Bạn có muốn xóa ${toDeleteIds.length} phần tử đang chọn?`);
+            const confirmDelete = await showConfirm({
+                title: 'Xóa phần tử thiết kế',
+                message: `Bạn có muốn xóa ${toDeleteIds.length} phần tử đang chọn khỏi thiết kế mẫu in không?`,
+                type: 'danger',
+                okText: 'Xóa',
+                cancelText: 'Hủy'
+            });
             if (confirmDelete) {
                 cfgForm.printElements = (cfgForm.printElements || []).filter(el => !toDeleteIds.includes(el.id));
                 selectedElementIds.value = [];
@@ -1457,9 +1506,16 @@ const duplicateElement = (el: PrintElement) => {
     saveBargeConfig();
 };
 
-const resetToDefaultLayout = () => {
+const resetToDefaultLayout = async () => {
     if (cfgForm.locked || authStore.role !== 'admin') return;
-    if (confirm('Bạn có chắc chắn muốn khôi phục thiết kế mẫu phiếu cân về ban đầu không?')) {
+    const confirm = await showConfirm({
+        title: 'Khôi phục mẫu chuẩn',
+        message: 'Bạn có chắc chắn muốn khôi phục thiết kế mẫu phiếu cân về ban đầu không?',
+        type: 'warning',
+        okText: 'Khôi phục',
+        cancelText: 'Hủy'
+    });
+    if (confirm) {
         cfgForm.printElements = getDefaultPrintElements();
         selectedElementId.value = null;
         saveBargeConfigImmediately();
@@ -1718,7 +1774,14 @@ const renameVessel = async (id: number, currentName: string) => {
 };
 
 const deleteVessel = async (id: number, name: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa tàu "${name}" cùng toàn bộ sà lan và dữ liệu cân xe của nó không?`)) return;
+    const confirm = await showConfirm({
+        title: 'Xóa tàu',
+        message: `Bạn có chắc chắn muốn xóa tàu "${name}" cùng toàn bộ sà lan và dữ liệu cân xe của nó không? Hành động này sẽ xóa vĩnh viễn dữ liệu.`,
+        type: 'danger',
+        okText: 'Xóa tàu',
+        cancelText: 'Hủy'
+    });
+    if (!confirm) return;
 
     loading.value = true;
     try {
@@ -1799,7 +1862,14 @@ const deleteBarge = async (_vesselId: number, id: number, name: string) => {
         return;
     }
 
-    if (!confirm(`Bạn có chắc chắn muốn xóa sà lan "${name}" cùng toàn bộ danh sách xe không?`)) return;
+    const confirm = await showConfirm({
+        title: 'Xóa sà lan',
+        message: `Bạn có chắc chắn muốn xóa sà lan "${name}" cùng toàn bộ danh sách xe không? Hành động này sẽ xóa vĩnh viễn dữ liệu.`,
+        type: 'danger',
+        okText: 'Xóa sà lan',
+        cancelText: 'Hủy'
+    });
+    if (!confirm) return;
 
     loading.value = true;
     try {
@@ -1883,8 +1953,14 @@ const syncFromAllocatorActiveBarge = async () => {
         let action: 'overwrite' | 'append' = 'append';
 
         if (currentTrucks.length > 0) {
-            const confirmMsg = `Sà lan này đang có ${currentTrucks.length} xe. Bạn muốn Ghi đè (Xóa xe cũ và thêm xe mới) hay Thêm tiếp?\n\n- Chọn OK để Ghi đè\n- Chọn Cancel để Thêm tiếp`;
-            action = confirm(confirmMsg) ? 'overwrite' : 'append';
+            const confirmOverwrite = await showConfirm({
+                title: 'Đồng bộ danh sách xe sà lan',
+                message: `Sà lan này đang có ${currentTrucks.length} xe.\n\n- Chọn Ghi đè: Để xóa các xe cũ và chỉ giữ danh sách xe mới từ phân bổ.\n- Chọn Thêm tiếp: Để giữ lại xe cũ và cộng dồn thêm xe mới.`,
+                type: 'warning',
+                okText: 'Ghi đè',
+                cancelText: 'Thêm tiếp'
+            });
+            action = confirmOverwrite ? 'overwrite' : 'append';
         }
 
         const importedTrucks: Truck[] = matchedTrips.map((t: any, idx: number) => {
@@ -1971,9 +2047,13 @@ const syncFromAllocatorAllBarges = async () => {
         return;
     }
 
-    const confirmSync = confirm(
-        `Bạn có chắc chắn muốn đồng bộ xe từ Phân rã chuyến cho tất cả ${bargesList.length} sà lan của tàu "${activeVessel.value.name}"?\n\nLưu ý: Tất cả các sà lan chưa bị khóa sẽ bị Ghi đè (Xóa xe cũ và thay bằng xe mới khớp từ Báo cáo cân hàng).`
-    );
+    const confirmSync = await showConfirm({
+        title: 'Đồng bộ toàn bộ sà lan',
+        message: `Bạn có chắc chắn muốn đồng bộ xe từ Phân rã chuyến cho tất cả ${bargesList.length} sà lan của tàu "${activeVessel.value.name}"?\n\nLưu ý: Tất cả các sà lan chưa bị khóa sẽ bị Ghi đè (Xóa xe cũ và thay bằng xe mới khớp từ Báo cáo cân hàng).`,
+        type: 'warning',
+        okText: 'Đồng bộ hết',
+        cancelText: 'Hủy'
+    });
     if (!confirmSync) return;
 
     loading.value = true;
@@ -2540,7 +2620,14 @@ const deleteTruck = async (id: number, plate: string) => {
         showToast('Sà lan đang bị khóa! Không thể xóa xe.', 'error');
         return;
     }
-    if (!confirm(`Bạn có muốn xóa xe "${plate}" ra khỏi danh sách không?`)) return;
+    const confirm = await showConfirm({
+        title: 'Xóa xe khỏi danh sách',
+        message: `Bạn có muốn xóa xe "${plate}" ra khỏi danh sách không?`,
+        type: 'danger',
+        okText: 'Xóa',
+        cancelText: 'Hủy'
+    });
+    if (!confirm) return;
 
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
@@ -2568,7 +2655,14 @@ const clearTrucks = async () => {
         showToast('Sà lan đang bị khóa! Không thể xóa danh sách.', 'error');
         return;
     }
-    if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ danh sách xe của sà lan này?")) return;
+    const confirm = await showConfirm({
+        title: 'Xóa toàn bộ danh sách xe',
+        message: 'Bạn có chắc chắn muốn xóa toàn bộ danh sách xe của sà lan này? Hành động này không thể hoàn tác!',
+        type: 'danger',
+        okText: 'Xóa sạch',
+        cancelText: 'Hủy'
+    });
+    if (!confirm) return;
 
     loading.value = true;
     try {
@@ -4190,6 +4284,78 @@ onUnmounted(() => {
                 </div>
             </div>
     </teleport>
+
+    <!-- Premium Custom Confirm Modal -->
+    <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+    >
+        <div 
+            v-if="confirmDialog.show" 
+            class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4"
+            @click.self="confirmDialog.onCancel"
+        >
+            <div 
+                class="w-full max-w-[480px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100"
+            >
+                <!-- Header -->
+                <div class="flex items-center gap-3">
+                    <div 
+                        class="size-10 rounded-full flex items-center justify-center"
+                        :class="[
+                            confirmDialog.type === 'danger' ? 'bg-red-50 text-red-600' :
+                            confirmDialog.type === 'warning' ? 'bg-amber-50 text-amber-600' :
+                            confirmDialog.type === 'success' ? 'bg-teal-50 text-teal-600' :
+                            'bg-primary/10 text-primary'
+                        ]"
+                    >
+                        <span class="material-symbols-outlined text-xl">
+                            {{ 
+                                confirmDialog.type === 'danger' ? 'error' :
+                                confirmDialog.type === 'warning' ? 'warning' :
+                                confirmDialog.type === 'success' ? 'check_circle' :
+                                'info'
+                            }}
+                        </span>
+                    </div>
+                    <h3 class="text-sm font-black text-gray-900 leading-tight">
+                        {{ confirmDialog.title }}
+                    </h3>
+                </div>
+                
+                <!-- Message Content -->
+                <div class="text-xs font-semibold text-gray-600 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto pr-1">
+                    {{ confirmDialog.message }}
+                </div>
+                
+                <!-- Footer Buttons -->
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                    <button 
+                        @click="confirmDialog.onCancel"
+                        class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                    >
+                        {{ confirmDialog.cancelText }}
+                    </button>
+                    <button 
+                        @click="confirmDialog.onOk"
+                        class="h-9 px-4 rounded-[12px] text-xs font-bold text-white active:scale-95 transition-all"
+                        :class="[
+                            confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                            confirmDialog.type === 'warning' ? 'bg-amber-500 hover:bg-amber-600' :
+                            confirmDialog.type === 'success' ? 'bg-teal-600 hover:bg-teal-700' :
+                            'bg-primary hover:bg-primary/95'
+                        ]"
+                    >
+                        {{ confirmDialog.okText }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Transition>
 </div>
 </template>
 

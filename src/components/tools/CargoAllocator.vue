@@ -90,6 +90,45 @@ const generatedTrips = ref<SplitTrip[]>([]);
 const existingTrips = ref<SplitTrip[]>([]);
 const isSavingToHistory = ref(false);
 const isInitLoading = ref(false);
+
+interface ConfirmDialogState {
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'warning' | 'danger' | 'info' | 'success';
+    okText?: string;
+    cancelText?: string;
+    onOk?: () => void;
+    onCancel?: () => void;
+}
+
+const confirmDialog = ref<ConfirmDialogState>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info'
+});
+
+function showConfirm(options: Omit<ConfirmDialogState, 'show'>) {
+    return new Promise<boolean>((resolve) => {
+        confirmDialog.value = {
+            show: true,
+            title: options.title,
+            message: options.message,
+            type: options.type,
+            okText: options.okText || 'Xác nhận',
+            cancelText: options.cancelText || 'Hủy',
+            onOk: () => {
+                confirmDialog.value.show = false;
+                resolve(true);
+            },
+            onCancel: () => {
+                confirmDialog.value.show = false;
+                resolve(false);
+            }
+        };
+    });
+}
 const vehiclesList = ref<{ plateNumber: string; moocNumber: string; }[]>([]);
 
 // Types & Channel Sync
@@ -570,7 +609,14 @@ async function handleTicketImport(event: Event) {
             let finalRecords = newRecords;
             const { dupRecords, description } = getHistoryDuplicates(newRecords);
             if (dupRecords.length > 0) {
-                if (confirm(`Cảnh báo: Phát hiện ${dupRecords.length} phiếu cân trong tệp tải lên đã tồn tại trong Sổ Theo Dõi:\n\n${description}\n\n- Nhấn OK: Để BỎ QUA các dòng trùng này và chỉ nhập các dòng mới.\n- Nhấn Hủy (Cancel): Để nhập TẤT CẢ các dòng.`)) {
+                const proceed = await showConfirm({
+                    title: 'Trùng lặp dữ liệu tệp nhập',
+                    message: `Phát hiện ${dupRecords.length} phiếu cân trong tệp tải lên đã tồn tại trong Sổ Theo Dõi:\n\n${description}\n\n- Nhấn OK: Để BỎ QUA các dòng trùng này và chỉ nhập các dòng mới.\n- Nhấn Hủy (Cancel): Để nhập TẤT CẢ các dòng.`,
+                    type: 'warning',
+                    okText: 'Bỏ qua trùng',
+                    cancelText: 'Nhập tất cả'
+                });
+                if (proceed) {
                     // Filter out duplicates
                     finalRecords = newRecords.filter(r => !dupRecords.some(dr => {
                         if (r.ticketNo && dr.ticketNo) return r.ticketNo === dr.ticketNo;
@@ -707,7 +753,14 @@ async function handleTicketExcelUpload(file: File, manualOrderNo: string = '') {
         let finalRecords = newRecords;
         const { dupRecords, description } = getHistoryDuplicates(newRecords);
         if (dupRecords.length > 0) {
-            if (confirm(`Cảnh báo: Phát hiện ${dupRecords.length} phiếu cân trong tệp tải lên đã tồn tại trong Sổ Theo Dõi:\n\n${description}\n\n- Nhấn OK: Để BỎ QUA các dòng trùng này và chỉ nhập các dòng mới.\n- Nhấn Hủy (Cancel): Để nhập TẤT CẢ các dòng.`)) {
+            const proceed = await showConfirm({
+                title: 'Trùng lặp dữ liệu tệp nhập',
+                message: `Phát hiện ${dupRecords.length} phiếu cân trong tệp tải lên đã tồn tại trong Sổ Theo Dõi:\n\n${description}\n\n- Nhấn OK: Để BỎ QUA các dòng trùng này và chỉ nhập các dòng mới.\n- Nhấn Hủy (Cancel): Để nhập TẤT CẢ các dòng.`,
+                type: 'warning',
+                okText: 'Bỏ qua trùng',
+                cancelText: 'Nhập tất cả'
+            });
+            if (proceed) {
                 // Filter out duplicates
                 finalRecords = newRecords.filter(r => !dupRecords.some(dr => {
                     if (r.ticketNo && dr.ticketNo) return r.ticketNo === dr.ticketNo;
@@ -868,8 +921,15 @@ function saveTicket() {
     saveTicketsToSupabase();
 }
 
-function deleteTicket(ticket: CSVRecord) {
-    if (confirm(`Bạn có chắc chắn muốn xóa phiếu cân ${ticket.ticketNo || ticket.plateNumber} không?`)) {
+async function deleteTicket(ticket: CSVRecord) {
+    const confirm = await showConfirm({
+        title: 'Xóa phiếu cân',
+        message: `Bạn có chắc chắn muốn xóa phiếu cân ${ticket.ticketNo || ticket.plateNumber} không?`,
+        type: 'danger',
+        okText: 'Xóa',
+        cancelText: 'Hủy'
+    });
+    if (confirm) {
         csvRecords.value = csvRecords.value.filter(t => t.id !== ticket.id);
         addToast('Đã xóa phiếu cân!', 'info');
         saveTicketsToSupabase();
@@ -877,8 +937,15 @@ function deleteTicket(ticket: CSVRecord) {
 }
 
 // Clear all tickets
-function clearAllTickets() {
-    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ danh sách phiếu cân hiện tại không?')) {
+async function clearAllTickets() {
+    const confirm = await showConfirm({
+        title: 'Xóa tất cả phiếu cân',
+        message: 'Bạn có chắc chắn muốn xóa toàn bộ danh sách phiếu cân hiện tại không? Hành động này sẽ dọn sạch Tab 1.',
+        type: 'danger',
+        okText: 'Xóa hết',
+        cancelText: 'Hủy'
+    });
+    if (confirm) {
         csvRecords.value = [];
         csvFile.value = null;
         addToast('Đã xóa sạch danh sách phiếu cân!', 'info');
@@ -1509,7 +1576,7 @@ watch(historySearchQuery, () => {
 });
 
 // Save generated temporary trips into history
-function saveToHistory() {
+async function saveToHistory() {
     if (generatedTrips.value.length === 0) {
         addToast('Không có dữ liệu phân bổ để lưu!', 'info');
         return;
@@ -1536,12 +1603,26 @@ function saveToHistory() {
 
     if (duplicates.length > 0) {
         const fullListStr = duplicates.map(d => `- ${d}`).join('\n');
-        if (!confirm(`Cảnh báo: Có ${duplicates.length} chuyến xe bị trùng lặp với dữ liệu đã tồn tại trong Sổ Theo Dõi:\n\n${fullListStr}\n\nBạn có chắc chắn vẫn muốn lưu các chuyến trùng lặp này vào Sổ Theo Dõi không?`)) {
+        const confirmSaveDup = await showConfirm({
+            title: 'Trùng lặp dữ liệu lịch sử',
+            message: `Cảnh báo: Có ${duplicates.length} chuyến xe bị trùng lặp với dữ liệu đã tồn tại trong Sổ Theo Dõi:\n\n${fullListStr}\n\nBạn có chắc chắn vẫn muốn lưu các chuyến trùng lặp này vào Sổ Theo Dõi không?`,
+            type: 'warning',
+            okText: 'Vẫn lưu',
+            cancelText: 'Hủy'
+        });
+        if (!confirmSaveDup) {
             return;
         }
     }
     
-    if (confirm(`Bạn có chắc chắn muốn lưu ${generatedTrips.value.length} chuyến xe này vào Sổ Theo Dõi và làm sạch danh sách phiếu cân hiện tại ở Tab 1 không?`)) {
+    const confirmSave = await showConfirm({
+        title: 'Lưu vào Sổ Theo Dõi',
+        message: `Bạn có chắc chắn muốn lưu ${generatedTrips.value.length} chuyến xe này vào Sổ Theo Dõi và làm sạch danh sách phiếu cân hiện tại ở Tab 1 không?`,
+        type: 'info',
+        okText: 'Lưu & Làm sạch',
+        cancelText: 'Hủy'
+    });
+    if (confirmSave) {
         // Append generated trips to history
         existingTrips.value = [...existingTrips.value, ...generatedTrips.value];
         
@@ -1563,8 +1644,15 @@ function saveToHistory() {
     }
 }
 
-function deleteGeneratedTrip(trip: SplitTrip) {
-    if (confirm(`Bạn có chắc muốn xóa chuyến xe của xe ${trip.plateNumber} này khỏi danh sách phân bổ không?`)) {
+async function deleteGeneratedTrip(trip: SplitTrip) {
+    const confirmDelete = await showConfirm({
+        title: 'Xóa chuyến xe phân bổ',
+        message: `Bạn có chắc muốn xóa chuyến xe của xe ${trip.plateNumber} này khỏi danh sách phân bổ không?`,
+        type: 'danger',
+        okText: 'Xóa',
+        cancelText: 'Hủy'
+    });
+    if (confirmDelete) {
         const index = generatedTrips.value.findIndex(t => t.stt === trip.stt);
         if (index !== -1) {
             generatedTrips.value.splice(index, 1);
@@ -1574,8 +1662,15 @@ function deleteGeneratedTrip(trip: SplitTrip) {
     }
 }
 
-function clearAllGeneratedTrips() {
-    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ danh sách phân bổ ở Tab 2 không? Hành động này không thể hoàn tác!')) {
+async function clearAllGeneratedTrips() {
+    const confirmClear = await showConfirm({
+        title: 'Xóa tất cả phân bổ',
+        message: 'Bạn có chắc chắn muốn xóa toàn bộ danh sách phân bổ ở Tab 2 không? Hành động này không thể hoàn tác!',
+        type: 'danger',
+        okText: 'Xóa sạch',
+        cancelText: 'Hủy'
+    });
+    if (confirmClear) {
         generatedTrips.value = [];
         saveTicketsToSupabase();
         addToast('Đã xóa sạch danh sách phân bổ!', 'info');
@@ -1583,8 +1678,15 @@ function clearAllGeneratedTrips() {
 }
 
 // Clear all history
-function clearHistory() {
-    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong Sổ Theo Dõi không? Hành động này không thể hoàn tác!')) {
+async function clearHistory() {
+    const confirmClearHistory = await showConfirm({
+        title: 'Xóa sạch Sổ Theo Dõi',
+        message: 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong Sổ Theo Dõi không? Hành động này không thể hoàn tác!',
+        type: 'danger',
+        okText: 'Xóa hết lịch sử',
+        cancelText: 'Hủy'
+    });
+    if (confirmClearHistory) {
         existingTrips.value = [];
         saveTicketsToSupabase();
         addToast('Đã xóa sạch lịch sử Sổ Theo Dõi!', 'info');
@@ -2828,8 +2930,79 @@ async function compileAndDownload() {
                     </button>
                 </div>
             </div>
-        </div>
+        <!-- Premium Custom Confirm Modal -->
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div 
+                v-if="confirmDialog.show" 
+                class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4"
+                @click.self="confirmDialog.onCancel"
+            >
+                <div 
+                    class="w-full max-w-[480px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100 animate-scale-up"
+                >
+                    <!-- Header -->
+                    <div class="flex items-center gap-3">
+                        <div 
+                            class="size-10 rounded-full flex items-center justify-center"
+                            :class="[
+                                confirmDialog.type === 'danger' ? 'bg-red-50 text-red-600' :
+                                confirmDialog.type === 'warning' ? 'bg-amber-50 text-amber-600' :
+                                confirmDialog.type === 'success' ? 'bg-teal-50 text-teal-600' :
+                                'bg-primary/10 text-primary'
+                            ]"
+                        >
+                            <span class="material-symbols-outlined text-xl">
+                                {{ 
+                                    confirmDialog.type === 'danger' ? 'error' :
+                                    confirmDialog.type === 'warning' ? 'warning' :
+                                    confirmDialog.type === 'success' ? 'check_circle' :
+                                    'info'
+                                }}
+                            </span>
+                        </div>
+                        <h3 class="text-sm font-black text-gray-900 leading-tight">
+                            {{ confirmDialog.title }}
+                        </h3>
+                    </div>
+                    
+                    <!-- Message Content -->
+                    <div class="text-xs font-semibold text-gray-600 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto pr-1">
+                        {{ confirmDialog.message }}
+                    </div>
+                    
+                    <!-- Footer Buttons -->
+                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                        <button 
+                            @click="confirmDialog.onCancel"
+                            class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                        >
+                            {{ confirmDialog.cancelText }}
+                        </button>
+                        <button 
+                            @click="confirmDialog.onOk"
+                            class="h-9 px-4 rounded-[12px] text-xs font-bold text-white active:scale-95 transition-all"
+                            :class="[
+                                confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                                confirmDialog.type === 'warning' ? 'bg-amber-500 hover:bg-amber-600' :
+                                confirmDialog.type === 'success' ? 'bg-teal-600 hover:bg-teal-700' :
+                                'bg-primary hover:bg-primary/95'
+                            ]"
+                        >
+                            {{ confirmDialog.okText }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
     </div>
+</div>
 </template>
 
 <style scoped>

@@ -6,6 +6,45 @@ import { supabase } from '@/supabase';
 
 const { addToast } = useToast();
 
+interface ConfirmDialogState {
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'warning' | 'danger' | 'info' | 'success';
+    okText?: string;
+    cancelText?: string;
+    onOk?: () => void;
+    onCancel?: () => void;
+}
+
+const confirmDialog = ref<ConfirmDialogState>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info'
+});
+
+function showConfirm(options: Omit<ConfirmDialogState, 'show'>) {
+    return new Promise<boolean>((resolve) => {
+        confirmDialog.value = {
+            show: true,
+            title: options.title,
+            message: options.message,
+            type: options.type,
+            okText: options.okText || 'Xác nhận',
+            cancelText: options.cancelText || 'Hủy',
+            onOk: () => {
+                confirmDialog.value.show = false;
+                resolve(true);
+            },
+            onCancel: () => {
+                confirmDialog.value.show = false;
+                resolve(false);
+            }
+        };
+    });
+}
+
 const syncChannel = new BroadcastChannel('allocator_sync_channel');
 
 syncChannel.onmessage = async (event) => {
@@ -210,7 +249,15 @@ const cancelEdit = () => {
 // Delete vehicle
 const deleteVehicle = async (index: number) => {
     const v = vehicles.value[index];
-    if (v && confirm(`Bạn có chắc chắn muốn xóa xe ${v.plateNumber} khỏi danh sách?`)) {
+    if (!v) return;
+    const confirm = await showConfirm({
+        title: 'Xóa xe khỏi danh sách',
+        message: `Bạn có chắc chắn muốn xóa xe ${v.plateNumber} khỏi danh sách?`,
+        type: 'danger',
+        okText: 'Xóa',
+        cancelText: 'Hủy'
+    });
+    if (confirm) {
         vehicles.value.splice(index, 1);
         await saveVehicles();
         addToast('Đã xóa xe khỏi danh sách!', 'info');
@@ -224,7 +271,14 @@ const deleteVehicle = async (index: number) => {
 
 // Clear all
 const clearAll = async () => {
-    if (confirm('Bạn có chắc chắn muốn xóa SẠCH toàn bộ danh sách xe không? Hành động này không thể hoàn tác!')) {
+    const confirm = await showConfirm({
+        title: 'Xóa sạch danh sách xe',
+        message: 'Bạn có chắc chắn muốn xóa SẠCH toàn bộ danh sách xe không? Hành động này không thể hoàn tác!',
+        type: 'danger',
+        okText: 'Xóa sạch',
+        cancelText: 'Hủy'
+    });
+    if (confirm) {
         vehicles.value = [];
         editingIndex.value = null;
         plateInput.value = '';
@@ -524,6 +578,77 @@ const handleExportExcel = async () => {
             </div>
 
         </div>
-
+        
+        <!-- Premium Custom Confirm Modal -->
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div 
+                v-if="confirmDialog.show" 
+                class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4"
+                @click.self="confirmDialog.onCancel"
+            >
+                <div 
+                    class="w-full max-w-[480px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100"
+                >
+                    <!-- Header -->
+                    <div class="flex items-center gap-3">
+                        <div 
+                            class="size-10 rounded-full flex items-center justify-center"
+                            :class="[
+                                confirmDialog.type === 'danger' ? 'bg-red-50 text-red-600' :
+                                confirmDialog.type === 'warning' ? 'bg-amber-50 text-amber-600' :
+                                confirmDialog.type === 'success' ? 'bg-teal-50 text-teal-600' :
+                                'bg-primary/10 text-primary'
+                            ]"
+                        >
+                            <span class="material-symbols-outlined text-xl">
+                                {{ 
+                                    confirmDialog.type === 'danger' ? 'error' :
+                                    confirmDialog.type === 'warning' ? 'warning' :
+                                    confirmDialog.type === 'success' ? 'check_circle' :
+                                    'info'
+                                }}
+                            </span>
+                        </div>
+                        <h3 class="text-sm font-black text-gray-900 leading-tight">
+                            {{ confirmDialog.title }}
+                        </h3>
+                    </div>
+                    
+                    <!-- Message Content -->
+                    <div class="text-xs font-semibold text-gray-600 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto pr-1">
+                        {{ confirmDialog.message }}
+                    </div>
+                    
+                    <!-- Footer Buttons -->
+                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                        <button 
+                            @click="confirmDialog.onCancel"
+                            class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                        >
+                            {{ confirmDialog.cancelText }}
+                        </button>
+                        <button 
+                            @click="confirmDialog.onOk"
+                            class="h-9 px-4 rounded-[12px] text-xs font-bold text-white active:scale-95 transition-all"
+                            :class="[
+                                confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                                confirmDialog.type === 'warning' ? 'bg-amber-500 hover:bg-amber-600' :
+                                confirmDialog.type === 'success' ? 'bg-teal-600 hover:bg-teal-700' :
+                                'bg-primary hover:bg-primary/95'
+                            ]"
+                        >
+                            {{ confirmDialog.okText }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Transition>
     </div>
 </template>
