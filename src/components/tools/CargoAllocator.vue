@@ -34,8 +34,7 @@ const props = defineProps<{
 // Local navigation selection state
 const activeVesselId = ref<number | null>(null);
 const activeBargeId = ref<number | 'vehicles' | null>(null);
-const activeSubViewMode = ref<'dashboard' | 'vehicles'>('dashboard');
-void activeSubViewMode; // kept for parent compatibility
+const activeSubViewMode = ref<'allocator' | 'vehicles'>('allocator');
 
 const formatDateTimeStr = (isoString: string): string => {
     if (!isoString) return '';
@@ -130,13 +129,7 @@ const csvFile = ref<File | null>(null);
 const ticketFileInput = ref<HTMLInputElement | null>(null);
 const importOrderNo = ref('');
 
-watch(activeBarge, (barge) => {
-    if (barge) {
-        importOrderNo.value = barge.config?.orderNo ? String(barge.config.orderNo) : '';
-    } else {
-        importOrderNo.value = '';
-    }
-}, { immediate: true });
+
 
 function triggerTicketFileInput() {
     ticketFileInput.value?.click();
@@ -206,20 +199,16 @@ let isSyncingFromChannel = false;
 syncChannel.onmessage = async (event) => {
     try {
         isSyncingFromChannel = true;
-        // Only sync if the sync event targets the currently selected barge
-        if (event.data.bargeId !== activeBargeId.value) return;
 
         if (event.data.type === 'tickets') {
-            const key = activeBargeId.value ? 'allocator_tickets_' + activeBargeId.value : 'allocator_tickets';
-            const saved = await dbContext.get<CSVRecord[]>(key);
+            const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
             if (saved && Array.isArray(saved)) {
                 if (JSON.stringify(csvRecords.value) !== JSON.stringify(saved)) {
                     csvRecords.value = saved;
                 }
             }
         } else if (event.data.type === 'history') {
-            const key = activeBargeId.value ? 'allocator_history_trips_' + activeBargeId.value : 'allocator_history_trips';
-            const savedHistory = await dbContext.get<SplitTrip[]>(key);
+            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
             if (savedHistory && Array.isArray(savedHistory)) {
                 if (JSON.stringify(existingTrips.value) !== JSON.stringify(savedHistory)) {
                     existingTrips.value = savedHistory;
@@ -1727,6 +1716,13 @@ void renameVessel;
 void deleteVessel;
 void selectVessel;
 void addBarge;
+void formatNumber;
+void availableGlobalMonths;
+void filteredAllBarges;
+void renameBarge;
+void deleteBarge;
+void allBargesList;
+void openAddBargeDialog;
 
 // Loaded and synchronization logic
 onMounted(async () => {
@@ -1778,47 +1774,31 @@ onMounted(async () => {
         if (savedVehicles && Array.isArray(savedVehicles)) {
             vehiclesList.value = savedVehicles;
         }
-        
-        await loadVessels();
+
+        isInitLoading.value = true;
+        try {
+            const savedTickets = await dbContext.get<CSVRecord[]>('allocator_tickets');
+            csvRecords.value = savedTickets || [];
+
+            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
+            existingTrips.value = savedHistory || [];
+
+            const savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips');
+            generatedTrips.value = savedGenerated || [];
+        } finally {
+            isInitLoading.value = false;
+        }
     } catch (e) {
         console.error('Lỗi khi nạp cấu hình từ IndexedDB:', e);
     }
 });
 
-// Watch activeBargeId: load the tickets, history and generated lists for this barge
-watch(activeBargeId, async (newBargeId) => {
-    isInitLoading.value = true;
-    csvFile.value = null;
-    try {
-        if (newBargeId && newBargeId !== 'vehicles') {
-            const saved = await dbContext.get<CSVRecord[]>('allocator_tickets_' + newBargeId);
-            csvRecords.value = saved || [];
-
-            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips_' + newBargeId);
-            existingTrips.value = savedHistory || [];
-
-            const savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips_' + newBargeId);
-            generatedTrips.value = savedGenerated || [];
-        } else {
-            csvRecords.value = [];
-            existingTrips.value = [];
-            generatedTrips.value = [];
-        }
-    } catch (e) {
-        console.error('Lỗi khi tải dữ liệu sà lan:', e);
-    } finally {
-        isInitLoading.value = false;
-    }
-}, { immediate: true });
-
 // Auto-save tickets on change
 watch(csvRecords, async (newVal) => {
     if (isSyncingFromChannel || isInitLoading.value) return;
     try {
-        const key = activeBargeId.value ? 'allocator_tickets_' + activeBargeId.value : 'allocator_tickets';
-        await dbContext.set(key, newVal);
-        syncChannel.postMessage({ type: 'tickets', bargeId: activeBargeId.value });
-        await refreshGlobalBargesSummary();
+        await dbContext.set('allocator_tickets', newVal);
+        syncChannel.postMessage({ type: 'tickets' });
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phiếu cân vào IndexedDB:', e);
     }
@@ -1828,10 +1808,8 @@ watch(csvRecords, async (newVal) => {
 watch(existingTrips, async (newVal) => {
     if (isSyncingFromChannel || isInitLoading.value) return;
     try {
-        const key = activeBargeId.value ? 'allocator_history_trips_' + activeBargeId.value : 'allocator_history_trips';
-        await dbContext.set(key, newVal);
-        syncChannel.postMessage({ type: 'history', bargeId: activeBargeId.value });
-        await refreshGlobalBargesSummary();
+        await dbContext.set('allocator_history_trips', newVal);
+        syncChannel.postMessage({ type: 'history' });
     } catch (e) {
         console.error('Lỗi khi lưu lịch sử chuyến xe vào IndexedDB:', e);
     }
@@ -1841,9 +1819,8 @@ watch(existingTrips, async (newVal) => {
 watch(generatedTrips, async (newVal) => {
     if (isSyncingFromChannel || isInitLoading.value) return;
     try {
-        const key = activeBargeId.value ? 'allocator_generated_trips_' + activeBargeId.value : 'allocator_generated_trips';
-        await dbContext.set(key, newVal);
-        syncChannel.postMessage({ type: 'generated', bargeId: activeBargeId.value });
+        await dbContext.set('allocator_generated_trips', newVal);
+        syncChannel.postMessage({ type: 'generated' });
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phân bổ vào IndexedDB:', e);
     }
@@ -2644,222 +2621,43 @@ async function compileAndDownload() {
             <!-- Sidebar (left) -->
             <aside class="w-72 h-full bg-white rounded-[24px] soft-shadow border border-primary/5 flex flex-col shrink-0 overflow-hidden no-print">
                 <!-- Sidebar header -->
-                <div class="p-3 border-b border-primary/5 flex items-center justify-between">
-                    <span 
-                        @click="activeVesselId = null; activeBargeId = null" 
-                        class="text-xs font-black text-gray-500 hover:text-primary cursor-pointer uppercase tracking-wider transition-colors flex items-center gap-1"
-                        title="Quay lại Trang tổng quan"
-                    >
-                        <span class="material-symbols-outlined text-sm">home</span>
-                        Tổng quan
-                    </span>
-                    <button @click="loadVessels" class="size-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-primary transition-colors" title="Tải lại danh sách">
-                        <span class="material-symbols-outlined text-lg" :class="{'animate-spin': loading}">refresh</span>
-                    </button>
+                <div class="p-4 border-b border-primary/5">
+                    <div class="text-[10px] uppercase font-black tracking-widest text-primary mb-0.5">Tiện ích quản lý</div>
+                    <h2 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-primary text-base">balance</span>
+                        Báo cáo cân hàng
+                    </h2>
                 </div>
 
-                <!-- Vehicles Manager Menu Item -->
-                <div class="p-2 border-b border-primary/5 bg-gray-50/50">
+                <!-- Navigation menu items -->
+                <div class="flex-1 overflow-y-auto p-3 space-y-2">
                     <div 
-                        @click="activeBargeId = 'vehicles'; activeVesselId = null;"
-                        :class="['flex items-center gap-2 p-2.5 rounded-[16px] cursor-pointer transition-all text-xs font-black border', activeBargeId === 'vehicles' ? 'bg-primary text-white border-primary shadow-soft' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-100']"
+                        @click="activeSubViewMode = 'allocator'"
+                        :class="['flex items-center gap-2.5 p-3 rounded-[16px] cursor-pointer transition-all text-xs font-black border', activeSubViewMode === 'allocator' ? 'bg-primary text-white border-primary shadow-soft' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-100']"
+                    >
+                        <span class="material-symbols-outlined text-base">analytics</span>
+                        Phân bổ tải trọng xếp hàng
+                    </div>
+
+                    <div 
+                        @click="activeSubViewMode = 'vehicles'"
+                        :class="['flex items-center gap-2.5 p-3 rounded-[16px] cursor-pointer transition-all text-xs font-black border', activeSubViewMode === 'vehicles' ? 'bg-primary text-white border-primary shadow-soft' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-100']"
                     >
                         <span class="material-symbols-outlined text-base">local_shipping</span>
                         Danh sách xe (Danh mục)
                     </div>
-                </div>
-
-                <!-- Flat Barges List -->
-                <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
-                    <div class="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-wider mb-1">Danh sách sà lan phân bổ</div>
-                    
-                    <div v-if="allBargesList.length === 0" class="text-center py-6 text-gray-400 text-xs">
-                        Chưa có dữ liệu sà lan. Nhấn nút bên dưới để thêm sà lan mới.
-                    </div>
-
-                    <div 
-                        v-for="barge in allBargesList" 
-                        :key="barge.id"
-                        @click="selectBarge(barge.vesselId, barge.id)"
-                        :class="['flex items-center justify-between p-2.5 rounded-[16px] cursor-pointer border transition-all text-xs font-bold', activeBargeId === barge.id ? 'bg-primary text-white border-primary shadow-soft' : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-100']"
-                    >
-                        <div class="flex flex-col min-w-0">
-                            <div class="flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-sm" :class="activeBargeId === barge.id ? 'text-white' : 'text-primary'">layers</span>
-                                <span class="truncate font-black text-xs max-w-[130px]">{{ barge.name }}</span>
-                                <span v-if="barge.config?.locked" class="material-symbols-outlined text-[11px]" :class="activeBargeId === barge.id ? 'text-white' : 'text-red-500'" title="Sà lan bị khóa">lock</span>
-                            </div>
-                            <div :class="['text-[9px] mt-0.5 truncate', activeBargeId === barge.id ? 'text-white/80' : 'text-gray-400 font-medium']">
-                                Tàu: {{ barge.vesselName }}
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-0.5 onClickPrevent" @click.stop>
-                            <button @click="renameBarge(barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-primary'" title="Đổi tên">
-                                <span class="material-symbols-outlined text-xs">edit</span>
-                            </button>
-                            <button @click="deleteBarge(barge.vesselId, barge.id, barge.name)" class="size-5 rounded-full hover:bg-black/10 flex items-center justify-center transition-colors" :class="activeBargeId === barge.id ? 'text-white' : 'text-gray-400 hover:text-red-500'" title="Xóa sà lan">
-                                <span class="material-symbols-outlined text-xs">delete</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Add Flat Barge Button -->
-                <div class="p-3 border-t border-primary/5 bg-gray-50 text-center">
-                    <button 
-                        @click="openAddBargeDialog"
-                        class="w-full py-2 border border-primary hover:bg-primary hover:text-white text-primary font-bold rounded-[14px] text-xs flex items-center justify-center gap-1 transition-all shadow-sm"
-                    >
-                        <span class="material-symbols-outlined text-xs font-black">add</span>
-                        Thêm sà lan mới
-                    </button>
                 </div>
             </aside>
 
             <!-- Workspace (right) -->
             <main class="flex-1 h-full min-h-0 flex flex-col gap-4 p-0 overflow-hidden">
                 <!-- Chế độ 1: Quản lý danh sách xe -->
-                <div v-if="activeBargeId === 'vehicles'" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white rounded-[24px] soft-shadow border border-primary/5 p-0">
+                <div v-if="activeSubViewMode === 'vehicles'" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white rounded-[24px] soft-shadow border border-primary/5 p-0">
                     <VehicleManager />
                 </div>
 
-                <!-- Chế độ 2: Chưa chọn sà lan (Global Dashboard) -->
-                <div v-else-if="!activeBargeId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
-                    <!-- Welcome Header banner -->
-                    <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
-                        <div>
-                            <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Báo cáo cân hàng</div>
-                            <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
-                                Báo cáo tổng quan hệ thống
-                            </h1>
-                        </div>
-                    </div>
-
-                    <!-- Stats Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                            <div class="size-11 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-outlined text-xl">directions_boat</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số tàu</p>
-                                <h4 class="text-lg font-black text-[#4a2c32]">{{ vessels.length }} <span class="text-xs text-gray-400 font-bold">tàu</span></h4>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                            <div class="size-11 bg-teal-500/10 text-teal-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-outlined text-xl">layers</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số sà lan</p>
-                                <h4 class="text-lg font-black text-teal-600">{{ allBargesList.length }} <span class="text-xs text-gray-400 font-bold">sà lan</span></h4>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                            <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-outlined text-xl">cloud_done</span>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trạng thái dữ liệu</p>
-                                <h4 class="text-lg font-black text-amber-600">Sẵn sàng <span class="text-xs text-gray-400 font-bold">offline</span></h4>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- All Barges Table Card -->
-                    <div class="flex-1 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col min-h-0">
-                        <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
-                            <h3 class="text-sm font-black text-primary flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-base">analytics</span>
-                                Danh sách quản lý phân bổ sà lan
-                            </h3>
-                        </div>
-                        
-                        <!-- Filters Row -->
-                        <div v-if="filteredAllBarges.length > 0 || globalBargeSearchQuery" class="flex flex-col md:flex-row gap-3 mb-4 p-3 bg-gray-50 rounded-[16px] border border-primary/5">
-                            <div class="relative flex-1 flex items-center">
-                                <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">search</span>
-                                <input 
-                                    v-model="globalBargeSearchQuery"
-                                    type="text"
-                                    placeholder="Tìm kiếm nhanh tên sà lan hoặc tên tàu..."
-                                    class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all placeholder:text-gray-400"
-                                />
-                            </div>
-                            <div v-if="availableGlobalMonths.length > 0" class="relative min-w-[200px] flex items-center">
-                                <span class="material-symbols-outlined absolute left-3 text-gray-400 text-sm">calendar_month</span>
-                                <select 
-                                    v-model="globalFilterMonth" 
-                                    class="w-full pl-9 pr-8 py-1.5 bg-white border border-gray-200 rounded-[12px] text-xs font-bold focus:outline-none focus:border-primary cursor-pointer appearance-none"
-                                >
-                                    <option value="">Tất cả các tháng (Thời gian)</option>
-                                    <option v-for="month in availableGlobalMonths" :key="month" :value="month">
-                                        Tháng {{ month }}
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div v-if="loadingGlobalSummary" class="text-center py-10 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
-                            <span class="material-symbols-outlined text-2xl animate-spin text-primary">sync</span>
-                            Đang tính toán dữ liệu sà lan...
-                        </div>
-                        <div v-else-if="filteredAllBarges.length === 0" class="text-center py-10 text-gray-400 text-xs italic">
-                            Chưa có sà lan nào được tạo hoặc không tìm thấy kết quả.
-                        </div>
-                        <div v-else class="flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border border-gray-100">
-                            <table class="w-full text-left border-collapse text-xs font-semibold">
-                                <thead>
-                                    <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
-                                        <th class="p-3 w-12 text-center bg-gray-50">STT</th>
-                                        <th class="p-3 bg-gray-50">Tên sà lan</th>
-                                        <th class="p-3 bg-gray-50">Thuộc Tàu</th>
-                                        <th class="p-3 text-right bg-gray-50">Số chuyến xe đã phân bổ</th>
-                                        <th class="p-3 text-right bg-gray-50">Khối lượng phân bổ (Net - kg)</th>
-                                        <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
-                                    <tr v-for="(b, idx) in filteredAllBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
-                                        <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
-                                        <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
-                                        <td class="p-3">
-                                            <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black">
-                                                {{ b.vesselName }}
-                                            </span>
-                                        </td>
-                                        <td class="p-3 text-right font-mono font-bold">{{ b.tripCount }} chuyến</td>
-                                        <td class="p-3 text-right font-mono font-bold text-teal-600">{{ formatNumber(b.totalWeight) }} kg</td>
-                                        <td class="p-3 text-center">
-                                            <button 
-                                                @click="selectBarge(b.vesselId, b.id)" 
-                                                class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
-                                            >
-                                                Mở phân bổ
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chế độ 3: Đang chọn sà lan (Barge Detail Workspace) -->
+                <!-- Chế độ 2: Giao diện Phân bổ tải trọng xếp hàng (Chạy toàn cục) -->
                 <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 min-h-0 overflow-y-auto pr-1">
-                    <!-- Breadcrumbs Header -->
-                    <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-3 px-4 soft-shadow border border-primary/5 gap-3">
-                        <div>
-                            <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Phân bổ tải trọng</div>
-                            <h1 class="text-sm font-black text-[#4a2c32] flex items-center gap-1.5">
-                                <span @click="activeVesselId = null; activeBargeId = null" class="text-gray-400 hover:text-primary cursor-pointer transition-colors flex items-center gap-0.5"><span class="material-symbols-outlined text-base">home</span>Tổng quan</span>
-                                <span class="text-gray-300">&rsaquo;</span>
-                                Sà lan: <span class="px-2 py-0.5 bg-teal-500/10 text-teal-600 rounded-full text-[10px] font-black">{{ activeBarge?.name }}</span>
-                                <span class="text-gray-300">|</span>
-                                <span class="text-[10px] text-gray-400 font-medium">Tàu chủ quản: {{ activeBarge?.vesselName }}</span>
-                            </h1>
-                        </div>
-                    </div>
 
                     <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
         <!-- Header Banner -->
