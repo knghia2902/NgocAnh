@@ -1275,7 +1275,28 @@ const activeVessel = computed(() => {
 const loadVessels = async () => {
     loading.value = true;
     try {
-        const data = await dbContext.get<Vessel[]>('allocator_vessels') || [];
+        let data = await dbContext.get<Vessel[]>('allocator_vessels') || [];
+        
+        // Nếu cơ sở dữ liệu trống, tự động tạo tàu và sà lan mặc định
+        if (data.length === 0) {
+            const defaultVesselId = Date.now();
+            const defaultBargeId = defaultVesselId + 1;
+            const defaultVessel: Vessel = {
+                id: defaultVesselId,
+                name: 'Tàu mặc định',
+                barges: [
+                    {
+                        id: defaultBargeId,
+                        name: 'Sà lan mặc định',
+                        vesselId: defaultVesselId,
+                        config: { locked: false, orderNo: '' }
+                    }
+                ]
+            };
+            data = [defaultVessel];
+            await dbContext.set('allocator_vessels', data);
+        }
+        
         vessels.value = data;
         
         // Expand all vessels by default
@@ -1285,9 +1306,29 @@ const loadVessels = async () => {
             }
         });
         
+        // Tự động chọn sà lan đầu tiên nếu chưa chọn sà lan nào và không ở tab quản lý danh sách xe
+        if (!activeBargeId.value) {
+            let firstBargeId: number | null = null;
+            let firstVesselId: number | null = null;
+            for (const v of data) {
+                if (v.barges && v.barges.length > 0) {
+                    const firstB = v.barges[0];
+                    if (firstB) {
+                        firstBargeId = firstB.id;
+                        firstVesselId = v.id;
+                        break;
+                    }
+                }
+            }
+            if (firstBargeId && firstVesselId) {
+                activeBargeId.value = firstBargeId;
+                activeVesselId.value = firstVesselId;
+            }
+        }
+        
         await refreshGlobalBargesSummary();
     } catch (e) {
-        addToast('Không thể tải danh sách tàu!', 'error');
+        addToast('Không thể tải danh sách sà lan!', 'error');
     } finally {
         loading.value = false;
     }
