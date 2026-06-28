@@ -169,17 +169,28 @@ const handleSidebarSwitch = (id: string) => {
     </div>
 
     <!-- Fullscreen Workspace Overlay for all tools -->
-    <div v-if="activeToolId && activeToolMetadata" class="fixed inset-0 bg-cute-gradient z-[100] flex flex-col overflow-hidden no-print animate-fade-in font-display">
+    <div 
+      v-if="activeToolId && activeToolMetadata" 
+      :class="[
+        activeToolId === 'weighbridge' 
+          ? 'fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden no-print font-display' 
+          : 'fixed inset-0 bg-cute-gradient z-[100] flex flex-col overflow-hidden no-print animate-fade-in font-display'
+      ]"
+    >
       
       <!-- Workspace Header bar -->
       <header class="bg-white px-6 py-2.5 border-b border-primary/10 flex items-center justify-between shadow-sm shrink-0">
         <div class="flex items-center gap-2.5">
-          <div :class="['size-9 rounded-full flex items-center justify-center text-white shadow-soft', activeToolMetadata.bgIcon.split(' ')[0] || 'bg-primary']">
-            <span class="material-symbols-outlined text-lg">{{ activeToolMetadata.icon }}</span>
+          <div :class="['size-9 rounded-full flex items-center justify-center text-white shadow-soft', activeToolId === 'weighbridge' ? 'bg-primary' : (activeToolMetadata.bgIcon.split(' ')[0] || 'bg-primary')]">
+            <span class="material-symbols-outlined text-lg">{{ activeToolId === 'weighbridge' ? 'print' : activeToolMetadata.icon }}</span>
           </div>
           <div>
-            <h2 class="text-sm font-black text-primary leading-tight">{{ activeToolMetadata.name }}</h2>
-            <p class="text-[10px] font-medium text-[#1b0d11]/60 leading-none">Công cụ tiện ích - Xử lý offline an toàn</p>
+            <h2 class="text-sm font-black text-primary leading-tight">
+              {{ activeToolId === 'weighbridge' ? 'PHẦN MỀM IN PHIẾU CÂN XE' : activeToolMetadata.name }}
+            </h2>
+            <p class="text-[10px] font-medium text-[#1b0d11]/60 leading-none">
+              {{ activeToolId === 'weighbridge' ? 'Cảng Nguyên Ngọc - Đồng bộ đám mây' : 'Công cụ tiện ích - Xử lý offline an toàn' }}
+            </p>
           </div>
         </div>
 
@@ -213,7 +224,7 @@ const handleSidebarSwitch = (id: string) => {
           class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-full text-xs flex items-center gap-1 transition-all"
         >
           <span class="material-symbols-outlined text-sm">close</span>
-          Đóng công cụ
+          Đóng
         </button>
       </header>
 
@@ -253,8 +264,20 @@ const handleSidebarSwitch = (id: string) => {
         </aside>
 
         <!-- Main Content Area -->
-        <main class="flex-1 overflow-y-auto p-6 bg-cute-gradient flex flex-col items-center">
-          <div class="w-full max-w-[1200px] h-full flex flex-col">
+        <main 
+          :class="[
+            activeToolId === 'weighbridge' 
+              ? 'flex-1 overflow-hidden flex flex-col bg-white' 
+              : 'flex-1 overflow-y-auto p-6 bg-cute-gradient flex flex-col items-center'
+          ]"
+        >
+          <div 
+            :class="[
+              activeToolId === 'weighbridge' 
+                ? 'w-full h-full flex flex-col overflow-hidden' 
+                : 'w-full max-w-[1200px] h-full flex flex-col'
+            ]"
+          >
             <FormatConverter v-if="activeToolId === 'converter'" />
             <ExcelMerger v-else-if="activeToolId === 'merger'" />
             <PdfOcrTools v-else-if="activeToolId === 'ocr'" />
