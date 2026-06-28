@@ -409,7 +409,7 @@ const handleExportExcel = async () => {
 </script>
 
 <template>
-    <div class="w-full flex flex-col gap-6 bg-[#FAF9F5] rounded-3xl p-6 border border-emerald-500/10 shadow-soft">
+    <div class="w-full flex flex-col gap-6 bg-white rounded-3xl p-6 border border-primary/5 shadow-soft">
         
         <!-- Header Section -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -445,7 +445,7 @@ const handleExportExcel = async () => {
                 
                 <button 
                     @click="triggerImport"
-                    class="px-3.5 py-2 bg-white border border-emerald-500/20 text-emerald-600 hover:bg-emerald-50 text-[11px] font-black rounded-[14px] flex items-center gap-1.5 transition-all shadow-sm"
+                    class="px-3.5 py-2 bg-white border border-primary/20 text-primary hover:bg-primary/5 text-[11px] font-black rounded-[14px] flex items-center gap-1.5 transition-all shadow-sm"
                 >
                     <span class="material-symbols-outlined text-sm font-bold">upload_file</span>
                     Nhập Excel
@@ -453,7 +453,7 @@ const handleExportExcel = async () => {
                 
                 <button 
                     @click="handleExportExcel"
-                    class="px-3.5 py-2 bg-white border border-emerald-500/20 text-emerald-600 hover:bg-emerald-50 text-[11px] font-black rounded-[14px] flex items-center gap-1.5 transition-all shadow-sm"
+                    class="px-3.5 py-2 bg-white border border-primary/20 text-primary hover:bg-primary/5 text-[11px] font-black rounded-[14px] flex items-center gap-1.5 transition-all shadow-sm"
                 >
                     <span class="material-symbols-outlined text-sm font-bold">download</span>
                     Xuất Excel
@@ -556,7 +556,7 @@ const handleExportExcel = async () => {
                                     <td class="px-4 py-3 text-center text-gray-400 font-mono font-bold">{{ index + 1 }}</td>
                                     <td class="px-4 py-3 text-primary font-mono font-black select-all">{{ v.plateNumber }}</td>
                                     <td class="px-4 py-3 font-mono select-all">
-                                        <span v-if="v.moocNumber" class="text-teal-600 font-bold">{{ v.moocNumber }}</span>
+                                        <span v-if="v.moocNumber" class="text-primary font-bold">{{ v.moocNumber }}</span>
                                         <span v-else class="text-gray-400 italic font-normal text-[11px]">Chưa cấu hình</span>
                                     </td>
                                     <td class="px-4 py-3 text-center">
