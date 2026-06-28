@@ -163,6 +163,18 @@ function showConfirm(options: Omit<ConfirmDialogState, 'show'>) {
     });
 }
 
+function handleConfirmOk() {
+    if (confirmDialog.value.onOk) {
+        confirmDialog.value.onOk();
+    }
+}
+
+function handleConfirmCancel() {
+    if (confirmDialog.value.onCancel) {
+        confirmDialog.value.onCancel();
+    }
+}
+
 // Excel Upload pending data
 interface ExcelColumn {
     index: number;
@@ -4297,7 +4309,7 @@ onUnmounted(() => {
         <div 
             v-if="confirmDialog.show" 
             class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4"
-            @click.self="confirmDialog.onCancel"
+            @click.self="handleConfirmCancel"
         >
             <div 
                 class="w-full max-w-[480px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100"
@@ -4335,13 +4347,13 @@ onUnmounted(() => {
                 <!-- Footer Buttons -->
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
                     <button 
-                        @click="confirmDialog.onCancel"
+                        @click="handleConfirmCancel"
                         class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
                     >
                         {{ confirmDialog.cancelText }}
                     </button>
                     <button 
-                        @click="confirmDialog.onOk"
+                        @click="handleConfirmOk"
                         class="h-9 px-4 rounded-[12px] text-xs font-bold text-white active:scale-95 transition-all"
                         :class="[
                             confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
