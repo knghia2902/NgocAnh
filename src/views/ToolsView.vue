@@ -266,14 +266,14 @@ const handleSidebarSwitch = (id: string) => {
         <!-- Main Content Area -->
         <main 
           :class="[
-            activeToolId === 'weighbridge' 
+            activeToolId === 'weighbridge' && activeTab === 'printer'
               ? 'flex-1 overflow-hidden flex flex-col bg-white' 
               : 'flex-1 overflow-y-auto p-6 bg-cute-gradient flex flex-col items-center'
           ]"
         >
           <div 
             :class="[
-              activeToolId === 'weighbridge' 
+              activeToolId === 'weighbridge' && activeTab === 'printer'
                 ? 'w-full h-full flex flex-col overflow-hidden' 
                 : 'w-full max-w-[1200px] h-full flex flex-col'
             ]"
