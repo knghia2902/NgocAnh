@@ -1777,14 +1777,43 @@ onMounted(async () => {
 
         isInitLoading.value = true;
         try {
-            const savedTickets = await dbContext.get<CSVRecord[]>('allocator_tickets');
-            csvRecords.value = savedTickets || [];
+            let savedTickets = await dbContext.get<CSVRecord[]>('allocator_tickets') || [];
+            let savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips') || [];
+            let savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips') || [];
 
-            const savedHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips');
-            existingTrips.value = savedHistory || [];
+            // Tự động di cư dữ liệu từ sà lan cũ nếu toàn cục trống rỗng
+            if (savedTickets.length === 0 && savedHistory.length === 0 && savedGenerated.length === 0) {
+                const vesselsData = await dbContext.get<any[]>('allocator_vessels') || [];
+                let migrated = false;
+                for (const v of vesselsData) {
+                    if (v.barges) {
+                        for (const b of v.barges) {
+                            const bTickets = await dbContext.get<CSVRecord[]>('allocator_tickets_' + b.id);
+                            if (bTickets && bTickets.length > 0) {
+                                const bHistory = await dbContext.get<SplitTrip[]>('allocator_history_trips_' + b.id) || [];
+                                const bGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips_' + b.id) || [];
 
-            const savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips');
-            generatedTrips.value = savedGenerated || [];
+                                savedTickets = bTickets;
+                                savedHistory = bHistory;
+                                savedGenerated = bGenerated;
+
+                                // Lưu đè vào key toàn cục
+                                await dbContext.set('allocator_tickets', savedTickets);
+                                await dbContext.set('allocator_history_trips', savedHistory);
+                                await dbContext.set('allocator_generated_trips', savedGenerated);
+
+                                migrated = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (migrated) break;
+                }
+            }
+
+            csvRecords.value = savedTickets;
+            existingTrips.value = savedHistory;
+            generatedTrips.value = savedGenerated;
         } finally {
             isInitLoading.value = false;
         }
