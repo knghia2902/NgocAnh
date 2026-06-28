@@ -527,6 +527,7 @@ async function handleTicketImport(event: Event) {
             const newRecords = parseCSVText(text, importOrderNo.value);
             const { added, updated, skipped } = mergeTickets(newRecords);
             addToast(`Import CSV: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
+            await saveTicketsToSupabase();
         } catch (error) {
             console.error(error);
             addToast('Lỗi khi đọc file CSV!', 'error');
@@ -651,6 +652,7 @@ async function handleTicketExcelUpload(file: File, manualOrderNo: string = '') {
         
         const { added, updated, skipped } = mergeTickets(newRecords);
         addToast(`Import Excel: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
+        await saveTicketsToSupabase();
         
     } catch (e) {
         console.error(e);
@@ -922,7 +924,8 @@ async function saveTicketsToSupabase() {
         const updatedSettings = {
             ...currentSettings,
             allocator_tickets: csvRecords.value,
-            allocator_history_trips: existingTrips.value
+            allocator_history_trips: existingTrips.value,
+            allocator_generated_trips: generatedTrips.value
         };
 
         const { error: updateError } = await supabase

@@ -1817,39 +1817,15 @@ const deleteBarge = async (_vesselId: number, id: number, name: string) => {
 };
 
 // Smart name normalization and matching for allocator sync
-function normalizeBargeName(name: string): string {
-    if (!name) return '';
-    return name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // remove Vietnamese accents
-        .replace(/đ/g, 'd')
-        .replace(/[^a-z0-9]/g, ''); // keep only alphanumeric
-}
 
 function isBargeMatch(trip: any, barge: Barge): boolean {
-    // 1. If barge has a configured orderNo, match strictly by orderNo
+    // Match strictly by orderNo. If barge has no orderNo, return false
     const bargeOrderNo = barge.config?.orderNo ? String(barge.config.orderNo).trim().toLowerCase() : '';
     const tripOrderNo = trip.orderNo ? String(trip.orderNo).trim().toLowerCase() : '';
     
     if (bargeOrderNo) {
         return bargeOrderNo === tripOrderNo;
     }
-    
-    // 2. Otherwise, fall back to matching by barge name
-    const nameA = trip.bargeName || '';
-    const nameB = barge.name || '';
-    
-    const normA = normalizeBargeName(nameA);
-    const normB = normalizeBargeName(nameB);
-    if (!normA || !normB) return false;
-    if (normA === normB) return true;
-    if (normA.includes(normB) || normB.includes(normA)) return true;
-    
-    // Check if numbers match (e.g. SL 09 and Sà lan 09)
-    const numA = normA.replace(/[^0-9]/g, '');
-    const numB = normB.replace(/[^0-9]/g, '');
-    if (numA && numB && numA === numB) return true;
     
     return false;
 }
@@ -1865,6 +1841,12 @@ const syncFromAllocatorActiveBarge = async () => {
         showToast('Sà lan đang bị khóa! Không thể nhập dữ liệu.', 'error');
         return;
     }
+    
+    const bargeOrderNo = activeBarge.value.config?.orderNo ? String(activeBarge.value.config.orderNo).trim() : '';
+    if (!bargeOrderNo) {
+        showToast(`Cảnh báo: Sà lan "${activeBarge.value.name}" chưa được cấu hình Mã lệnh!`, 'error');
+        return;
+    }
 
     loading.value = true;
     try {
@@ -1876,18 +1858,18 @@ const syncFromAllocatorActiveBarge = async () => {
 
         if (fetchError) throw fetchError;
 
-        const historyTrips = data?.settings?.allocator_history_trips || [];
-        if (!Array.isArray(historyTrips) || historyTrips.length === 0) {
-            showToast('Không tìm thấy chuyến xe nào trong Sổ Theo Dõi. Hãy thực hiện phân rã và Lưu vào Sổ Theo Dõi trước!', 'error');
+        const allocatorTrips = data?.settings?.allocator_generated_trips || [];
+        if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) {
+            showToast('Không tìm thấy chuyến xe nào trong Báo cáo phân bổ. Hãy thực hiện phân bổ tải trọng trước!', 'error');
             return;
         }
 
         const activeBargeName = activeBarge.value.name;
-        // Filter trips for this active barge (matches by orderNo or name)
-        const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t, activeBarge.value!));
+        // Filter trips for this active barge (matches strictly by orderNo)
+        const matchedTrips = allocatorTrips.filter((t: any) => isBargeMatch(t, activeBarge.value!));
 
         if (matchedTrips.length === 0) {
-            showToast(`Không tìm thấy chuyến xe nào được phân bổ cho sà lan "${activeBargeName}" trong Sổ Theo Dõi!`, 'error');
+            showToast(`Không tìm thấy chuyến xe nào được phân bổ cho sà lan "${activeBargeName}" với mã lệnh "${bargeOrderNo}" trong Báo cáo phân bổ!`, 'error');
             return;
         }
 
@@ -1999,9 +1981,9 @@ const syncFromAllocatorAllBarges = async () => {
 
         if (fetchError) throw fetchError;
 
-        const historyTrips = data?.settings?.allocator_history_trips || [];
-        if (!Array.isArray(historyTrips) || historyTrips.length === 0) {
-            showToast('Không tìm thấy chuyến xe nào trong Sổ Theo Dõi. Hãy thực hiện phân rã và Lưu vào Sổ Theo Dõi trước!', 'error');
+        const allocatorTrips = data?.settings?.allocator_generated_trips || [];
+        if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) {
+            showToast('Không tìm thấy chuyến xe nào trong Báo cáo phân bổ. Hãy thực hiện phân bổ tải trọng trước!', 'error');
             return;
         }
 
@@ -2014,8 +1996,15 @@ const syncFromAllocatorAllBarges = async () => {
                 details.push(`Sà lan "${barge.name}" đang bị khóa -> Bỏ qua`);
                 continue;
             }
+            
+            const bargeOrderNo = barge.config?.orderNo ? String(barge.config.orderNo).trim() : '';
+            if (!bargeOrderNo) {
+                details.push(`Sà lan "${barge.name}" chưa được cấu hình Mã lệnh -> Bỏ qua và cảnh báo`);
+                showToast(`Cảnh báo: Sà lan "${barge.name}" chưa được cấu hình Mã lệnh!`, 'error');
+                continue;
+            }
 
-            const matchedTrips = historyTrips.filter((t: any) => isBargeMatch(t, barge));
+            const matchedTrips = allocatorTrips.filter((t: any) => isBargeMatch(t, barge));
             if (matchedTrips.length === 0) {
                 continue;
             }
