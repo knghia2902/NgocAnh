@@ -267,7 +267,7 @@ const handleSidebarSwitch = (id: string) => {
         <main 
           :class="[
             activeToolId === 'weighbridge' && activeTab === 'printer'
-              ? 'flex-1 overflow-hidden flex flex-col bg-white' 
+              ? 'flex-1 overflow-hidden flex flex-col bg-cute-gradient' 
               : 'flex-1 overflow-y-auto p-6 bg-cute-gradient flex flex-col items-center'
           ]"
         >
