@@ -3685,18 +3685,37 @@ onUnmounted(() => {
 
                             <!-- Visual Template Designer Section (Full width) -->
                             <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5">
-                                <h3 class="text-sm font-black text-primary mb-4 flex items-center justify-between border-b border-gray-100 pb-2">
+                                <h3 class="text-sm font-black text-primary mb-4 flex items-center justify-between border-b border-gray-100 pb-2 flex-wrap gap-2">
                                     <div class="flex items-center gap-1.5 select-none">
                                         <span class="material-symbols-outlined text-base">design_services</span>
                                         Thiết kế tự do &amp; Kéo thả mẫu phiếu cân A5
                                     </div>
-                                    <button 
-                                        @click="resetToDefaultLayout" 
-                                        :disabled="cfgForm.locked"
-                                        class="px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold rounded-lg border border-red-100 transition-all select-none"
-                                    >
-                                        Khôi phục mẫu chuẩn
-                                    </button>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <button 
+                                            @click="saveAsGlobalDefaultLayout"
+                                            title="Lưu mẫu thiết kế hiện tại làm mẫu mặc định cho các sà lan khác"
+                                            class="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 select-none"
+                                        >
+                                            <span class="material-symbols-outlined text-xs">star</span>
+                                            Đặt làm mẫu mặc định
+                                        </button>
+                                        <button 
+                                            @click="applyLayoutToAllBarges"
+                                            :disabled="cfgForm.locked"
+                                            title="Áp dụng thiết kế hiện tại cho tất cả sà lan trên toàn hệ thống"
+                                            class="px-3 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 select-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span class="material-symbols-outlined text-xs">done_all</span>
+                                            Áp dụng cho TẤT CẢ sà lan
+                                        </button>
+                                        <button 
+                                            @click="resetToDefaultLayout" 
+                                            :disabled="cfgForm.locked"
+                                            class="px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold rounded-lg border border-red-100 transition-all select-none"
+                                        >
+                                            Khôi phục mẫu chuẩn
+                                        </button>
+                                    </div>
                                 </h3>
                                 
                                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -4099,25 +4118,6 @@ onUnmounted(() => {
                             </div>
                             
                             <div class="flex flex-col gap-2 pt-2 border-t border-primary/5 mt-2">
-                                <div class="flex flex-wrap gap-2 justify-end">
-                                    <button 
-                                        @click="saveAsGlobalDefaultLayout"
-                                        title="Lưu mẫu thiết kế hiện tại làm mẫu mặc định cho các sà lan khác"
-                                        class="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-[10px] rounded-[8px] transition-all flex items-center gap-1"
-                                    >
-                                        <span class="material-symbols-outlined text-xs">star</span>
-                                        Đặt làm mẫu mặc định
-                                    </button>
-                                    <button 
-                                        @click="applyLayoutToAllBarges"
-                                        :disabled="cfgForm.locked"
-                                        title="Áp dụng thiết kế hiện tại cho tất cả sà lan trên toàn hệ thống"
-                                        class="px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] rounded-[8px] transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <span class="material-symbols-outlined text-xs">done_all</span>
-                                        Áp dụng cho TẤT CẢ sà lan
-                                    </button>
-                                </div>
                                 
                                 <div class="flex justify-end mt-1">
                                     <button 
