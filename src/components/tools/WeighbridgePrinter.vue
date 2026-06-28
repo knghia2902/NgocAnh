@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{
 
 // Fullscreen state
 const isOpen = ref(false);
-const activeTab = ref<'data' | 'config'>('data');
+const activeTab = ref<'data' | 'config' | 'goods'>('data');
 
 watch(() => authStore.role, (newRole) => {
     if (newRole !== 'admin') {
@@ -3371,6 +3371,13 @@ onUnmounted(() => {
                                 <span class="material-symbols-outlined text-sm">settings</span>
                                 Cấu hình mẫu phiếu
                             </button>
+                            <button 
+                                @click="activeTab = 'goods'"
+                                :class="['px-4 py-1.5 rounded-[12px] font-bold text-xs transition-all flex items-center gap-1', activeTab === 'goods' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
+                            >
+                                <span class="material-symbols-outlined text-sm">inventory_2</span>
+                                Danh sách hàng hóa
+                            </button>
 
                         </div>
 
@@ -3636,53 +3643,13 @@ onUnmounted(() => {
                                                     v-model="cfgForm.goods" 
                                                     :disabled="cfgForm.locked" 
                                                     type="text" 
-                                                    placeholder="Thêm danh sách hàng hóa bên dưới..." 
+                                                    placeholder="Thêm danh sách ở tab Hàng hóa..." 
                                                     class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                             </div>
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Mã hàng hóa</label>
                                                 <input v-model="cfgForm.goodsCode" :disabled="cfgForm.locked" type="text" placeholder="Mã hàng..." class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                                            </div>
-
-                                            <!-- Goods List Manager -->
-                                            <div class="flex flex-col gap-1.5 md:col-span-2">
-                                                <label class="text-[10px] font-bold text-gray-500">Danh sách hàng hóa</label>
-                                                <div class="flex gap-1.5">
-                                                    <input 
-                                                        v-model="newGoodsItem" 
-                                                        :disabled="cfgForm.locked" 
-                                                        type="text" 
-                                                        placeholder="Nhập tên hàng hóa mới..." 
-                                                        class="flex-1 px-3 py-1.5 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        @keyup.enter="() => { if (newGoodsItem.trim() && !cfgForm.locked) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
-                                                    >
-                                                    <button 
-                                                        :disabled="cfgForm.locked || !newGoodsItem.trim()"
-                                                        @click="() => { if (newGoodsItem.trim()) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
-                                                        class="px-3 py-1.5 bg-primary text-white rounded-[8px] text-[10px] font-bold hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                                                    >
-                                                        <span class="material-symbols-outlined text-xs">add</span>
-                                                        Thêm
-                                                    </button>
-                                                </div>
-                                                <div v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0" class="flex flex-wrap gap-1.5 mt-1">
-                                                    <span 
-                                                        v-for="(item, idx) in cfgForm.goodsList" 
-                                                        :key="idx" 
-                                                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/5 border border-primary/10 rounded-lg text-[10px] font-bold text-[#4a2c32] group"
-                                                    >
-                                                        {{ item }}
-                                                        <button 
-                                                            v-if="!cfgForm.locked"
-                                                            @click="cfgForm.goodsList!.splice(idx, 1)"
-                                                            class="size-4 rounded-full bg-red-100 text-red-500 hover:bg-red-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <span class="material-symbols-outlined text-[10px]">close</span>
-                                                        </button>
-                                                    </span>
-                                                </div>
-                                                <p v-else class="text-[10px] text-gray-400 italic">Chưa có hàng hóa nào. Thêm tên hàng hóa ở trên.</p>
                                             </div>
                                             <div class="flex flex-col gap-1 md:col-span-2">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên chủ hàng (mặc định)</label>
@@ -4184,6 +4151,85 @@ onUnmounted(() => {
                                 </div>
                             </div>
 
+                        </div>
+
+                        <!-- TAB 3: GOODS LIST -->
+                        <div v-if="activeTab === 'goods'" class="flex flex-col gap-4 animate-fade-in">
+                            <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5">
+                                <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                                    <span class="material-symbols-outlined text-base">inventory_2</span>
+                                    Quản lý danh sách hàng hóa
+                                </h3>
+                                <p class="text-xs text-gray-500 mb-4">Thêm các tên hàng hóa vào danh sách. Khi in phiếu cân, bạn sẽ chọn tên hàng hóa từ dropdown thay vì nhập tay.</p>
+
+                                <!-- Add new item -->
+                                <div class="flex gap-2 mb-4">
+                                    <input 
+                                        v-model="newGoodsItem" 
+                                        type="text" 
+                                        placeholder="Nhập tên hàng hóa mới..." 
+                                        class="flex-1 px-4 py-2.5 rounded-[12px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold"
+                                        @keyup.enter="() => { if (newGoodsItem.trim()) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
+                                    >
+                                    <button 
+                                        :disabled="!newGoodsItem.trim()"
+                                        @click="() => { if (newGoodsItem.trim()) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
+                                        class="px-5 py-2.5 bg-primary text-white rounded-[12px] text-xs font-bold hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                    >
+                                        <span class="material-symbols-outlined text-sm">add</span>
+                                        Thêm hàng hóa
+                                    </button>
+                                </div>
+
+                                <!-- Goods list table -->
+                                <div v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0" class="border border-gray-100 rounded-[12px] overflow-hidden">
+                                    <table class="w-full">
+                                        <thead>
+                                            <tr class="bg-primary/5">
+                                                <th class="text-left px-4 py-2.5 text-[10px] font-black text-[#4a2c32] uppercase tracking-wider w-12">STT</th>
+                                                <th class="text-left px-4 py-2.5 text-[10px] font-black text-[#4a2c32] uppercase tracking-wider">Tên hàng hóa</th>
+                                                <th class="text-center px-4 py-2.5 text-[10px] font-black text-[#4a2c32] uppercase tracking-wider w-20">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(item, idx) in cfgForm.goodsList" :key="idx" class="border-t border-gray-50 hover:bg-primary/[0.02] transition-colors">
+                                                <td class="px-4 py-2.5 text-xs font-bold text-gray-400">{{ idx + 1 }}</td>
+                                                <td class="px-4 py-2.5 text-xs font-semibold text-[#4a2c32]">
+                                                    {{ item }}
+                                                    <span v-if="cfgForm.goods === item" class="ml-1.5 px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-bold rounded-md">Đang chọn</span>
+                                                </td>
+                                                <td class="px-4 py-2.5 text-center">
+                                                    <button 
+                                                        @click="cfgForm.goodsList!.splice(idx, 1)"
+                                                        class="size-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-all mx-auto active:scale-90"
+                                                        title="Xóa hàng hóa này"
+                                                    >
+                                                        <span class="material-symbols-outlined text-sm">delete</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div v-else class="text-center py-10">
+                                    <span class="material-symbols-outlined text-4xl text-gray-200 mb-2">inventory_2</span>
+                                    <p class="text-xs text-gray-400 font-semibold">Chưa có hàng hóa nào trong danh sách</p>
+                                    <p class="text-[10px] text-gray-300 mt-1">Thêm hàng hóa bằng ô nhập phía trên</p>
+                                </div>
+
+                                <!-- Summary -->
+                                <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                                    <span class="text-[10px] font-bold text-gray-400">Tổng: {{ cfgForm.goodsList?.length || 0 }} hàng hóa</span>
+                                    <button 
+                                        v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0"
+                                        @click="() => { cfgForm.goodsList = []; cfgForm.goods = ''; }"
+                                        class="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold rounded-lg border border-red-100 transition-all flex items-center gap-1"
+                                    >
+                                        <span class="material-symbols-outlined text-xs">delete_sweep</span>
+                                        Xóa tất cả
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </main>
