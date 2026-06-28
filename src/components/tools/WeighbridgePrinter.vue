@@ -4298,6 +4298,7 @@ onUnmounted(() => {
     </teleport>
 
     <!-- Premium Custom Confirm Modal -->
+    <Teleport to="body">
     <Transition
         enter-active-class="transition duration-200 ease-out"
         enter-from-class="opacity-0"
@@ -4368,6 +4369,7 @@ onUnmounted(() => {
             </div>
         </div>
     </Transition>
+    </Teleport>
 </div>
 </template>
 
