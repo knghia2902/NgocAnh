@@ -6,9 +6,36 @@ import { excelService } from '@/services/excel/ExcelService';
 import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig, type PrintElement } from '@/services/excel/WeighbridgeService';
 const props = withDefaults(defineProps<{
     hideCard?: boolean;
+    activeVesselId?: number | null;
+    activeBargeId?: number | null;
+    vesselsList?: Vessel[];
+    hideSidebar?: boolean;
 }>(), {
-    hideCard: false
+    hideCard: false,
+    activeVesselId: null,
+    activeBargeId: null,
+    vesselsList: () => [],
+    hideSidebar: false
 });
+
+const emit = defineEmits<{
+    (e: 'select-barge', vesselId: number, bargeId: number): void;
+    (e: 'update-vessels'): void;
+}>();
+
+watch(() => props.activeVesselId, (newVal) => {
+    activeVesselId.value = newVal;
+}, { immediate: true });
+
+watch(() => props.activeBargeId, (newVal) => {
+    activeBargeId.value = newVal;
+}, { immediate: true });
+
+watch(() => props.vesselsList, (newVal) => {
+    if (newVal && newVal.length > 0) {
+        vessels.value = newVal;
+    }
+}, { immediate: true, deep: true });
 
 // Fullscreen state
 const isOpen = ref(false);
@@ -596,6 +623,7 @@ const loadVessels = async () => {
 const selectBarge = async (vesselId: number, bargeId: number) => {
     activeVesselId.value = vesselId;
     activeBargeId.value = bargeId;
+    emit('select-barge', vesselId, bargeId);
     
     // Reset filters and sorting when switching barges
     searchQuery.value = '';
@@ -2915,7 +2943,7 @@ onUnmounted(() => {
             <!-- Main area -->
             <div class="flex-1 flex overflow-hidden">
                 <!-- Sidebar (left): Vessels -> Barges tree -->
-                <aside class="w-72 bg-white border-r border-primary/10 flex flex-col shrink-0">
+                <aside v-if="!hideSidebar" class="w-72 bg-white border-r border-primary/10 flex flex-col shrink-0">
                     <div class="p-3 border-b border-primary/5 flex items-center justify-between">
                         <span 
                             @click="activeVesselId = null; activeBargeId = null" 
