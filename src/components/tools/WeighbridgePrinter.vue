@@ -2788,7 +2788,7 @@ const formatDateTimeStr = (isoString: string): string => {
 };
 
 const formatNumber = (num: number): string => {
-    return Number(num).toLocaleString('vi-VN');
+    return Number(num).toLocaleString('en-US');
 };
 
 // Print Logic
