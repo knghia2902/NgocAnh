@@ -1828,14 +1828,12 @@ function normalizeBargeName(name: string): string {
 }
 
 function isBargeMatch(trip: any, barge: Barge): boolean {
-    // 1. If barge has a configured orderNo, try to match by orderNo first
+    // 1. If barge has a configured orderNo, match strictly by orderNo
     const bargeOrderNo = barge.config?.orderNo ? String(barge.config.orderNo).trim().toLowerCase() : '';
     const tripOrderNo = trip.orderNo ? String(trip.orderNo).trim().toLowerCase() : '';
     
-    if (bargeOrderNo && tripOrderNo) {
-        if (bargeOrderNo === tripOrderNo || tripOrderNo.includes(bargeOrderNo) || bargeOrderNo.includes(tripOrderNo)) {
-            return true;
-        }
+    if (bargeOrderNo) {
+        return bargeOrderNo === tripOrderNo;
     }
     
     // 2. Otherwise, fall back to matching by barge name

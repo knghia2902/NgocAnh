@@ -1430,7 +1430,7 @@ async function exportSourceTickets() {
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet('Phiếu cân');
         
-        const headers = ['STT', 'Số phiếu', 'Biển số xe', 'Khách hàng', 'Cân lần 1', 'Cân lần 2', 'KL hàng (kg)', 'Loại hàng', 'Ngày vào', 'Giờ vào', 'Ngày ra', 'Giờ ra', 'Xuất/Nhập', 'Sà lan', 'Tài xế', 'Ghi chú'];
+        const headers = ['STT', 'Số phiếu', 'Mã lệnh', 'Biển số xe', 'Khách hàng', 'Cân lần 1', 'Cân lần 2', 'KL hàng (kg)', 'Loại hàng', 'Ngày vào', 'Giờ vào', 'Ngày ra', 'Giờ ra', 'Xuất/Nhập', 'Sà lan', 'Tài xế', 'Ghi chú'];
         const headerRow = sheet.getRow(1);
         headers.forEach((h, i) => { headerRow.getCell(i + 1).value = h; });
         headerRow.font = { name: 'Arial', size: 10, bold: true };
@@ -1440,20 +1440,21 @@ async function exportSourceTickets() {
             const row = sheet.getRow(idx + 2);
             row.getCell(1).value = idx + 1;
             row.getCell(2).value = r.ticketNo;
-            row.getCell(3).value = formatPlate(r.plateNumber);
-            row.getCell(4).value = r.customer;
-            row.getCell(5).value = r.weight1;
-            row.getCell(6).value = r.weight2;
-            row.getCell(7).value = r.weightNet;
-            row.getCell(8).value = r.cargoType;
-            row.getCell(9).value = r.dateInStr;
-            row.getCell(10).value = r.timeInStr;
-            row.getCell(11).value = r.dateOutStr;
-            row.getCell(12).value = r.timeOutStr;
-            row.getCell(13).value = r.direction;
-            row.getCell(14).value = r.bargeName;
-            row.getCell(15).value = r.driverName;
-            row.getCell(16).value = r.notes;
+            row.getCell(3).value = r.orderNo || '';
+            row.getCell(4).value = formatPlate(r.plateNumber);
+            row.getCell(5).value = r.customer;
+            row.getCell(6).value = r.weight1;
+            row.getCell(7).value = r.weight2;
+            row.getCell(8).value = r.weightNet;
+            row.getCell(9).value = r.cargoType;
+            row.getCell(10).value = r.dateInStr;
+            row.getCell(11).value = r.timeInStr;
+            row.getCell(12).value = r.dateOutStr;
+            row.getCell(13).value = r.timeOutStr;
+            row.getCell(14).value = r.direction;
+            row.getCell(15).value = r.bargeName;
+            row.getCell(16).value = r.driverName;
+            row.getCell(17).value = r.notes;
             row.font = { name: 'Arial', size: 10 };
         });
         
@@ -1497,9 +1498,10 @@ async function compileAndDownload() {
         dsSheet = workbook.addWorksheet('DS');
 
         if (activeDataTab.value === 'template') {
-            // Set 15 columns matching "Ánh phân bổ bằng tay.csv"
+            // Set 16 columns matching "Ánh phân bổ bằng tay.csv" plus orderNo
             dsSheet.columns = [
                 { header: 'So phieu', key: 'ticketNo', width: 18 },
+                { header: 'Ma lenh', key: 'orderNo', width: 15 },
                 { header: 'So xe', key: 'plateNumber', width: 15 },
                 { header: 'Khach hang', key: 'customer', width: 30 },
                 { header: 'KL can lan 1', key: 'weight1', width: 15 },
@@ -1518,25 +1520,26 @@ async function compileAndDownload() {
             
             const headerRow = dsSheet.getRow(1);
             headerRow.getCell(1).value = 'So phieu';
-            headerRow.getCell(2).value = 'So xe';
-            headerRow.getCell(3).value = 'Khach hang';
-            headerRow.getCell(4).value = 'KL can lan 1';
-            headerRow.getCell(5).value = 'KL can lan 2';
-            headerRow.getCell(6).value = 'KL hang';
-            headerRow.getCell(7).value = 'Ngay can lan 1';
-            headerRow.getCell(8).value = 'Gio can lan 1';
-            headerRow.getCell(9).value = '';
-            headerRow.getCell(10).value = 'Ngay can lan 2';
-            headerRow.getCell(11).value = 'Gio can lan 2';
-            headerRow.getCell(12).value = '';
-            headerRow.getCell(13).value = 'Xuat/Nhap';
-            headerRow.getCell(14).value = 'Loai Hang';
-            headerRow.getCell(15).value = 'Loai Salan';
+            headerRow.getCell(2).value = 'Ma lenh';
+            headerRow.getCell(3).value = 'So xe';
+            headerRow.getCell(4).value = 'Khach hang';
+            headerRow.getCell(5).value = 'KL can lan 1';
+            headerRow.getCell(6).value = 'KL can lan 2';
+            headerRow.getCell(7).value = 'KL hang';
+            headerRow.getCell(8).value = 'Ngay can lan 1';
+            headerRow.getCell(9).value = 'Gio can lan 1';
+            headerRow.getCell(10).value = '';
+            headerRow.getCell(11).value = 'Ngay can lan 2';
+            headerRow.getCell(12).value = 'Gio can lan 2';
+            headerRow.getCell(13).value = '';
+            headerRow.getCell(14).value = 'Xuat/Nhap';
+            headerRow.getCell(15).value = 'Loai Hang';
+            headerRow.getCell(16).value = 'Loai Salan';
             
             headerRow.font = { name: 'Arial', size: 10, bold: true };
             headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
             
-            for (let colIdx = 1; colIdx <= 15; colIdx++) {
+            for (let colIdx = 1; colIdx <= 16; colIdx++) {
                 const cell = headerRow.getCell(colIdx);
                 cell.fill = {
                     type: 'pattern',
@@ -1556,22 +1559,23 @@ async function compileAndDownload() {
             dataToExport.forEach(trip => {
                 const row = dsSheet.getRow(currentRowIdx);
                 row.getCell(1).value = trip.ticketNo;
-                row.getCell(2).value = formatPlate(trip.plateNumber);
-                row.getCell(3).value = trip.customer;
-                row.getCell(4).value = trip.weight1;
-                row.getCell(5).value = trip.weight2;
-                row.getCell(6).value = trip.weightNet;
-                row.getCell(7).value = formatExcelDate(trip.date1Obj);
-                row.getCell(8).value = formatExcelTime(trip.date1Obj);
-                row.getCell(9).value = formatExcelDateTimeCombined(trip.date1Obj);
-                row.getCell(10).value = formatExcelDate(trip.date2Obj);
-                row.getCell(11).value = formatExcelTime(trip.date2Obj);
-                row.getCell(12).value = formatExcelDateTimeCombined(trip.date2Obj);
-                row.getCell(13).value = trip.direction;
-                row.getCell(14).value = trip.cargoType;
-                row.getCell(15).value = trip.bargeName;
+                row.getCell(2).value = trip.orderNo || '';
+                row.getCell(3).value = formatPlate(trip.plateNumber);
+                row.getCell(4).value = trip.customer;
+                row.getCell(5).value = trip.weight1;
+                row.getCell(6).value = trip.weight2;
+                row.getCell(7).value = trip.weightNet;
+                row.getCell(8).value = formatExcelDate(trip.date1Obj);
+                row.getCell(9).value = formatExcelTime(trip.date1Obj);
+                row.getCell(10).value = formatExcelDateTimeCombined(trip.date1Obj);
+                row.getCell(11).value = formatExcelDate(trip.date2Obj);
+                row.getCell(12).value = formatExcelTime(trip.date2Obj);
+                row.getCell(13).value = formatExcelDateTimeCombined(trip.date2Obj);
+                row.getCell(14).value = trip.direction;
+                row.getCell(15).value = trip.cargoType;
+                row.getCell(16).value = trip.bargeName;
                 
-                for (let colIdx = 1; colIdx <= 15; colIdx++) {
+                for (let colIdx = 1; colIdx <= 16; colIdx++) {
                     const cell = row.getCell(colIdx);
                     cell.font = { name: 'Arial', size: 10 };
                     cell.border = {
@@ -1580,9 +1584,9 @@ async function compileAndDownload() {
                         bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
                         right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
                     };
-                    if ([1, 2, 7, 8, 9, 10, 11, 12, 13].includes(colIdx)) {
+                    if ([1, 2, 3, 8, 9, 10, 11, 12, 13, 14].includes(colIdx)) {
                         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    } else if ([4, 5, 6].includes(colIdx)) {
+                    } else if ([5, 6, 7].includes(colIdx)) {
                         cell.alignment = { horizontal: 'right', vertical: 'middle' };
                         cell.numFmt = '#,##0.00';
                     } else {
@@ -1592,7 +1596,7 @@ async function compileAndDownload() {
                 currentRowIdx++;
             });
         } else {
-            // Set 10 columns for summary layout
+            // Set 11 columns for summary layout
             dsSheet.columns = [
                 { header: '', key: 'A', width: 3 },
                 { header: 'STT', key: 'stt', width: 8 },
@@ -1601,6 +1605,7 @@ async function compileAndDownload() {
                 { header: 'TTTP (tấn)', key: 'tttp', width: 15 },
                 { header: 'Hạn mức hàng (tấn)', key: 'limit', width: 22 },
                 { header: 'Số phiếu cân', key: 'ticketNo', width: 18 },
+                { header: 'Mã lệnh', key: 'orderNo', width: 18 },
                 { header: 'Loại hàng hóa', key: 'cargoType', width: 18 },
                 { header: 'Trọng lượng hàng (tấn)', key: 'weightTons', width: 22 },
                 { header: 'Ghi chú', key: 'notes', width: 15 }
@@ -1614,14 +1619,15 @@ async function compileAndDownload() {
             headerRow.getCell(5).value = 'TTTP (tấn)';
             headerRow.getCell(6).value = 'Hạn mức hàng (tấn)';
             headerRow.getCell(7).value = 'Số phiếu cân';
-            headerRow.getCell(8).value = 'Loại hàng hóa';
-            headerRow.getCell(9).value = 'Trọng lượng hàng (tấn)';
-            headerRow.getCell(10).value = 'Ghi chú';
+            headerRow.getCell(8).value = 'Mã lệnh';
+            headerRow.getCell(9).value = 'Loại hàng hóa';
+            headerRow.getCell(10).value = 'Trọng lượng hàng (tấn)';
+            headerRow.getCell(11).value = 'Ghi chú';
             
             headerRow.font = { name: 'Arial', size: 10, bold: true };
             headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             
-            for (let colIdx = 2; colIdx <= 10; colIdx++) {
+            for (let colIdx = 2; colIdx <= 11; colIdx++) {
                 const cell = headerRow.getCell(colIdx);
                 cell.fill = {
                     type: 'pattern',
@@ -1650,11 +1656,12 @@ async function compileAndDownload() {
                 row.getCell(5).value = trip.tttp;              // Col E: TTTP
                 row.getCell(6).value = trip.limit;             // Col F: Allowed Cargo
                 row.getCell(7).value = trip.ticketNo;          // Col G: Ticket No
-                row.getCell(8).value = trip.cargoType;         // Col H: Cargo type
-                row.getCell(9).value = trip.weightTons;        // Col I: Weight in tons
-                row.getCell(10).value = null;                  // Col J: Ghi chú
+                row.getCell(8).value = trip.orderNo || '';     // Col H: Order No
+                row.getCell(9).value = trip.cargoType;         // Col I: Cargo type
+                row.getCell(10).value = trip.weightTons;       // Col J: Weight in tons
+                row.getCell(11).value = null;                  // Col K: Ghi chú
                 
-                for (let colIdx = 2; colIdx <= 10; colIdx++) {
+                for (let colIdx = 2; colIdx <= 11; colIdx++) {
                     const cell = row.getCell(colIdx);
                     cell.font = { name: 'Arial', size: 10 };
                     cell.border = {
@@ -1663,9 +1670,9 @@ async function compileAndDownload() {
                         bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
                         right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
                     };
-                    if (colIdx === 2 || colIdx === 3 || colIdx === 4 || colIdx === 7) {
+                    if (colIdx === 2 || colIdx === 3 || colIdx === 4 || colIdx === 7 || colIdx === 8) {
                         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    } else if (colIdx === 5 || colIdx === 6 || colIdx === 9) {
+                    } else if (colIdx === 5 || colIdx === 6 || colIdx === 10) {
                         cell.alignment = { horizontal: 'right', vertical: 'middle' };
                         cell.numFmt = '#,##0.00';
                     } else {
@@ -2087,6 +2094,7 @@ async function compileAndDownload() {
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="py-2 px-3 w-12 text-center bg-gray-55 font-bold">STT</th>
                                 <th class="py-2 px-3 bg-gray-55 font-bold">Số phiếu</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Mã lệnh</th>
                                 <th class="py-2 px-3 bg-gray-55 font-bold">Số xe</th>
                                 <th class="py-2 px-3 bg-gray-55 font-bold">Loại hàng</th>
                                 <th class="py-2 px-3 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
@@ -2106,6 +2114,7 @@ async function compileAndDownload() {
                                     {{ (sourceCurrentPage - 1) * itemsPerPage + idx + 1 }}
                                 </td>
                                 <td class="py-2 px-3 font-semibold text-gray-500">{{ ticket.ticketNo }}</td>
+                                <td class="py-2 px-3 font-semibold text-teal-600 font-mono">{{ ticket.orderNo || '-' }}</td>
                                 <td class="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(ticket.plateNumber) }}</td>
                                 <td class="py-2 px-3 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
                                 <td class="py-2 px-3 text-right font-black text-primary">{{ ticket.weightNet.toLocaleString() }}</td>
@@ -2199,6 +2208,7 @@ async function compileAndDownload() {
                                 <th class="py-2 px-3 text-center bg-gray-50 font-bold">TTTP (tấn)</th>
                                 <th class="py-2 px-3 text-center bg-gray-55 font-bold">Trọng lượng hàng CP (tấn)</th>
                                 <th class="py-2 px-3 bg-gray-50 font-bold">Số phiếu</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Mã lệnh</th>
                                 <th class="py-2 px-3 text-center w-28 bg-gray-55 font-bold">Loại hàng</th>
                                 <th class="py-2 px-3 text-right bg-gray-50 font-bold">Khối lượng (tấn)</th>
                                 <th class="py-2 px-3 text-center w-16 bg-gray-55 font-bold">Trạng thái</th>
@@ -2228,6 +2238,7 @@ async function compileAndDownload() {
                                 <td class="py-2 px-3 text-center">{{ trip.tttp.toFixed(1) }}</td>
                                 <td class="py-2 px-3 text-center">{{ trip.limit.toFixed(1) }}</td>
                                 <td class="py-2 px-3 font-semibold text-gray-500">{{ trip.ticketNo }}</td>
+                                <td class="py-2 px-3 font-semibold text-teal-600 font-mono">{{ trip.orderNo || '-' }}</td>
                                 <td class="py-2 px-3 truncate max-w-[120px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
                                 <td class="py-2 px-3 text-right font-black text-primary">{{ trip.weightTons.toFixed(2) }}</td>
                                 <td class="py-2 px-3 text-center">
@@ -2334,6 +2345,7 @@ async function compileAndDownload() {
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="py-[14px] px-3 bg-gray-55 font-bold">Số phiếu</th>
+                                <th class="py-[14px] px-3 bg-gray-55 font-bold">Mã lệnh</th>
                                 <th class="py-[14px] px-3 bg-gray-50 font-bold">Số xe</th>
                                 <th class="py-[14px] px-3 bg-gray-55 font-bold">Khách hàng</th>
                                 <th class="py-[14px] px-3 text-right bg-gray-50 font-bold">KL cân lần 1</th>
@@ -2357,6 +2369,7 @@ async function compileAndDownload() {
                                 class="hover:bg-gray-50 transition-colors"
                             >
                                 <td class="py-[14px] px-3 font-bold text-gray-800">{{ trip.ticketNo }}</td>
+                                <td class="py-[14px] px-3 font-semibold text-teal-600 font-mono">{{ trip.orderNo || '-' }}</td>
                                 <td class="py-[14px] px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(trip.plateNumber) }}</td>
                                 <td class="py-[14px] px-3 max-w-[150px] truncate text-gray-500" :title="trip.customer">{{ trip.customer }}</td>
                                 <td class="py-[14px] px-3 text-right font-mono text-gray-600">{{ trip.weight1.toLocaleString() }}</td>
