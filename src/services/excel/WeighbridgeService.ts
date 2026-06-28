@@ -259,9 +259,9 @@ export const WeighbridgeService = {
             xn: 'XUẤT KHẨU',
             ticketPrefix: 'PC-',
             ticketSeed: 1,
-            chinhpham: 100,
-            phupham: 0,
-            ketluan: 'Chính phẩm đạt tiêu chuẩn',
+            chinhpham: '------------',
+            phupham: '------------',
+            ketluan: '[ ] Đạt\n[ ] Không đạt',
             updatedAt: Date.now()
         };
         const newBarge: Barge = {

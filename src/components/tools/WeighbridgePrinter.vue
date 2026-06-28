@@ -74,6 +74,7 @@ const getDefaultPrintElements = (): PrintElement[] => [
 
     // Footer
     { id: 'sig1', type: 'text', x: 18.5, y: 118, width: 30, height: 4, text: 'NV TRẠM CÂN', align: 'center', fontSize: 10, fontWeight: 'bold' },
+    { id: 'sig1_name', type: 'field', x: 18.5, y: 133, width: 30, height: 4, label: '', fieldId: 'operator', align: 'center', fontSize: 10, fontWeight: 'bold' },
     { id: 'sig2', type: 'text', x: 60, y: 118, width: 25, height: 4, text: 'BẢO VỆ', align: 'center', fontSize: 10, fontWeight: 'bold' },
     { id: 'sig3', type: 'text', x: 86, y: 118, width: 25, height: 4, text: 'CHỦ HÀNG', align: 'center', fontSize: 10, fontWeight: 'bold' },
     { id: 'sig4', type: 'text', x: 116, y: 118, width: 25, height: 4, text: 'THỦ KHO', align: 'center', fontSize: 10, fontWeight: 'bold' },
@@ -167,9 +168,9 @@ const cfgForm = reactive<BargeConfig>({
     xn: 'XUẤT KHẨU',
     ticketPrefix: 'PC-',
     ticketSeed: 1,
-    chinhpham: 100,
-    phupham: 0,
-    ketluan: 'Chính phẩm đạt tiêu chuẩn',
+    chinhpham: '------------',
+    phupham: '------------',
+    ketluan: '[ ] Đạt\n[ ] Không đạt',
     locked: false,
     orderNo: '',
     printFields: getDefaultPrintFields(),

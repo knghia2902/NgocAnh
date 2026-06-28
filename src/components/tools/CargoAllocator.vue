@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { dbContext } from '@/services/storage/DBContext';
 import { supabase } from '@/supabase';
@@ -86,7 +86,10 @@ function triggerTicketFileInput() {
     ticketFileInput.value?.click();
 }
 const csvRecords = ref<CSVRecord[]>([]);
+const generatedTrips = ref<SplitTrip[]>([]);
 const existingTrips = ref<SplitTrip[]>([]);
+const isSavingToHistory = ref(false);
+const isInitLoading = ref(false);
 const vehiclesList = ref<{ plateNumber: string; moocNumber: string; }[]>([]);
 
 // Types & Channel Sync
@@ -482,28 +485,40 @@ function parseDateTime(dateStr: string, timeStr: string): Date {
     }
 }
 
+function ensureDate(d: any): Date {
+    if (d instanceof Date) return d;
+    if (!d) return new Date();
+    // Handle serialized Supabase timestamps or string dates safely
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
 // Format Date object to "HH:mm:ss\nDD/MM/YYYY"
-function formatExcelDateTime(date: Date): string {
+function formatExcelDateTime(date: any): string {
+    const d = ensureDate(date);
     const pad = (n: number) => String(n).padStart(2, '0');
-    const hh = pad(date.getHours());
-    const mm = pad(date.getMinutes());
-    const ss = pad(date.getSeconds());
-    const DD = pad(date.getDate());
-    const MM = pad(date.getMonth() + 1);
-    const YYYY = date.getFullYear();
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    const ss = pad(d.getSeconds());
+    const DD = pad(d.getDate());
+    const MM = pad(d.getMonth() + 1);
+    const YYYY = d.getFullYear();
     return `${hh}:${mm}:${ss}\n${DD}/${MM}/${YYYY}`;
 }
 
-function formatExcelDate(d: Date): string {
+function formatExcelDate(date: any): string {
+    const d = ensureDate(date);
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
-function formatExcelTime(d: Date): string {
+function formatExcelTime(date: any): string {
+    const d = ensureDate(date);
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getHours()}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function formatExcelDateTimeCombined(d: Date): string {
+function formatExcelDateTimeCombined(date: any): string {
+    const d = ensureDate(date);
     const hour24 = d.getHours();
     const ampm = hour24 >= 12 ? 'PM' : 'AM';
     const hour12 = hour24 % 12 || 12;
@@ -851,6 +866,7 @@ watch(sourceSearchQuery, () => {
 const syncStatus = ref<'synced' | 'saving' | 'error'>('synced');
 
 async function loadTicketsFromSupabase() {
+    isInitLoading.value = true;
     try {
         const { data, error } = await supabase
             .from('content')
@@ -899,6 +915,17 @@ async function loadTicketsFromSupabase() {
                 }
             }
 
+            // 4. Overwrite generated trips
+            const remoteGenerated = data.settings.allocator_generated_trips;
+            if (Array.isArray(remoteGenerated)) {
+                if (JSON.stringify(generatedTrips.value) !== JSON.stringify(remoteGenerated)) {
+                    generatedTrips.value = remoteGenerated;
+                    await dbContext.set('allocator_generated_trips', remoteGenerated);
+                }
+            } else {
+                regenerateAllocatedTrips();
+            }
+
             syncStatus.value = 'synced';
         }
     } catch (e) {
@@ -906,6 +933,7 @@ async function loadTicketsFromSupabase() {
         syncStatus.value = 'error';
     } finally {
         isSyncingFromChannel = false;
+        isInitLoading.value = false;
     }
 }
 
@@ -990,6 +1018,7 @@ onMounted(async () => {
         if (savedUseAuto !== undefined && savedUseAuto !== null) useAutoTicketNo.value = savedUseAuto;
 
 
+        isInitLoading.value = true;
         const saved = await dbContext.get<CSVRecord[]>('allocator_tickets');
         if (saved && Array.isArray(saved)) {
             csvRecords.value = saved;
@@ -1000,15 +1029,25 @@ onMounted(async () => {
             existingTrips.value = savedHistory;
         }
 
+        const savedGenerated = await dbContext.get<SplitTrip[]>('allocator_generated_trips');
+        if (savedGenerated && Array.isArray(savedGenerated)) {
+            generatedTrips.value = savedGenerated;
+        } else {
+            regenerateAllocatedTrips();
+        }
+
         const savedVehicles = await dbContext.get<any[]>('allocator_vehicles');
         if (savedVehicles && Array.isArray(savedVehicles)) {
             vehiclesList.value = savedVehicles;
         }
 
+        isInitLoading.value = false;
+
         // Đồng bộ dữ liệu từ đám mây
         await loadTicketsFromSupabase();
     } catch (e) {
         console.error('Lỗi khi nạp dữ liệu từ IndexedDB:', e);
+        isInitLoading.value = false;
     }
 });
 
@@ -1031,6 +1070,17 @@ watch(existingTrips, async (newVal) => {
         syncChannel.postMessage({ type: 'history' });
     } catch (e) {
         console.error('Lỗi khi lưu lịch sử chuyến xe vào IndexedDB:', e);
+    }
+}, { deep: true });
+
+// Auto-save generated trips on change
+watch(generatedTrips, async (newVal) => {
+    if (isSyncingFromChannel || isInitLoading.value) return;
+    try {
+        await dbContext.set('allocator_generated_trips', newVal);
+        syncChannel.postMessage({ type: 'generated' });
+    } catch (e) {
+        console.error('Lỗi khi lưu danh sách phân bổ vào IndexedDB:', e);
     }
 }, { deep: true });
 
@@ -1057,18 +1107,13 @@ const totalCsvWeightTons = computed(() => {
     return kg / 1000;
 });
 
-// Computed: Next STT start number
-const nextSTT = computed(() => {
-    if (existingTrips.value.length > 0) {
-        const lastTrip = existingTrips.value[existingTrips.value.length - 1];
-        return (lastTrip?.stt || 0) + 1;
+function regenerateAllocatedTrips() {
+    if (isSavingToHistory.value || isInitLoading.value) return;
+    
+    if (csvRecords.value.length === 0) {
+        generatedTrips.value = [];
+        return;
     }
-    return 1;
-});
-
-// Computed: Generated split trips based on current settings
-const generatedTrips = computed<SplitTrip[]>(() => {
-    if (csvRecords.value.length === 0) return [];
     
     interface TempTrip {
         plateNumber: string;
@@ -1290,7 +1335,36 @@ const generatedTrips = computed<SplitTrip[]>(() => {
         };
     });
     
-    return finalTrips;
+    generatedTrips.value = finalTrips;
+}
+
+// Watch dependencies to automatically regenerate
+watch(
+    [
+        csvRecords, 
+        distStrategy, 
+        spacingStrategy, 
+        timeIntervalMinutes, 
+        standardTTTPLimit, 
+        useAutoTicketNo, 
+        ticketStart, 
+        ticketPadding, 
+        ticketPrefix, 
+        ticketSuffix
+    ], 
+    () => {
+        regenerateAllocatedTrips();
+    }, 
+    { deep: true }
+);
+
+// Computed: Next STT start number
+const nextSTT = computed(() => {
+    if (existingTrips.value.length > 0) {
+        const lastTrip = existingTrips.value[existingTrips.value.length - 1];
+        return (lastTrip?.stt || 0) + 1;
+    }
+    return 1;
 });
 
 const selectedCustomer = ref('');
@@ -1390,13 +1464,45 @@ function saveToHistory() {
         return;
     }
     
+    // Check duplicates
+    const duplicates: string[] = [];
+    generatedTrips.value.forEach(gt => {
+        const isDup = existingTrips.value.some(et => {
+            if (gt.ticketNo && et.ticketNo && gt.ticketNo === et.ticketNo) {
+                return true;
+            }
+            // Fallback match: Plate + Net Weight + Date1 Time
+            const gtDateStr = formatExcelDateTimeCombined(gt.date1Obj);
+            const etDateStr = formatExcelDateTimeCombined(et.date1Obj);
+            return normalizePlate(gt.plateNumber) === normalizePlate(et.plateNumber) &&
+                   gt.weightNet === et.weightNet &&
+                   gtDateStr === etDateStr;
+        });
+        if (isDup) {
+            duplicates.push(gt.ticketNo || `${formatPlate(gt.plateNumber)} (${gt.weightNet} kg)`);
+        }
+    });
+
+    if (duplicates.length > 0) {
+        const exampleDups = duplicates.slice(0, 3).join(', ');
+        const suffix = duplicates.length > 3 ? '...' : '';
+        if (!confirm(`Cảnh báo: Có ${duplicates.length} chuyến xe bị trùng lặp với dữ liệu đã tồn tại trong Sổ Theo Dõi (ví dụ: ${exampleDups}${suffix}).\n\nBạn có chắc chắn vẫn muốn lưu các chuyến trùng lặp này vào Sổ Theo Dõi không?`)) {
+            return;
+        }
+    }
+    
     if (confirm(`Bạn có chắc chắn muốn lưu ${generatedTrips.value.length} chuyến xe này vào Sổ Theo Dõi và làm sạch danh sách phiếu cân hiện tại ở Tab 1 không?`)) {
         // Append generated trips to history
         existingTrips.value = [...existingTrips.value, ...generatedTrips.value];
         
-        // Clear active tickets in Tab 1
+        // Clear active tickets in Tab 1 without clearing Tab 2
+        isSavingToHistory.value = true;
         csvRecords.value = [];
         csvFile.value = null;
+        
+        nextTick(() => {
+            isSavingToHistory.value = false;
+        });
         
         // Save empty tickets list to Supabase
         saveTicketsToSupabase();
@@ -1404,6 +1510,17 @@ function saveToHistory() {
         // Switch tab to Tab 3 (Theo dõi)
         activeDataTab.value = 'generated';
         addToast('Đã lưu thành công vào Sổ Theo Dõi!', 'success');
+    }
+}
+
+function deleteGeneratedTrip(trip: SplitTrip) {
+    if (confirm(`Bạn có chắc muốn xóa chuyến xe của xe ${trip.plateNumber} này khỏi danh sách phân bổ không?`)) {
+        const index = generatedTrips.value.findIndex(t => t.stt === trip.stt);
+        if (index !== -1) {
+            generatedTrips.value.splice(index, 1);
+            saveTicketsToSupabase();
+            addToast('Đã xóa chuyến xe phân bổ thành công!', 'success');
+        }
     }
 }
 
@@ -2363,6 +2480,7 @@ async function compileAndDownload() {
                                 <th class="py-[14px] px-3 text-center bg-gray-55 font-bold">X/N</th>
                                 <th class="py-[14px] px-3 bg-gray-50 font-bold">Loại hàng</th>
                                 <th class="py-[14px] px-3 bg-gray-55 font-bold">Loại Sà lan</th>
+                                <th class="py-[14px] px-3 text-center bg-gray-50 font-bold w-[80px]">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -2391,9 +2509,18 @@ async function compileAndDownload() {
                                 </td>
                                 <td class="py-[14px] px-3 truncate max-w-[150px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
                                 <td class="py-[14px] px-3 truncate max-w-[150px]" :title="trip.bargeName">{{ trip.bargeName }}</td>
+                                <td class="py-[14px] px-3 text-center">
+                                    <button 
+                                        @click="deleteGeneratedTrip(trip)"
+                                        class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center mx-auto"
+                                        title="Xóa chuyến xe này"
+                                    >
+                                        <span class="material-symbols-outlined text-base">delete</span>
+                                    </button>
+                                </td>
                             </tr>
                             <tr v-if="filteredTrips.length === 0">
-                                <td colspan="15" class="p-8 text-center text-gray-400 italic">
+                                <td colspan="16" class="p-8 text-center text-gray-400 italic">
                                     Không tìm thấy bản ghi nào khớp bộ lọc!
                                 </td>
                             </tr>
