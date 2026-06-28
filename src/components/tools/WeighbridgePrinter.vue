@@ -3715,6 +3715,14 @@ onUnmounted(() => {
                                         >
                                             Khôi phục mẫu chuẩn
                                         </button>
+                                        <button 
+                                            @click="saveBargeConfigImmediately" 
+                                            :disabled="cfgForm.locked"
+                                            class="px-3 py-1 bg-primary text-white font-bold text-[10px] rounded-lg transition-all flex items-center gap-1 select-none hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                                        >
+                                            <span class="material-symbols-outlined text-xs">save</span>
+                                            Lưu cấu hình mẫu phiếu
+                                        </button>
                                     </div>
                                 </h3>
                                 
@@ -4116,20 +4124,7 @@ onUnmounted(() => {
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="flex flex-col gap-2 pt-2 border-t border-primary/5 mt-2">
-                                
-                                <div class="flex justify-end mt-1">
-                                    <button 
-                                        @click="saveBargeConfigImmediately" 
-                                        :disabled="cfgForm.locked"
-                                        class="px-5 py-2.5 bg-primary text-white font-bold text-xs rounded-[8px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
-                                    >
-                                        <span class="material-symbols-outlined text-sm">save</span>
-                                        Lưu cấu hình mẫu phiếu
-                                    </button>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
                 </main>
