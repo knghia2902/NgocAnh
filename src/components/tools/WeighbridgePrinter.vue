@@ -182,6 +182,59 @@ function handleConfirmCancel() {
     }
 }
 
+interface InputDialogState {
+    show: boolean;
+    title: string;
+    placeholder: string;
+    value: string;
+    okText?: string;
+    cancelText?: string;
+    resolve?: (val: string | null) => void;
+}
+
+const inputDialog = ref<InputDialogState>({
+    show: false,
+    title: '',
+    placeholder: '',
+    value: ''
+});
+
+const inputPromptRef = ref<HTMLInputElement | null>(null);
+
+function showPrompt(title: string, defaultValue: string = '', placeholder: string = ''): Promise<string | null> {
+    return new Promise((resolve) => {
+        inputDialog.value = {
+            show: true,
+            title,
+            placeholder,
+            value: defaultValue,
+            okText: 'Xác nhận',
+            cancelText: 'Hủy',
+            resolve
+        };
+        nextTick(() => {
+            inputPromptRef.value?.focus();
+            if (inputPromptRef.value) {
+                inputPromptRef.value.select();
+            }
+        });
+    });
+}
+
+function handleInputOk() {
+    if (inputDialog.value.resolve) {
+        inputDialog.value.resolve(inputDialog.value.value);
+    }
+    inputDialog.value.show = false;
+}
+
+function handleInputCancel() {
+    if (inputDialog.value.resolve) {
+        inputDialog.value.resolve(null);
+    }
+    inputDialog.value.show = false;
+}
+
 // Excel Upload pending data
 interface ExcelColumn {
     index: number;
@@ -1755,7 +1808,7 @@ const handleTicketConfigChange = async () => {
 
 // Vessel CRUD
 const addVessel = async () => {
-    const name = prompt('Nhập tên tàu mới:');
+    const name = await showPrompt('Nhập tên tàu mới:');
     if (!name || !name.trim()) return;
 
     loading.value = true;
@@ -1776,7 +1829,7 @@ const addVessel = async () => {
 };
 
 const renameVessel = async (id: number, currentName: string) => {
-    const name = prompt('Nhập tên tàu mới:', currentName);
+    const name = await showPrompt('Đổi tên tàu:', currentName);
     if (!name || !name.trim() || name.trim() === currentName) return;
 
     loading.value = true;
@@ -1828,7 +1881,7 @@ const deleteVessel = async (id: number, name: string) => {
 
 // Barge CRUD
 const addBarge = async (vesselId: number) => {
-    const name = prompt('Nhập tên sà lan mới:');
+    const name = await showPrompt('Nhập tên sà lan mới:');
     if (!name || !name.trim()) return;
 
     loading.value = true;
@@ -1855,7 +1908,7 @@ const renameBarge = async (id: number, currentName: string) => {
         return;
     }
 
-    const name = prompt('Nhập tên sà lan mới:', currentName);
+    const name = await showPrompt('Đổi tên sà lan:', currentName);
     if (!name || !name.trim() || name.trim() === currentName) return;
 
     loading.value = true;
@@ -4471,6 +4524,66 @@ onUnmounted(() => {
                         ]"
                     >
                         {{ confirmDialog.okText }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Transition>
+    </Teleport>
+
+    <!-- Premium Custom Input Prompt Modal -->
+    <Teleport to="body">
+    <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+    >
+        <div 
+            v-if="inputDialog.show" 
+            class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4 no-print"
+            @click.self="handleInputCancel"
+        >
+            <div 
+                class="w-full max-w-[420px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100"
+            >
+                <!-- Header -->
+                <div class="flex items-center gap-3">
+                    <div class="size-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">edit_note</span>
+                    </div>
+                    <h3 class="text-sm font-black text-gray-900 leading-tight">
+                        {{ inputDialog.title }}
+                    </h3>
+                </div>
+                
+                <!-- Input field -->
+                <div class="flex flex-col gap-1">
+                    <input 
+                        type="text" 
+                        v-model="inputDialog.value"
+                        :placeholder="inputDialog.placeholder"
+                        @keyup.enter="handleInputOk"
+                        class="w-full px-4 py-2.5 bg-white border border-gray-200 focus:border-primary rounded-[14px] text-xs font-bold focus:outline-none transition-all"
+                        ref="inputPromptRef"
+                    />
+                </div>
+                
+                <!-- Footer Buttons -->
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                    <button 
+                        @click="handleInputCancel"
+                        class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                    >
+                        {{ inputDialog.cancelText }}
+                    </button>
+                    <button 
+                        @click="handleInputOk"
+                        class="h-9 px-5 rounded-[12px] text-xs font-bold text-white bg-primary hover:bg-primary/95 active:scale-95 transition-all"
+                    >
+                        {{ inputDialog.okText }}
                     </button>
                 </div>
             </div>
