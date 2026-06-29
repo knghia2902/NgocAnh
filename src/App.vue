@@ -25,19 +25,40 @@ const handleHeaderLogout = () => {
     router.push('/');
 };
 
+const uiScale = ref(Number(localStorage.getItem('ui-scale')) || 1);
+const showScalePanel = ref(false);
+
+const updateScale = (scale: number) => {
+    uiScale.value = Math.max(0.5, Math.min(2.0, scale));
+    localStorage.setItem('ui-scale', String(uiScale.value));
+    (document.documentElement.style as any).zoom = uiScale.value;
+};
+
+const closeScalePanel = () => {
+    showScalePanel.value = false;
+};
+
+const closeAllPopups = () => {
+    closeDropdown();
+    closeScalePanel();
+};
+
 onMounted(async () => {
+    // Apply saved zoom
+    (document.documentElement.style as any).zoom = uiScale.value;
+
     // Load all content from Supabase
     await ContentService.loadAll();
     
     // Track visitor (only counts unique visitors within 30 days)
     await VisitorTracker.trackVisit(() => ContentService.incrementVisitors());
 
-    // Register click listener to close dropdown when clicking outside
-    window.addEventListener('click', closeDropdown);
+    // Register click listener to close popups when clicking outside
+    window.addEventListener('click', closeAllPopups);
 });
 
 onUnmounted(() => {
-    window.removeEventListener('click', closeDropdown);
+    window.removeEventListener('click', closeAllPopups);
 });
 </script>
 
@@ -155,6 +176,63 @@ onUnmounted(() => {
         </div>
     </footer>
     <ToastNotification />
+
+    <!-- UI Scale Control (Floating Widget) -->
+    <div class="fixed bottom-4 right-4 z-[9999] no-print" @click.stop>
+      <!-- Toggle button -->
+      <button 
+        @click="showScalePanel = !showScalePanel"
+        class="size-10 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
+        title="Điều chỉnh tỷ lệ hiển thị UI"
+      >
+        <span class="material-symbols-outlined text-lg">aspect_ratio</span>
+      </button>
+
+      <!-- Control Panel -->
+      <Transition name="slide-up">
+        <div 
+          v-if="showScalePanel" 
+          class="absolute bottom-12 right-0 w-64 bg-white rounded-2xl shadow-2xl border border-primary/10 p-4 flex flex-col gap-3 font-display text-xs"
+        >
+          <div class="flex items-center justify-between border-b border-primary/5 pb-2">
+            <span class="font-black text-primary">Tỷ lệ hiển thị (UI Scale)</span>
+            <button @click="updateScale(1)" class="text-[10px] font-black text-gray-400 hover:text-primary hover:underline">Mặc định</button>
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between text-gray-500 font-bold">
+              <span>Cỡ chữ & tỷ lệ</span>
+              <span class="font-mono text-primary font-black">{{ Math.round(uiScale * 100) }}%</span>
+            </div>
+            <input 
+              type="range" 
+              min="0.5" 
+              max="1.5" 
+              step="0.05" 
+              :value="uiScale" 
+              @input="(e: any) => updateScale(Number(e.target.value))"
+              class="w-full h-1.5 bg-gray-150 rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
+
+          <!-- Quick buttons -->
+          <div class="grid grid-cols-5 gap-1">
+            <button 
+              v-for="s in [0.8, 0.9, 1.0, 1.1, 1.2]" 
+              :key="s" 
+              @click="updateScale(s)"
+              :class="['py-1 rounded text-[10px] font-mono font-bold transition-all', Math.abs(uiScale - s) < 0.01 ? 'bg-primary text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100']"
+            >
+              {{ Math.round(s * 100) }}%
+            </button>
+          </div>
+
+          <p class="text-[9px] text-gray-400 font-semibold italic">
+            * Giúp phóng to/thu nhỏ toàn bộ trang web cho vừa vặn màn hình của bạn.
+          </p>
+        </div>
+      </Transition>
+    </div>
   </div>
 </template>
 
