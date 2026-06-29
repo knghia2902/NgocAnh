@@ -2679,7 +2679,7 @@ async function compileAndDownload() {
             </aside>
 
             <!-- Workspace (right) -->
-            <main class="flex-1 h-full flex flex-col gap-4 p-0 overflow-y-auto pr-1.5">
+            <main class="flex-1 min-h-0 flex flex-col gap-4 p-0 overflow-y-auto pr-1.5">
                 <!-- Chế độ 1: Quản lý danh sách xe -->
                 <div v-if="activeSubViewMode === 'vehicles'" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white rounded-[24px] soft-shadow border border-primary/5 p-0">
                     <VehicleManager />
