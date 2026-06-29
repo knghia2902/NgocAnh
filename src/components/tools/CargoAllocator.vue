@@ -2706,15 +2706,15 @@ async function compileAndDownload() {
         <!-- Settings Section -->
 
         <!-- 3-Column Settings & Capacities configs -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <!-- Parameters configuration -->
-            <div class="lg:col-span-2 bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+            <div class="lg:col-span-2 bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
                 <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
                     <span class="material-symbols-outlined text-base">tune</span>
                     Cấu hình giải thuật & quy tắc phân bổ
                 </h4>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <!-- Distribution Strategy -->
                     <div class="flex flex-col gap-1.5">
                         <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Chiến lược chia trọng lượng</label>
@@ -2758,8 +2758,8 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Cấu hình số phiếu cân -->
-                <div class="border-t border-gray-100 pt-4 mt-2">
-                    <div class="flex items-center justify-between mb-3">
+                <div class="border-t border-gray-100 pt-2.5 mt-1">
+                    <div class="flex items-center justify-between mb-2">
                         <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
                             <span class="material-symbols-outlined text-base">tag</span>
                             Cấu hình số phiếu cân tự động
@@ -2826,7 +2826,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- General Capacity standards config -->
-            <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4">
+            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
                 <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
                     <span class="material-symbols-outlined text-base">shield</span>
                     Hạn mức tải trọng tiêu chuẩn
