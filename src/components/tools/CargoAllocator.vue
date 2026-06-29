@@ -2679,14 +2679,14 @@ async function compileAndDownload() {
             </aside>
 
             <!-- Workspace (right) -->
-            <main class="flex-1 min-h-0 flex flex-col gap-4 p-0 overflow-y-auto pr-1.5">
+            <main class="flex-1 min-h-0 flex flex-col gap-4 pb-4 overflow-y-auto pr-1.5">
                 <!-- Chế độ 1: Quản lý danh sách xe -->
                 <div v-if="activeSubViewMode === 'vehicles'" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white rounded-[24px] soft-shadow border border-primary/5 p-0">
                     <VehicleManager />
                 </div>
 
                 <!-- Chế độ 2: Giao diện Phân bổ tải trọng xếp hàng (Chạy toàn cục) -->
-                <div v-else class="min-h-full flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-4">
+                <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto">
 
                     <div class="flex-1 flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-0 fade-in">
         <!-- Header Banner -->
