@@ -21,6 +21,9 @@ onMounted(async () => {
 });
 
 watch(activeToolId, (newVal) => {
+    const isWeighbridge = newVal === 'weighbridge';
+    window.dispatchEvent(new CustomEvent('weighbridge-status', { detail: isWeighbridge }));
+
     if (newVal) {
         document.body.style.overflow = 'hidden';
     } else {
@@ -30,6 +33,7 @@ watch(activeToolId, (newVal) => {
 
 onUnmounted(() => {
     document.body.style.overflow = '';
+    window.dispatchEvent(new CustomEvent('weighbridge-status', { detail: false }));
 });
 
 const allTools = [

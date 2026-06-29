@@ -25,13 +25,16 @@ const handleHeaderLogout = () => {
     router.push('/');
 };
 
-const uiScale = ref(Number(localStorage.getItem('ui-scale')) || 1);
+const uiScale = ref(Number(localStorage.getItem('ui-scale')) || 0.9);
 const showScalePanel = ref(false);
+const isWeighbridge = ref(false);
 
 const updateScale = (scale: number) => {
     uiScale.value = Math.max(0.5, Math.min(2.0, scale));
     localStorage.setItem('ui-scale', String(uiScale.value));
-    (document.documentElement.style as any).zoom = uiScale.value;
+    if (!isWeighbridge.value) {
+        (document.documentElement.style as any).zoom = uiScale.value;
+    }
 };
 
 const closeScalePanel = () => {
@@ -43,9 +46,18 @@ const closeAllPopups = () => {
     closeScalePanel();
 };
 
+const handleWeighbridgeStatus = (e: any) => {
+    isWeighbridge.value = !!e.detail;
+    if (isWeighbridge.value) {
+        (document.documentElement.style as any).zoom = 1;
+    } else {
+        (document.documentElement.style as any).zoom = uiScale.value;
+    }
+};
+
 onMounted(async () => {
-    // Apply saved zoom
-    (document.documentElement.style as any).zoom = uiScale.value;
+    // Check if weighbridge was active (e.g. from document class if any, but default to current zoom)
+    (document.documentElement.style as any).zoom = isWeighbridge.value ? 1 : uiScale.value;
 
     // Load all content from Supabase
     await ContentService.loadAll();
@@ -55,10 +67,12 @@ onMounted(async () => {
 
     // Register click listener to close popups when clicking outside
     window.addEventListener('click', closeAllPopups);
+    window.addEventListener('weighbridge-status', handleWeighbridgeStatus);
 });
 
 onUnmounted(() => {
     window.removeEventListener('click', closeAllPopups);
+    window.removeEventListener('weighbridge-status', handleWeighbridgeStatus);
 });
 </script>
 
@@ -178,7 +192,7 @@ onUnmounted(() => {
     <ToastNotification />
 
     <!-- UI Scale Control (Floating Widget) -->
-    <div class="fixed bottom-4 right-4 z-[9999] no-print" @click.stop>
+    <div v-if="!isWeighbridge" class="fixed bottom-4 right-4 z-[9999] no-print" @click.stop>
       <!-- Toggle button -->
       <button 
         @click="showScalePanel = !showScalePanel"
