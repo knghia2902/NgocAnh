@@ -2878,7 +2878,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in flex-1">
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in flex-1 overflow-hidden">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3047,7 +3047,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Source Tickets -->
-            <div v-if="activeDataTab === 'source'" class="flex flex-col gap-3">
+            <div v-if="activeDataTab === 'source'" class="flex flex-col gap-3 flex-1 min-h-0">
                 <!-- Search & Info -->
                 <div class="flex items-center justify-between gap-4">
                     <div class="relative w-full max-w-[320px] flex items-center">
@@ -3157,7 +3157,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Generated Split Trips -->
-            <div v-if="activeDataTab === 'generated'" class="flex flex-col gap-3">
+            <div v-if="activeDataTab === 'generated'" class="flex flex-col gap-3 flex-1 min-h-0">
                 <!-- Search Filter Row -->
                 <div class="flex items-center justify-between gap-4">
                     <div class="relative w-full max-w-[320px] flex items-center">
@@ -3275,7 +3275,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Detail Template (Theo dõi) -->
-            <div v-if="activeDataTab === 'template'" class="flex flex-col gap-3">
+            <div v-if="activeDataTab === 'template'" class="flex flex-col gap-3 flex-1 min-h-0">
                 <!-- Search Filter Row -->
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
