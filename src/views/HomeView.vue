@@ -66,22 +66,51 @@ import { contentStore } from '../stores/content';
             <div class="h-1.5 w-24 bg-primary rounded-full glow-primary"></div>
         </div>
         <div class="flex flex-wrap justify-center gap-4 md:gap-6 px-4">
-            <component 
-                :is="item.tool ? 'router-link' : 'div'" 
-                v-for="item in contentStore.toolkit" 
-                :key="item.label" 
-                :to="item.tool || undefined"
-                class="group flex flex-col items-center gap-3 p-6 bg-white/60 border border-strawberry-cream/10 rounded-xl transition-all cursor-default backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105"
-                :class="{ 'cursor-pointer hover:border-primary/30 hover:bg-white/80': item.tool }"
-            >
-                <div class="size-16 rounded-full bg-white flex items-center justify-center shadow-sm text-primary transition-colors group-hover:bg-primary/5">
-                    <span class="material-symbols-outlined text-3xl">{{ item.icon }}</span>
+            <template v-for="item in contentStore.toolkit" :key="item.label">
+                <!-- Link ngoài (External Link) -->
+                <a 
+                    v-if="item.tool && (item.tool.startsWith('http://') || item.tool.startsWith('https://'))"
+                    :href="item.tool"
+                    target="_blank"
+                    class="group flex flex-col items-center gap-3 p-6 bg-white/60 border border-strawberry-cream/10 rounded-xl transition-all cursor-pointer backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 hover:border-primary/30 hover:bg-white/80"
+                >
+                    <div class="size-16 rounded-full bg-white flex items-center justify-center shadow-sm text-primary transition-colors group-hover:bg-primary/5">
+                        <span class="material-symbols-outlined text-3xl">{{ item.icon }}</span>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-bold text-lg leading-none">{{ item.label }}</p>
+                        <p class="text-[10px] text-primary font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">Click to open ↗</p>
+                    </div>
+                </a>
+
+                <!-- Link trong (Internal Route) -->
+                <router-link 
+                    v-else-if="item.tool"
+                    :to="item.tool"
+                    class="group flex flex-col items-center gap-3 p-6 bg-white/60 border border-strawberry-cream/10 rounded-xl transition-all cursor-pointer backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105 hover:border-primary/30 hover:bg-white/80"
+                >
+                    <div class="size-16 rounded-full bg-white flex items-center justify-center shadow-sm text-primary transition-colors group-hover:bg-primary/5">
+                        <span class="material-symbols-outlined text-3xl">{{ item.icon }}</span>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-bold text-lg leading-none">{{ item.label }}</p>
+                        <p class="text-[10px] text-primary font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">Click to use ✨</p>
+                    </div>
+                </router-link>
+
+                <!-- Thẻ tĩnh (Static Card) -->
+                <div 
+                    v-else
+                    class="group flex flex-col items-center gap-3 p-6 bg-white/60 border border-strawberry-cream/10 rounded-xl transition-all cursor-default backdrop-blur-md shadow-sm hover:shadow-md hover:scale-105"
+                >
+                    <div class="size-16 rounded-full bg-white flex items-center justify-center shadow-sm text-primary transition-colors group-hover:bg-primary/5">
+                        <span class="material-symbols-outlined text-3xl">{{ item.icon }}</span>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-bold text-lg leading-none">{{ item.label }}</p>
+                    </div>
                 </div>
-                <div class="text-center">
-                    <p class="font-bold text-lg leading-none">{{ item.label }}</p>
-                    <p v-if="item.tool" class="text-[10px] text-primary font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">Click to use ✨</p>
-                </div>
-            </component>
+            </template>
         </div>
     </section>
 
