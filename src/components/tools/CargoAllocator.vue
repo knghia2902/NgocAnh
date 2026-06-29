@@ -3067,16 +3067,16 @@ async function compileAndDownload() {
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
-                                <th class="py-2 px-3 w-12 text-center bg-gray-55 font-bold">STT</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Số phiếu</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Mã lệnh</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Số xe</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Loại hàng</th>
-                                <th class="py-2 px-3 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Thời gian vào</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Thời gian ra</th>
-                                <th class="py-2 px-3 bg-gray-55 font-bold">Tài xế</th>
-                                <th class="py-2 px-3 text-center w-24 bg-gray-55 font-bold">Thao tác</th>
+                                <th class="py-1 px-3 w-12 text-center bg-gray-55 font-bold">STT</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Số phiếu</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Mã lệnh</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Số xe</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Loại hàng</th>
+                                <th class="py-1 px-3 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Thời gian vào</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Thời gian ra</th>
+                                <th class="py-1 px-3 bg-gray-55 font-bold">Tài xế</th>
+                                <th class="py-1 px-3 text-center w-24 bg-gray-55 font-bold">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -3085,32 +3085,32 @@ async function compileAndDownload() {
                                 :key="ticket.id || idx"
                                 class="hover:bg-gray-50 transition-colors"
                             >
-                                <td class="py-2 px-3 text-center font-bold text-gray-400">
+                                <td class="py-1 px-3 text-center font-bold text-gray-400">
                                     {{ (sourceCurrentPage - 1) * itemsPerPage + idx + 1 }}
                                 </td>
-                                <td class="py-2 px-3 font-semibold text-gray-500">{{ ticket.ticketNo }}</td>
-                                <td class="py-2 px-3 font-semibold text-teal-600 font-mono">{{ ticket.orderNo || '-' }}</td>
-                                <td class="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(ticket.plateNumber) }}</td>
-                                <td class="py-2 px-3 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
-                                <td class="py-2 px-3 text-right font-black text-primary">{{ ticket.weightNet.toLocaleString() }}</td>
-                                <td class="py-2 px-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeInStr }} {{ ticket.dateInStr }}</td>
-                                <td class="py-2 px-3 text-[10px] text-gray-500 font-mono">{{ ticket.timeOutStr }} {{ ticket.dateOutStr }}</td>
-                                <td class="py-2 px-3 text-gray-500 truncate max-w-[100px]" :title="ticket.driverName">{{ ticket.driverName || '-' }}</td>
-                                <td class="py-2 px-3 text-center">
+                                <td class="py-1 px-3 font-semibold text-gray-500 whitespace-nowrap">{{ ticket.ticketNo }}</td>
+                                <td class="py-1 px-3 font-semibold text-teal-600 font-mono whitespace-nowrap">{{ ticket.orderNo || '-' }}</td>
+                                <td class="py-1 px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(ticket.plateNumber) }}</td>
+                                <td class="py-1 px-3 truncate max-w-[120px]" :title="ticket.cargoType">{{ ticket.cargoType }}</td>
+                                <td class="py-1 px-3 text-right font-black text-primary whitespace-nowrap">{{ ticket.weightNet.toLocaleString() }}</td>
+                                <td class="py-1 px-3 text-[10px] text-gray-500 font-mono whitespace-nowrap">{{ ticket.timeInStr }} {{ ticket.dateInStr }}</td>
+                                <td class="py-1 px-3 text-[10px] text-gray-500 font-mono whitespace-nowrap">{{ ticket.timeOutStr }} {{ ticket.dateOutStr }}</td>
+                                <td class="py-1 px-3 text-gray-500 truncate max-w-[100px]" :title="ticket.driverName">{{ ticket.driverName || '-' }}</td>
+                                <td class="py-1 px-3 text-center">
                                     <div class="flex items-center justify-center gap-1.5">
                                         <button 
                                             @click="openEditTicketDialog(ticket)" 
-                                            class="size-7 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all"
+                                            class="size-6 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all"
                                             title="Sửa"
                                         >
-                                            <span class="material-symbols-outlined text-[15px]">edit</span>
+                                            <span class="material-symbols-outlined text-[13px]">edit</span>
                                         </button>
                                         <button 
                                             @click="deleteTicket(ticket)" 
-                                            class="size-7 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all"
+                                            class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all"
                                             title="Xóa"
                                         >
-                                            <span class="material-symbols-outlined text-[15px]">delete</span>
+                                            <span class="material-symbols-outlined text-[13px]">delete</span>
                                         </button>
                                     </div>
                                 </td>
