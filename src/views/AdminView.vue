@@ -30,6 +30,32 @@ const isEditingTool = ref(false);
 const editingToolIndex = ref(-1);
 const newTool = ref({ icon: '', label: '', tool: '' });
 
+const handleToolSelect = (event: Event) => {
+    const val = (event.target as HTMLSelectElement).value;
+    if (!val) return;
+    if (val === 'custom') {
+        newTool.value.tool = '';
+        newTool.value.icon = '';
+        newTool.value.label = '';
+        return;
+    }
+    
+    newTool.value.tool = val;
+    if (val === '/tools?tool=weighbridge') {
+        newTool.value.icon = 'print';
+        newTool.value.label = 'In Phiếu Cân Xe';
+    } else if (val === '/tools?tool=merger') {
+        newTool.value.icon = 'layers';
+        newTool.value.label = 'Gộp Excel';
+    } else if (val === '/tools?tool=converter') {
+        newTool.value.icon = 'swap_horiz';
+        newTool.value.label = 'Chuyển Đổi File';
+    } else if (val === '/tools?tool=ocr') {
+        newTool.value.icon = 'menu_book';
+        newTool.value.label = 'PDF & OCR';
+    }
+};
+
 // Social Links & Icon Picker
 const showIconPickerFor = ref<any>(null);
 const customIcons: Record<string, string> = {
@@ -790,11 +816,27 @@ onMounted(async () => {
 
                 <div class="space-y-4 pt-6 border-t border-dashed border-primary/10">
                     <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">{{ isEditingTool ? 'Editing Skill' : 'New Magic Skill' }}</p>
-                    <div class="grid grid-cols-2 gap-4">
-                        <input v-model="newTool.icon" placeholder="Material Icon Name" class="bg-gray-50 p-4 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20" />
-                        <input v-model="newTool.label" placeholder="Skill Label" class="bg-gray-50 p-4 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20" />
+                    
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-wider text-left">Chọn liên kết nhanh công cụ</label>
+                        <select 
+                            :value="['/tools?tool=weighbridge', '/tools?tool=merger', '/tools?tool=converter', '/tools?tool=ocr'].includes(newTool.tool) ? newTool.tool : ''"
+                            @change="handleToolSelect"
+                            class="w-full bg-gray-50 px-4 py-3.5 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                        >
+                            <option value="">-- Nhập tùy chỉnh thủ công dưới đây --</option>
+                            <option value="/tools?tool=weighbridge">In Phiếu Cân Xe (Mã lệnh & Sà lan)</option>
+                            <option value="/tools?tool=merger">Gộp Excel Thông Minh</option>
+                            <option value="/tools?tool=converter">Chuyển Đổi Định Dạng File</option>
+                            <option value="/tools?tool=ocr">PDF & OCR Tools</option>
+                        </select>
                     </div>
-                    <input v-model="newTool.tool" placeholder="Linked Tool Path (optional)" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20" />
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <input v-model="newTool.icon" placeholder="Material Icon Name (ví dụ: print)" class="bg-gray-50 p-4 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20" />
+                        <input v-model="newTool.label" placeholder="Skill Label (ví dụ: In Phiếu Cân)" class="bg-gray-50 p-4 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20" />
+                    </div>
+                    <input v-model="newTool.tool" placeholder="Linked Tool Path (ví dụ: /tools?tool=weighbridge)" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-black border-none outline-none focus:ring-2 focus:ring-primary/20" />
                     <button @click="addTool" class="w-full py-5 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-sm">
                         {{ isEditingTool ? 'Update Magic Skill ✨' : 'Add Magic Skill ✨' }}
                     </button>
