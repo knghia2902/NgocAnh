@@ -2725,151 +2725,71 @@ async function compileAndDownload() {
 
         <!-- Settings Section -->
 
-        <!-- 3-Column Settings & Capacities configs -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0">
-            <!-- Parameters configuration -->
-            <div class="lg:col-span-2 bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
-                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">tune</span>
-                    Cấu hình giải thuật & quy tắc phân bổ
+        <!-- 4-Column Compact Settings -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-white rounded-[20px] p-3.5 soft-shadow border border-primary/5 shrink-0 text-left">
+            
+            <!-- Cột 1: Quy tắc phân bổ -->
+            <div class="flex flex-col gap-2 border-r border-gray-100/80 pr-2 last:border-r-0">
+                <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
+                    <span class="material-symbols-outlined text-[13px]">tune</span>
+                    Quy tắc phân bổ
                 </h4>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <!-- Distribution Strategy -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Chiến lược chia trọng lượng</label>
-                        <select v-model="distStrategy" class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
+                <div class="space-y-2">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Chiến lược chia</span>
+                        <select v-model="distStrategy" class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
                             <option value="random">Phân bổ ngẫu nhiên</option>
                             <option value="even">Chia đều</option>
                             <option value="max">Tối đa hóa công suất</option>
                         </select>
-
                     </div>
-
-                    <!-- Spacing Strategy -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Phương pháp định thời gian</label>
-                        <select v-model="spacingStrategy" class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
-                            <option value="even">Phân bổ đều theo chu kỳ cân</option>
-                            <option value="forward">Tịnh tiến từ thời gian vào (+ Interval)</option>
-                            <option value="backward">Lùi dần từ thời gian ra (- Interval)</option>
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Định thời gian</span>
+                        <select v-model="spacingStrategy" class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
+                            <option value="even">Phân đều chu kỳ</option>
+                            <option value="forward">Tịnh tiến (+ Phút)</option>
+                            <option value="backward">Lùi dần (- Phút)</option>
                         </select>
-
                     </div>
-
-                    <!-- Time Interval (Used if forward/backward) -->
-                    <div v-if="spacingStrategy !== 'even'" class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Khoảng cách giữa các chuyến (phút)</label>
+                    <div v-if="spacingStrategy !== 'even'" class="flex items-center gap-1.5 bg-primary/5 p-1 rounded-lg border border-primary/10">
+                        <span class="text-[9px] font-bold text-gray-500 uppercase whitespace-nowrap">Giãn cách:</span>
                         <input 
                             type="number" 
                             v-model.number="timeIntervalMinutes" 
                             min="10" 
                             max="720"
-                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                            class="w-12 px-1 py-0.5 bg-white border border-gray-200 rounded-[4px] text-[10px] font-bold focus:outline-none focus:border-primary transition-all font-mono text-center"
                         >
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            Thời gian tối thiểu giãn cách giữa hai chuyến xe liên tiếp.
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Cấu hình số phiếu cân -->
-                <div class="border-t border-gray-100 pt-2.5 mt-1">
-                    <div class="flex items-center justify-between mb-2">
-                        <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
-                            <span class="material-symbols-outlined text-base">tag</span>
-                            Cấu hình số phiếu cân tự động
-                        </h4>
-                        <label class="flex items-center gap-1.5 cursor-pointer text-xs font-bold select-none">
-                            <input type="checkbox" v-model="useAutoTicketNo" class="rounded border-gray-300 text-primary focus:ring-primary">
-                            Kích hoạt số phiếu tự động
-                        </label>
-                    </div>
-                    
-                    <div v-if="useAutoTicketNo" class="grid grid-cols-1 md:grid-cols-4 gap-3 animate-fade-in">
-                        <!-- Tiền tố -->
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tiền tố số phiếu</label>
-                            <input 
-                                type="text" 
-                                v-model="ticketPrefix" 
-                                placeholder="Ví dụ: PC-"
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
-                            >
-                        </div>
-
-                        <!-- Số bắt đầu -->
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số phiếu bắt đầu</label>
-                            <input 
-                                type="number" 
-                                v-model.number="ticketStart" 
-                                min="0"
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
-                            >
-                        </div>
-
-                        <!-- Số lượng số 0 (Padding) -->
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Số chữ số (Padding)</label>
-                            <input 
-                                type="number" 
-                                v-model.number="ticketPadding" 
-                                min="1" 
-                                max="10"
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
-                            >
-                        </div>
-
-                        <!-- Hậu tố -->
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hậu tố số phiếu</label>
-                            <input 
-                                type="text" 
-                                v-model="ticketSuffix" 
-                                placeholder="Ví dụ: /26B"
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
-                            >
-                        </div>
-                    </div>
-                    
-                    <!-- Xem trước định dạng số phiếu -->
-                    <div v-if="useAutoTicketNo" class="mt-2 text-[10px] text-gray-400 font-semibold italic flex items-center gap-1 select-none">
-                        <span class="material-symbols-outlined text-[12px]">visibility</span>
-                        Xem trước mẫu số phiếu: <span class="font-bold text-teal-600 font-mono">{{ previewTicketNo }}</span>
+                        <span class="text-[9px] text-gray-400 font-bold">phút</span>
                     </div>
                 </div>
             </div>
 
-            <!-- General Capacity standards config -->
-            <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
-                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">shield</span>
-                    Hạn mức tải trọng tiêu chuẩn
+            <!-- Cột 2: Hạn mức tải trọng -->
+            <div class="flex flex-col gap-2 border-r border-gray-100/80 pr-2 lg:pl-1 last:border-r-0">
+                <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
+                    <span class="material-symbols-outlined text-[13px]">shield</span>
+                    Hạn mức tải trọng
                 </h4>
-
-                <div class="flex flex-col gap-3.5">
-                    <!-- Trọng tải cho phép -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trọng tải cho phép (tấn)</label>
+                <div class="space-y-2">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Trọng tải cho phép (tấn)</span>
                         <input 
                             type="number" 
                             v-model.number="standardTTTPLimit" 
                             step="0.1"
-                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                            class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
                         >
                     </div>
-
-                    <!-- Xác xe -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Xác xe tiêu chuẩn (tấn)</label>
-                        <div class="flex items-center gap-2">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Xác xe tiêu chuẩn (tấn)</span>
+                        <div class="flex items-center gap-1.5">
                             <input 
                                 type="number" 
                                 v-model.number="standardCurbMin" 
                                 step="0.1"
                                 placeholder="Min"
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                                class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
                             >
                             <span class="text-gray-400 text-xs font-bold">~</span>
                             <input 
@@ -2877,19 +2797,85 @@ async function compileAndDownload() {
                                 v-model.number="standardCurbMax" 
                                 step="0.1"
                                 placeholder="Max"
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-[12px] text-xs font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                                class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono text-center"
                             >
                         </div>
                     </div>
-
-                    <!-- Hạn mức hàng -->
-                    <div class="mt-1 pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
-                        <span class="font-bold uppercase tracking-wider text-[9px]">Hạn mức hàng:</span>
-                        <span class="font-bold text-primary font-mono bg-primary/5 px-2.5 py-1 rounded-lg">
+                    <div class="text-[9px] text-gray-400 font-bold flex items-center justify-between mt-1">
+                        <span>Hạn mức hàng:</span>
+                        <span class="text-primary font-mono bg-primary/5 px-2 py-0.5 rounded">
                             {{ Math.max(0, standardTTTPLimit - standardCurbMax).toFixed(1) }} - {{ Math.max(0, standardTTTPLimit - standardCurbMin).toFixed(1) }} tấn
                         </span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Cột 3: Số phiếu tự động (Phần 1) -->
+            <div class="flex flex-col gap-2 border-r border-gray-100/80 pr-2 lg:pl-1 last:border-r-0">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
+                        <span class="material-symbols-outlined text-[13px]">tag</span>
+                        Số phiếu tự động
+                    </h4>
+                    <label class="flex items-center gap-1 cursor-pointer text-[10px] font-bold select-none text-gray-500">
+                        <input type="checkbox" v-model="useAutoTicketNo" class="size-3 rounded border-gray-300 text-primary focus:ring-primary">
+                        Kích hoạt
+                    </label>
+                </div>
+                <div v-if="useAutoTicketNo" class="space-y-2 animate-fade-in">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Tiền tố số phiếu</span>
+                        <input 
+                            type="text" 
+                            v-model="ticketPrefix" 
+                            placeholder="Ví dụ: PC-"
+                            class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
+                    </div>
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Số phiếu bắt đầu</span>
+                        <input 
+                            type="number" 
+                            v-model.number="ticketStart" 
+                            min="0"
+                            class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
+                    </div>
+                </div>
+                <div v-else class="h-full flex items-center justify-center border border-dashed border-gray-200 rounded-xl py-4 text-gray-400 text-[10px] font-bold select-none bg-gray-50/50">
+                    Nhập tay số phiếu
+                </div>
+            </div>
+
+            <!-- Cột 4: Số phiếu tự động (Phần 2) -->
+            <div class="flex flex-col justify-between h-full lg:pl-1">
+                <div v-if="useAutoTicketNo" class="space-y-2 animate-fade-in text-left">
+                    <h4 class="text-[10px] font-black text-transparent select-none hidden lg:block">Cấu hình định dạng</h4>
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Số chữ số (Padding)</span>
+                        <input 
+                            type="number" 
+                            v-model.number="ticketPadding" 
+                            min="1" 
+                            max="10"
+                            class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
+                    </div>
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Hậu tố số phiếu</span>
+                        <input 
+                            type="text" 
+                            v-model="ticketSuffix" 
+                            placeholder="Ví dụ: /26B"
+                            class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
+                        >
+                    </div>
+                    <div class="text-[9px] text-gray-400 font-semibold italic flex items-center gap-1 mt-1 select-none">
+                        <span class="material-symbols-outlined text-[11px]">visibility</span>
+                        Xem trước: <span class="font-bold text-teal-600 font-mono">{{ previewTicketNo }}</span>
+                    </div>
+                </div>
+                <div v-else class="h-full hidden lg:block"></div>
             </div>
         </div>
 
