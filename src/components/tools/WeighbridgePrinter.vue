@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, onUnmounted, computed, watch, nextTick } from
 import { authStore } from '@/stores/auth';
 import { supabase } from '@/supabase';
 import { excelService } from '@/services/excel/ExcelService';
+import { dbContext } from '@/services/storage/DBContext';
 import { WeighbridgeService, type Vessel, type Barge, type Truck, type BargeConfig, type CustomFieldConfig, type PrintElement } from '@/services/excel/WeighbridgeService';
 const props = withDefaults(defineProps<{
     hideCard?: boolean;
@@ -13,6 +14,47 @@ const props = withDefaults(defineProps<{
 // Fullscreen state
 const isOpen = ref(false);
 const activeTab = ref<'data' | 'config' | 'goods'>('data');
+
+// Global goods list state & sync channel
+const globalGoodsList = ref<string[]>([]);
+const syncChannel = new BroadcastChannel('allocator_sync_channel');
+syncChannel.onmessage = async (event) => {
+    try {
+        if (event.data.type === 'goods') {
+            const saved = await dbContext.get<string[]>('allocator_goods');
+            if (saved && Array.isArray(saved)) {
+                globalGoodsList.value = saved;
+            }
+        }
+    } catch (e) {
+        console.error('Lỗi khi đồng bộ hàng hóa toàn cục:', e);
+    }
+};
+
+async function loadGlobalGoods() {
+    try {
+        // Load from DB first
+        const saved = await dbContext.get<string[]>('allocator_goods');
+        if (saved && Array.isArray(saved)) {
+            globalGoodsList.value = saved;
+        }
+        
+        // Fetch from Supabase
+        const { data, error } = await supabase
+            .from('content')
+            .select('settings')
+            .eq('id', 'main')
+            .single();
+        if (error) throw error;
+        
+        if (data?.settings && Array.isArray(data.settings.allocator_goods)) {
+            globalGoodsList.value = data.settings.allocator_goods;
+            await dbContext.set('allocator_goods', data.settings.allocator_goods);
+        }
+    } catch (e) {
+        console.warn('Lỗi khi tải danh mục hàng hóa toàn cục:', e);
+    }
+}
 
 watch(() => props.hideCard, (newVal) => {
     if (newVal) {
@@ -294,7 +336,7 @@ const cfgForm = reactive<BargeConfig>({
     goodsList: []
 });
 
-const newGoodsItem = ref('');
+
 
 const dialogTruck = reactive({
     id: 0,
@@ -2109,136 +2151,7 @@ const syncFromAllocatorActiveBarge = async () => {
 };
 
 // Sync allocator trips for all barges on active vessel
-const syncFromAllocatorAllBarges = async () => {
-    const vesselId = activeVesselId.value;
-    if (!vesselId || !activeVessel.value) {
-        showToast('Vui lòng chọn một tàu trước!', 'error');
-        return;
-    }
 
-    const bargesList = activeVessel.value.barges || [];
-    if (bargesList.length === 0) {
-        showToast('Tàu này chưa có sà lan nào!', 'error');
-        return;
-    }
-
-    const confirmSync = await showConfirm({
-        title: 'Đồng bộ toàn bộ sà lan',
-        message: `Bạn có chắc chắn muốn đồng bộ xe từ Phân rã chuyến cho tất cả ${bargesList.length} sà lan của tàu "${activeVessel.value.name}"?\n\nLưu ý: Tất cả các sà lan chưa bị khóa sẽ bị Ghi đè (Xóa xe cũ và thay bằng xe mới khớp từ Báo cáo cân hàng).`,
-        type: 'warning',
-        okText: 'Đồng bộ hết',
-        cancelText: 'Hủy'
-    });
-    if (!confirmSync) return;
-
-    loading.value = true;
-    try {
-        const { data, error: fetchError } = await supabase
-            .from('content')
-            .select('settings')
-            .eq('id', 'main')
-            .single();
-
-        if (fetchError) throw fetchError;
-
-        const allocatorTrips = data?.settings?.allocator_generated_trips || [];
-        if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) {
-            showToast('Không tìm thấy chuyến xe nào trong Báo cáo phân bổ. Hãy thực hiện phân bổ tải trọng trước!', 'error');
-            return;
-        }
-
-        let syncedBargesCount = 0;
-        let totalSyncedTrucks = 0;
-        const details: string[] = [];
-
-        for (const barge of bargesList) {
-            if (barge.config?.locked) {
-                details.push(`Sà lan "${barge.name}" đang bị khóa -> Bỏ qua`);
-                continue;
-            }
-            
-            const bargeOrderNo = barge.config?.orderNo ? String(barge.config.orderNo).trim() : '';
-            if (!bargeOrderNo) {
-                details.push(`Sà lan "${barge.name}" chưa được cấu hình Mã lệnh -> Bỏ qua và cảnh báo`);
-                showToast(`Cảnh báo: Sà lan "${barge.name}" chưa được cấu hình Mã lệnh!`, 'error');
-                continue;
-            }
-
-            const matchedTrips = allocatorTrips.filter((t: any) => isBargeMatch(t, barge));
-            if (matchedTrips.length === 0) {
-                continue;
-            }
-
-            const importedTrucks: Truck[] = matchedTrips.map((t: any, idx: number) => {
-                let dIn = '';
-                let dOut = '';
-                try {
-                    if (t.date1Obj) {
-                        const date1 = new Date(t.date1Obj);
-                        if (!isNaN(date1.getTime())) {
-                            const offset = date1.getTimezoneOffset();
-                            const localDate = new Date(date1.getTime() - (offset * 60 * 1000));
-                            dIn = localDate.toISOString().slice(0, 16);
-                        }
-                    }
-                    if (t.date2Obj) {
-                        const date2 = new Date(t.date2Obj);
-                        if (!isNaN(date2.getTime())) {
-                            const offset = date2.getTimezoneOffset();
-                            const localDate = new Date(date2.getTime() - (offset * 60 * 1000));
-                            dOut = localDate.toISOString().slice(0, 16);
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Error parsing date:', e);
-                }
-
-                if (!dIn) {
-                    dIn = new Date().toISOString().slice(0, 16);
-                }
-                if (!dOut) {
-                    const outDate = new Date();
-                    outDate.setMinutes(outDate.getMinutes() + 30);
-                    dOut = outDate.toISOString().slice(0, 16);
-                }
-
-                return {
-                    id: Date.now() + idx + Math.floor(Math.random() * 1000),
-                    barge_id: barge.id,
-                    ticketNo: t.ticketNo || '',
-                    plateNumber: t.plateNumber || '',
-                    driver: '',
-                    weight1: Number(t.weight1) || 0,
-                    weight2: Number(t.weight2) || 0,
-                    weightNet: Number(t.weightNet) || 0,
-                    dateIn: dIn,
-                    dateOut: dOut,
-                    note: t.notes || ''
-                };
-            });
-
-            const success = await WeighbridgeService.saveTrucks(barge.id, importedTrucks);
-            if (success) {
-                syncedBargesCount++;
-                totalSyncedTrucks += importedTrucks.length;
-                details.push(`Sà lan "${barge.name}": Đã đồng bộ ${importedTrucks.length} xe`);
-            }
-        }
-
-        if (syncedBargesCount > 0) {
-            showToast(`Đã đồng bộ thành công ${totalSyncedTrucks} xe cho ${syncedBargesCount} sà lan!`);
-            alert(`Kết quả đồng bộ:\n\n${details.join('\n')}`);
-            await loadVessels();
-        } else {
-            showToast('Không có sà lan nào được đồng bộ (hoặc tất cả sà lan khớp đều đã bị khóa)!', 'success');
-        }
-    } catch (e: any) {
-        console.error(e);
-        showToast('Lỗi khi đồng bộ toàn bộ sà lan: ' + (e.message || e), 'error');
-    } finally {
-        loading.value = false;
-    }
-};
 
 // Excel Upload and Analysis
 const handleExcelFile = async (file: File) => {
@@ -2877,6 +2790,7 @@ const triggerPrint = (singleTruck?: Truck) => {
 // Initialize
 onMounted(() => {
     loadVessels();
+    loadGlobalGoods();
     document.addEventListener('keydown', handleKeyDown);
 });
 
@@ -2907,6 +2821,9 @@ watch(activeTab, async (newTab) => {
 }, { immediate: true });
 
 onUnmounted(() => {
+    try {
+        syncChannel.close();
+    } catch (e) {}
     document.removeEventListener('keydown', handleKeyDown);
     if (resizeObserver) {
         resizeObserver.disconnect();
@@ -3069,7 +2986,7 @@ onUnmounted(() => {
                 <!-- Workspace (right) -->
                 <main class="flex-1 h-full min-h-0 flex flex-col gap-4 p-0 overflow-hidden">
                     <!-- Global Dashboard (Empty State replaced by All Barges Overview) -->
-                    <div v-if="!activeVesselId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
+                    <div v-if="!activeVesselId" class="flex-1 flex flex-col gap-4 w-full max-w-[1500px] mx-auto pb-0 animate-fade-in min-h-0">
                         <!-- Welcome Header banner -->
                         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
                             <div>
@@ -3170,38 +3087,38 @@ onUnmounted(() => {
                                 <table class="w-full text-left border-collapse text-xs font-semibold">
                                     <thead>
                                         <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
-                                            <th class="p-3 w-12 text-center bg-gray-50">STT</th>
-                                            <th class="p-3 bg-gray-50">Tên sà lan</th>
-                                            <th class="p-3 bg-gray-50">Thuộc Tàu</th>
-                                            <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
-                                            <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
-                                            <th class="p-3 bg-gray-50 text-center">Trạng thái</th>
-                                            <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
+                                            <th class="px-3 py-2 w-12 text-center bg-gray-50">STT</th>
+                                            <th class="px-3 py-2 bg-gray-50">Tên sà lan</th>
+                                            <th class="px-3 py-2 bg-gray-50">Thuộc Tàu</th>
+                                            <th class="px-3 py-2 bg-gray-50">Thời gian bắt đầu</th>
+                                            <th class="px-3 py-2 bg-gray-50">Thời gian kết thúc</th>
+                                            <th class="px-3 py-2 bg-gray-50 text-center">Trạng thái</th>
+                                            <th class="px-3 py-2 text-center w-28 bg-gray-50">Thao tác</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
                                         <tr v-for="(b, idx) in filteredAllBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
-                                            <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
-                                            <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
-                                            <td class="p-3">
-                                                <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black">
+                                            <td class="px-3 py-2 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
+                                            <td class="px-3 py-2 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="px-3 py-2">
+                                                <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black whitespace-nowrap">
                                                     {{ b.vesselName }}
                                                 </span>
                                             </td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateStart ? formatDateTimeStr(b.dateStart) : '-' }}</td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ b.dateEnd ? formatDateTimeStr(b.dateEnd) : '-' }}</td>
-                                            <td class="p-3 flex justify-center">
-                                                <span v-if="b.locked" class="px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                            <td class="px-3 py-2 text-gray-500 whitespace-nowrap">{{ b.dateStart ? formatDateTimeStr(b.dateStart) : '-' }}</td>
+                                            <td class="px-3 py-2 text-gray-500 whitespace-nowrap">{{ b.dateEnd ? formatDateTimeStr(b.dateEnd) : '-' }}</td>
+                                            <td class="px-3 py-2 text-center">
+                                                <span v-if="b.locked" class="inline-flex px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold items-center gap-1 whitespace-nowrap">
                                                     <span class="material-symbols-outlined text-[11px]">lock</span> Khóa
                                                 </span>
-                                                <span v-else class="px-2.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                                <span v-else class="inline-flex px-2.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-bold items-center gap-1 whitespace-nowrap">
                                                     <span class="material-symbols-outlined text-[11px]">lock_open</span> Mở
                                                 </span>
                                             </td>
-                                            <td class="p-3 text-center">
+                                            <td class="px-3 py-2 text-center">
                                                 <button 
                                                     @click="selectBarge(b.vesselId, b.id)" 
-                                                    class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
+                                                    class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all whitespace-nowrap"
                                                 >
                                                     Xem chi tiết
                                                 </button>
@@ -3214,7 +3131,7 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Vessel Summary Dashboard -->
-                    <div v-else-if="activeVesselId && !activeBargeId" class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 animate-fade-in min-h-0">
+                    <div v-else-if="activeVesselId && !activeBargeId" class="flex-1 flex flex-col gap-4 w-full max-w-[1500px] mx-auto pb-0 animate-fade-in min-h-0">
                         <!-- Vessel header breadcrumbs -->
                         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 gap-3">
                             <div class="flex items-center gap-3">
@@ -3229,14 +3146,6 @@ onUnmounted(() => {
                             </div>
                             
                             <div class="flex items-center gap-2">
-                                <button 
-                                    @click="syncFromAllocatorAllBarges"
-                                    class="px-4 py-2 bg-primary text-white font-bold text-xs rounded-[12px] shadow-soft hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
-                                    :disabled="loading"
-                                >
-                                    <span class="material-symbols-outlined text-sm">sync_alt</span>
-                                    Đồng bộ từ Phân rã chuyến
-                                </button>
                                 <button 
                                     v-if="filteredVesselBarges.length > 0"
                                     @click="exportVesselSummaryExcel"
@@ -3338,36 +3247,36 @@ onUnmounted(() => {
                                 <table class="w-full text-left border-collapse text-xs font-semibold">
                                     <thead>
                                         <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
-                                            <th class="p-3 w-12 text-center bg-gray-50">STT</th>
-                                            <th class="p-3 bg-gray-50">Tên sà lan</th>
-                                            <th class="p-3 text-right bg-gray-50">Số chuyến xe chạy</th>
-                                            <th class="p-3 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
-                                            <th class="p-3 bg-gray-50">Thời gian bắt đầu</th>
-                                            <th class="p-3 bg-gray-50">Thời gian kết thúc</th>
-                                            <th class="p-3 bg-gray-50 text-center">Trạng thái</th>
-                                            <th class="p-3 text-center w-24 bg-gray-50">Thao tác</th>
+                                            <th class="px-3 py-2 w-12 text-center bg-gray-50">STT</th>
+                                            <th class="px-3 py-2 bg-gray-50">Tên sà lan</th>
+                                            <th class="px-3 py-2 text-right bg-gray-50">Số chuyến xe chạy</th>
+                                            <th class="px-3 py-2 text-right text-primary bg-gray-50">Tổng khối lượng (Net - kg)</th>
+                                            <th class="px-3 py-2 bg-gray-50">Thời gian bắt đầu</th>
+                                            <th class="px-3 py-2 bg-gray-50">Thời gian kết thúc</th>
+                                            <th class="px-3 py-2 bg-gray-50 text-center">Trạng thái</th>
+                                            <th class="px-3 py-2 text-center w-28 bg-gray-50">Thao tác</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
                                         <tr v-for="(b, idx) in filteredVesselBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
-                                            <td class="p-3 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
-                                            <td class="p-3 font-bold text-gray-900">{{ b.name }}</td>
-                                            <td class="p-3 text-right font-medium">{{ formatNumber(b.truckCount) }}</td>
-                                            <td class="p-3 text-right font-bold text-teal-600">{{ formatNumber(b.totalWeight) }}</td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateStart) || '-' }}</td>
-                                            <td class="p-3 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateEnd) || '-' }}</td>
-                                            <td class="p-3 flex justify-center">
-                                                <span v-if="b.locked" class="px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                            <td class="px-3 py-2 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
+                                            <td class="px-3 py-2 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="px-3 py-2 text-right font-medium">{{ formatNumber(b.truckCount) }}</td>
+                                            <td class="px-3 py-2 text-right font-bold text-teal-600">{{ formatNumber(b.totalWeight) }}</td>
+                                            <td class="px-3 py-2 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateStart) || '-' }}</td>
+                                            <td class="px-3 py-2 text-gray-500 whitespace-nowrap">{{ formatDateTimeStr(b.dateEnd) || '-' }}</td>
+                                            <td class="px-3 py-2 text-center">
+                                                <span v-if="b.locked" class="inline-flex px-2.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[10px] font-bold items-center gap-1 whitespace-nowrap">
                                                     <span class="material-symbols-outlined text-[11px]">lock</span> Khóa
                                                 </span>
-                                                <span v-else class="px-2.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
+                                                <span v-else class="inline-flex px-2.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-bold items-center gap-1 whitespace-nowrap">
                                                     <span class="material-symbols-outlined text-[11px]">lock_open</span> Mở
                                                 </span>
                                             </td>
-                                            <td class="p-3 text-center">
+                                            <td class="px-3 py-2 text-center">
                                                 <button 
                                                     @click="selectBarge(activeVesselId!, b.id)" 
-                                                    class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all"
+                                                    class="px-2.5 py-1 bg-primary text-white font-bold rounded-[12px] text-[10px] hover:scale-[1.05] transition-all whitespace-nowrap"
                                                 >
                                                     Xem chi tiết
                                                 </button>
@@ -3380,7 +3289,7 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Active Barge Workspace -->
-                    <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 min-h-0">
+                    <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1500px] mx-auto pb-0 min-h-0">
                         <!-- Header with breadcrumbs -->
                         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-3 px-4 soft-shadow border border-primary/5 gap-3">
                             <div>
@@ -3431,13 +3340,7 @@ onUnmounted(() => {
                                 <span class="material-symbols-outlined text-sm">settings</span>
                                 Cấu hình mẫu phiếu
                             </button>
-                            <button 
-                                @click="activeTab = 'goods'"
-                                :class="['px-4 py-1.5 rounded-[12px] font-bold text-xs transition-all flex items-center gap-1', activeTab === 'goods' ? 'bg-primary text-white shadow-soft' : 'text-[#4a2c32]/60 hover:bg-white/50']"
-                            >
-                                <span class="material-symbols-outlined text-sm">inventory_2</span>
-                                Danh sách hàng hóa
-                            </button>
+
 
                         </div>
 
@@ -3690,20 +3593,20 @@ onUnmounted(() => {
                                             <div class="flex flex-col gap-1">
                                                 <label class="text-[10px] font-bold text-gray-500">Tên hàng hóa (mặc định)</label>
                                                 <select 
-                                                    v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0"
+                                                    v-if="globalGoodsList && globalGoodsList.length > 0"
                                                     v-model="cfgForm.goods" 
                                                     :disabled="cfgForm.locked" 
                                                     class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold bg-white disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <option value="">-- Chọn hàng hóa --</option>
-                                                    <option v-for="g in cfgForm.goodsList" :key="g" :value="g">{{ g }}</option>
+                                                    <option v-for="g in globalGoodsList" :key="g" :value="g">{{ g }}</option>
                                                 </select>
                                                 <input 
                                                     v-else
                                                     v-model="cfgForm.goods" 
                                                     :disabled="cfgForm.locked" 
                                                     type="text" 
-                                                    placeholder="Thêm danh sách ở tab Hàng hóa..." 
+                                                    placeholder="Thêm danh mục ở Báo cáo cân hàng..." 
                                                     class="px-3 py-2 rounded-[8px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                             </div>
@@ -4213,84 +4116,6 @@ onUnmounted(() => {
 
                         </div>
 
-                        <!-- TAB 3: GOODS LIST -->
-                        <div v-if="activeTab === 'goods'" class="flex flex-col gap-4 animate-fade-in">
-                            <div class="bg-white rounded-[16px] p-5 soft-shadow border border-primary/5">
-                                <h3 class="text-sm font-black text-primary mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-2">
-                                    <span class="material-symbols-outlined text-base">inventory_2</span>
-                                    Quản lý danh sách hàng hóa
-                                </h3>
-                                <p class="text-xs text-gray-500 mb-4">Thêm các tên hàng hóa vào danh sách. Khi in phiếu cân, bạn sẽ chọn tên hàng hóa từ dropdown thay vì nhập tay.</p>
-
-                                <!-- Add new item -->
-                                <div class="flex gap-2 mb-4">
-                                    <input 
-                                        v-model="newGoodsItem" 
-                                        type="text" 
-                                        placeholder="Nhập tên hàng hóa mới..." 
-                                        class="flex-1 px-4 py-2.5 rounded-[12px] border border-gray-200 focus:border-primary focus:outline-none text-xs font-semibold"
-                                        @keyup.enter="() => { if (newGoodsItem.trim()) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
-                                    >
-                                    <button 
-                                        :disabled="!newGoodsItem.trim()"
-                                        @click="() => { if (newGoodsItem.trim()) { if (!cfgForm.goodsList) cfgForm.goodsList = []; if (!cfgForm.goodsList.includes(newGoodsItem.trim())) { cfgForm.goodsList.push(newGoodsItem.trim()); } newGoodsItem = ''; } }"
-                                        class="px-5 py-2.5 bg-primary text-white rounded-[12px] text-xs font-bold hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                    >
-                                        <span class="material-symbols-outlined text-sm">add</span>
-                                        Thêm hàng hóa
-                                    </button>
-                                </div>
-
-                                <!-- Goods list table -->
-                                <div v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0" class="border border-gray-100 rounded-[12px] overflow-hidden">
-                                    <table class="w-full">
-                                        <thead>
-                                            <tr class="bg-primary/5">
-                                                <th class="text-left px-4 py-2.5 text-[10px] font-black text-[#4a2c32] uppercase tracking-wider w-12">STT</th>
-                                                <th class="text-left px-4 py-2.5 text-[10px] font-black text-[#4a2c32] uppercase tracking-wider">Tên hàng hóa</th>
-                                                <th class="text-center px-4 py-2.5 text-[10px] font-black text-[#4a2c32] uppercase tracking-wider w-20">Thao tác</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(item, idx) in cfgForm.goodsList" :key="idx" class="border-t border-gray-50 hover:bg-primary/[0.02] transition-colors">
-                                                <td class="px-4 py-2.5 text-xs font-bold text-gray-400">{{ idx + 1 }}</td>
-                                                <td class="px-4 py-2.5 text-xs font-semibold text-[#4a2c32]">
-                                                    {{ item }}
-                                                    <span v-if="cfgForm.goods === item" class="ml-1.5 px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-bold rounded-md">Đang chọn</span>
-                                                </td>
-                                                <td class="px-4 py-2.5 text-center">
-                                                    <button 
-                                                        @click="cfgForm.goodsList!.splice(idx, 1)"
-                                                        class="size-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-all mx-auto active:scale-90"
-                                                        title="Xóa hàng hóa này"
-                                                    >
-                                                        <span class="material-symbols-outlined text-sm">delete</span>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div v-else class="text-center py-10">
-                                    <span class="material-symbols-outlined text-4xl text-gray-200 mb-2">inventory_2</span>
-                                    <p class="text-xs text-gray-400 font-semibold">Chưa có hàng hóa nào trong danh sách</p>
-                                    <p class="text-[10px] text-gray-300 mt-1">Thêm hàng hóa bằng ô nhập phía trên</p>
-                                </div>
-
-                                <!-- Summary -->
-                                <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                                    <span class="text-[10px] font-bold text-gray-400">Tổng: {{ cfgForm.goodsList?.length || 0 }} hàng hóa</span>
-                                    <button 
-                                        v-if="cfgForm.goodsList && cfgForm.goodsList.length > 0"
-                                        @click="() => { cfgForm.goodsList = []; cfgForm.goods = ''; }"
-                                        class="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold rounded-lg border border-red-100 transition-all flex items-center gap-1"
-                                    >
-                                        <span class="material-symbols-outlined text-xs">delete_sweep</span>
-                                        Xóa tất cả
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </main>
             </div>

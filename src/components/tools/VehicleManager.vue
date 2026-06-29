@@ -409,7 +409,7 @@ const handleExportExcel = async () => {
 </script>
 
 <template>
-    <div class="w-full flex flex-col gap-6 bg-white rounded-3xl p-6 border border-primary/5 shadow-soft">
+    <div class="w-full flex-1 flex flex-col gap-6 bg-white rounded-3xl p-6 border border-primary/5 shadow-soft">
         
         <!-- Header Section -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -417,15 +417,6 @@ const handleExportExcel = async () => {
                 <h3 class="text-lg font-black text-primary flex items-center gap-2">
                     <span class="material-symbols-outlined text-xl">local_shipping</span>
                     Danh sách xe
-                    <span v-if="syncStatus === 'synced'" class="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[10px] font-bold">cloud_done</span> Đã đồng bộ
-                    </span>
-                    <span v-else-if="syncStatus === 'saving'" class="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full flex items-center gap-1 animate-pulse">
-                        <span class="material-symbols-outlined text-[10px] font-bold animate-spin">sync</span> Đang đồng bộ...
-                    </span>
-                    <span v-else class="text-[10px] font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-full flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[10px] font-bold">cloud_off</span> Lỗi đồng bộ
-                    </span>
                 </h3>
                 <p class="text-[11px] text-gray-500 font-semibold mt-1">
                     Quản lý danh sách biển số xe và số mooc tương ứng. Tổng cộng: 

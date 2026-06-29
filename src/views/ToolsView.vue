@@ -86,7 +86,7 @@ const activeToolMetadata = computed(() => {
 const openTool = (id: string) => {
   if (id === 'weighbridge' || id === 'allocator') {
     activeToolId.value = 'weighbridge';
-    activeTab.value = id === 'allocator' ? 'allocator' : 'printer';
+    activeTab.value = 'allocator';
   } else {
     activeToolId.value = id;
   }
@@ -95,7 +95,7 @@ const openTool = (id: string) => {
 const handleSidebarSwitch = (id: string) => {
   if (id === 'weighbridge' || id === 'allocator') {
     activeToolId.value = 'weighbridge';
-    activeTab.value = id === 'allocator' ? 'allocator' : 'printer';
+    activeTab.value = 'allocator';
   } else {
     activeToolId.value = id;
   }
