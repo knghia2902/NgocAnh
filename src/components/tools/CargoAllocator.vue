@@ -1017,7 +1017,6 @@ async function clearAllTickets() {
 
 // Tabs and filters for Source tickets
 const activeDataTab = ref<'source' | 'generated' | 'template'>('source');
-const isSettingsCollapsed = ref(false);
 const sourceCurrentPage = ref(1);
 const sourceSearchQuery = ref('');
 
@@ -2705,45 +2704,16 @@ async function compileAndDownload() {
 
         <!-- Settings Section -->
 
-        <!-- Collapsed Settings Bar -->
-        <div v-show="isSettingsCollapsed" class="bg-white rounded-[24px] p-3 px-5 soft-shadow border border-primary/5 flex items-center justify-between shrink-0 animate-fade-in">
-            <div class="flex items-center gap-4 text-xs font-bold text-gray-500">
-                <span class="material-symbols-outlined text-primary text-base">tune</span>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span>Chiến lược: <strong class="text-[#4a2c32]">{{ distStrategy === 'random' ? 'Ngẫu nhiên' : distStrategy === 'even' ? 'Chia đều' : 'Tối đa công suất' }}</strong></span>
-                    <span class="text-gray-300">|</span>
-                    <span>Định thời: <strong class="text-[#4a2c32]">{{ spacingStrategy === 'even' ? 'Đều theo chu kỳ' : spacingStrategy === 'forward' ? 'Tịnh tiến' : 'Lùi dần' }}</strong></span>
-                    <span class="text-gray-300">|</span>
-                    <span>Hạn mức: <strong class="text-[#4a2c32]">{{ standardTTTPLimit }}t</strong></span>
-                </div>
-            </div>
-            <button 
-                @click="isSettingsCollapsed = false"
-                class="px-3 py-1.5 rounded-[12px] bg-primary/5 hover:bg-primary/10 text-primary text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-            >
-                <span class="material-symbols-outlined text-sm animate-pulse">tune</span>
-                Mở rộng cấu hình
-            </button>
-        </div>
+        <!-- Settings Section -->
 
         <!-- 3-Column Settings & Capacities configs -->
-        <div v-show="!isSettingsCollapsed" class="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0">
             <!-- Parameters configuration -->
             <div class="lg:col-span-2 bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
-                <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-base">tune</span>
-                        Cấu hình giải thuật & quy tắc phân bổ
-                    </h4>
-                    <button 
-                        @click="isSettingsCollapsed = true"
-                        class="px-2 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-150 text-[10px] font-bold text-gray-500 hover:text-primary transition-all flex items-center gap-1"
-                        title="Thu gọn cấu hình"
-                    >
-                        <span class="material-symbols-outlined text-xs">expand_less</span>
-                        Thu gọn
-                    </button>
-                </div>
+                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-base">tune</span>
+                    Cấu hình giải thuật & quy tắc phân bổ
+                </h4>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <!-- Distribution Strategy -->
@@ -2754,9 +2724,7 @@ async function compileAndDownload() {
                             <option value="even">Chia đều</option>
                             <option value="max">Tối đa hóa công suất</option>
                         </select>
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            {{ distStrategy === 'random' ? 'Tự động tạo ra các số tải trọng ngẫu nhiên tự nhiên dưới hạn mức cho phép.' : distStrategy === 'even' ? 'Chia đều toàn bộ khối lượng thực tế cho số chuyến tối thiểu. Trọng lượng mỗi chuyến bằng nhau.' : 'Xếp tối đa tải trọng cho phép cho các chuyến đầu, chuyến cuối cùng chở phần khối lượng còn thừa.' }}
-                        </span>
+
                     </div>
 
                     <!-- Spacing Strategy -->
@@ -2767,9 +2735,7 @@ async function compileAndDownload() {
                             <option value="forward">Tịnh tiến từ thời gian vào (+ Interval)</option>
                             <option value="backward">Lùi dần từ thời gian ra (- Interval)</option>
                         </select>
-                        <span class="text-[9px] text-gray-400 leading-tight">
-                            {{ spacingStrategy === 'even' ? 'Thời gian các chuyến được chia đều trong khoảng từ lúc xe vào trạm đến lúc xe ra.' : 'Mỗi chuyến xe sau được xếp cách chuyến xe trước một khoảng thời gian cố định.' }}
-                        </span>
+
                     </div>
 
                     <!-- Time Interval (Used if forward/backward) -->
