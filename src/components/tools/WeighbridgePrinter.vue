@@ -140,6 +140,10 @@ const activeBargeId = ref<number | null>(null);
 const trucks = ref<Truck[]>([]);
 const loading = ref(false);
 const saving = ref(false);
+const isOnline = ref(navigator.onLine);
+const updateOnlineStatus = () => {
+    isOnline.value = navigator.onLine;
+};
 
 
 // Filters and sorting state
@@ -2792,6 +2796,8 @@ onMounted(() => {
     loadVessels();
     loadGlobalGoods();
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
 });
 
 // Watch activeTab to dynamically register/deregister ResizeObserver when entering/leaving config tab
@@ -2825,6 +2831,8 @@ onUnmounted(() => {
         syncChannel.close();
     } catch (e) {}
     document.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('online', updateOnlineStatus);
+    window.removeEventListener('offline', updateOnlineStatus);
     if (resizeObserver) {
         resizeObserver.disconnect();
     }
@@ -3018,12 +3026,20 @@ onUnmounted(() => {
                                 </div>
                             </div>
                             <div class="bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex items-center gap-4">
-                                <div class="size-11 bg-amber-500/10 text-amber-600 rounded-[12px] flex items-center justify-center flex-shrink-0">
-                                    <span class="material-symbols-outlined text-xl">cloud_done</span>
+                                <div 
+                                    class="size-11 rounded-[12px] flex items-center justify-center flex-shrink-0 transition-all"
+                                    :class="isOnline ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'"
+                                >
+                                    <span class="material-symbols-outlined text-xl">{{ isOnline ? 'cloud' : 'cloud_off' }}</span>
                                 </div>
-                                <div>
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trạng thái dữ liệu</p>
-                                    <h4 class="text-lg font-black text-amber-600">Sẵn sàng <span class="text-xs text-gray-400 font-bold">offline</span></h4>
+                                <div class="text-left">
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Đồng bộ đám mây</p>
+                                    <h4 
+                                        class="text-lg font-black transition-colors"
+                                        :class="isOnline ? 'text-emerald-600' : 'text-amber-600'"
+                                    >
+                                        {{ isOnline ? 'Đã kết nối' : 'Ngoại tuyến' }}
+                                    </h4>
                                 </div>
                             </div>
                         </div>
