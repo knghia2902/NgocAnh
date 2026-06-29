@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
 import FormatConverter from '../components/tools/FormatConverter.vue';
 import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
@@ -8,6 +9,7 @@ import CargoAllocator from '../components/tools/CargoAllocator.vue';
 import { authStore } from '../stores/auth';
 import { ContentService } from '../services/ContentService';
 
+const route = useRoute();
 
 // Active tool and sub-views
 const activeToolId = ref<string | null>(null);
@@ -18,6 +20,11 @@ const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', '
 
 onMounted(async () => {
     allowedStaffTools.value = await ContentService.loadStaffTools();
+
+    const toolParam = route.query.tool;
+    if (typeof toolParam === 'string' && toolParam) {
+        openTool(toolParam);
+    }
 });
 
 watch(activeToolId, (newVal) => {
