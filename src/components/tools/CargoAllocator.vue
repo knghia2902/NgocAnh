@@ -2686,9 +2686,9 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Chế độ 2: Giao diện Phân bổ tải trọng xếp hàng (Chạy toàn cục) -->
-                <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 min-h-0 overflow-y-auto pr-1">
+                <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0 min-h-0">
 
-                    <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-8 fade-in">
+                    <div class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-2 fade-in flex-1 min-h-0">
         <!-- Header Banner -->
         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
             <div>
@@ -2878,7 +2878,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in flex-1 min-h-0">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3047,7 +3047,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Source Tickets -->
-            <div v-if="activeDataTab === 'source'" class="flex flex-col gap-4">
+            <div v-if="activeDataTab === 'source'" class="flex-1 flex flex-col gap-3 min-h-0">
                 <!-- Search & Info -->
                 <div class="flex items-center justify-between gap-4">
                     <div class="relative w-full max-w-[320px] flex items-center">
@@ -3073,7 +3073,7 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Source Tickets Table -->
-                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                <div class="flex-1 overflow-y-auto overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
@@ -3157,7 +3157,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Generated Split Trips -->
-            <div v-if="activeDataTab === 'generated'" class="flex flex-col gap-4">
+            <div v-if="activeDataTab === 'generated'" class="flex-1 flex flex-col gap-3 min-h-0">
                 <!-- Search Filter Row -->
                 <div class="flex items-center justify-between gap-4">
                     <div class="relative w-full max-w-[320px] flex items-center">
@@ -3183,7 +3183,7 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Preview Data Table -->
-                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                <div class="flex-1 overflow-y-auto overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
@@ -3275,7 +3275,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Detail Template (Theo dõi) -->
-            <div v-if="activeDataTab === 'template'" class="flex flex-col gap-4">
+            <div v-if="activeDataTab === 'template'" class="flex-1 flex flex-col gap-3 min-h-0">
                 <!-- Search Filter Row -->
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
@@ -3325,7 +3325,7 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Preview Data Table -->
-                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                <div class="flex-1 overflow-y-auto overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
