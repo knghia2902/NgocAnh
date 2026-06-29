@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import FormatConverter from '../components/tools/FormatConverter.vue';
 import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
@@ -18,6 +18,18 @@ const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', '
 
 onMounted(async () => {
     allowedStaffTools.value = await ContentService.loadStaffTools();
+});
+
+watch(activeToolId, (newVal) => {
+    if (newVal) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}, { immediate: true });
+
+onUnmounted(() => {
+    document.body.style.overflow = '';
 });
 
 const allTools = [
