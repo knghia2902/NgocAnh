@@ -2646,9 +2646,9 @@ async function compileAndDownload() {
 <template>
     <div class="cargo-allocator-wrapper flex-1 flex flex-col min-h-0 overflow-hidden h-full w-full">
         <!-- Main area -->
-        <div class="flex-1 flex overflow-y-auto gap-4 p-4 pr-1">
+        <div class="flex-1 flex overflow-hidden gap-4 p-4">
             <!-- Sidebar (left) -->
-            <aside class="w-72 bg-white rounded-[24px] soft-shadow border border-primary/5 flex flex-col shrink-0 no-print">
+            <aside class="w-72 h-full bg-white rounded-[24px] soft-shadow border border-primary/5 flex flex-col shrink-0 overflow-hidden no-print">
                 <!-- Sidebar header -->
                 <div class="p-4 border-b border-primary/5">
                     <div class="text-[10px] uppercase font-black tracking-widest text-primary mb-0.5">Tiện ích quản lý</div>
@@ -2679,16 +2679,16 @@ async function compileAndDownload() {
             </aside>
 
             <!-- Workspace (right) -->
-            <main class="flex-1 flex flex-col gap-4 p-0">
+            <main class="flex-1 h-full flex flex-col gap-4 p-0 overflow-y-auto pr-1.5">
                 <!-- Chế độ 1: Quản lý danh sách xe -->
                 <div v-if="activeSubViewMode === 'vehicles'" class="flex-1 flex flex-col min-h-0 overflow-hidden bg-white rounded-[24px] soft-shadow border border-primary/5 p-0">
                     <VehicleManager />
                 </div>
 
                 <!-- Chế độ 2: Giao diện Phân bổ tải trọng xếp hàng (Chạy toàn cục) -->
-                <div v-else class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-0">
+                <div v-else class="min-h-full flex flex-col gap-4 w-full max-w-[1200px] mx-auto pb-4">
 
-                    <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-0 fade-in">
+                    <div class="flex-1 flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-0 fade-in">
         <!-- Header Banner -->
         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
             <div>
@@ -2878,7 +2878,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in flex-1">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
