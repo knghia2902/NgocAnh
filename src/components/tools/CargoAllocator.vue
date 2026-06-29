@@ -1017,6 +1017,7 @@ async function clearAllTickets() {
 
 // Tabs and filters for Source tickets
 const activeDataTab = ref<'source' | 'generated' | 'template'>('source');
+const isSettingsCollapsed = ref(false);
 const sourceCurrentPage = ref(1);
 const sourceSearchQuery = ref('');
 
@@ -2704,14 +2705,45 @@ async function compileAndDownload() {
 
         <!-- Settings Section -->
 
+        <!-- Collapsed Settings Bar -->
+        <div v-show="isSettingsCollapsed" class="bg-white rounded-[24px] p-3 px-5 soft-shadow border border-primary/5 flex items-center justify-between shrink-0 animate-fade-in">
+            <div class="flex items-center gap-4 text-xs font-bold text-gray-500">
+                <span class="material-symbols-outlined text-primary text-base">tune</span>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>Chiến lược: <strong class="text-[#4a2c32]">{{ distStrategy === 'random' ? 'Ngẫu nhiên' : distStrategy === 'even' ? 'Chia đều' : 'Tối đa công suất' }}</strong></span>
+                    <span class="text-gray-300">|</span>
+                    <span>Định thời: <strong class="text-[#4a2c32]">{{ spacingStrategy === 'even' ? 'Đều theo chu kỳ' : spacingStrategy === 'forward' ? 'Tịnh tiến' : 'Lùi dần' }}</strong></span>
+                    <span class="text-gray-300">|</span>
+                    <span>Hạn mức: <strong class="text-[#4a2c32]">{{ standardTTTPLimit }}t</strong></span>
+                </div>
+            </div>
+            <button 
+                @click="isSettingsCollapsed = false"
+                class="px-3 py-1.5 rounded-[12px] bg-primary/5 hover:bg-primary/10 text-primary text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+            >
+                <span class="material-symbols-outlined text-sm animate-pulse">tune</span>
+                Mở rộng cấu hình
+            </button>
+        </div>
+
         <!-- 3-Column Settings & Capacities configs -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0">
+        <div v-show="!isSettingsCollapsed" class="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0">
             <!-- Parameters configuration -->
             <div class="lg:col-span-2 bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
-                <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-base">tune</span>
-                    Cấu hình giải thuật & quy tắc phân bổ
-                </h4>
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-base">tune</span>
+                        Cấu hình giải thuật & quy tắc phân bổ
+                    </h4>
+                    <button 
+                        @click="isSettingsCollapsed = true"
+                        class="px-2 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-150 text-[10px] font-bold text-gray-500 hover:text-primary transition-all flex items-center gap-1"
+                        title="Thu gọn cấu hình"
+                    >
+                        <span class="material-symbols-outlined text-xs">expand_less</span>
+                        Thu gọn
+                    </button>
+                </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <!-- Distribution Strategy -->
