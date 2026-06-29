@@ -2878,7 +2878,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in shrink-0">
+        <div class="bg-white rounded-[24px] p-5 pb-3 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in shrink-0">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3367,10 +3367,10 @@ async function compileAndDownload() {
                                 <td class="py-1 px-3 text-center">
                                     <button 
                                         @click="deleteGeneratedTrip(trip)"
-                                        class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center mx-auto"
+                                        class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all mx-auto"
                                         title="Xóa chuyến xe này"
                                     >
-                                        <span class="material-symbols-outlined text-base">delete</span>
+                                        <span class="material-symbols-outlined text-[13px]">delete</span>
                                     </button>
                                 </td>
                             </tr>
