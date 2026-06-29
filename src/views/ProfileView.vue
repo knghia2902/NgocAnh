@@ -234,13 +234,14 @@ const handleLogout = () => {
 
             <!-- Navigation Hub & Logout -->
             <div class="mt-6 pt-6 border-t border-primary/10 flex flex-col sm:flex-row gap-3 justify-between items-center relative z-10">
+                <router-link to="/" class="w-full sm:w-auto px-5 py-2.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] rounded-full transition-all flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-wider">
+                    <span class="material-symbols-outlined text-sm">home</span>
+                    Quay lại Trang Chủ
+                </router-link>
+                
                 <router-link v-if="authStore.role === 'admin'" to="/admin" class="w-full sm:w-auto px-5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-[10px] rounded-full transition-all flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-wider">
                     <span class="material-symbols-outlined text-sm">settings_applications</span>
-                    Đi đến Trang Quản Trị
-                </router-link>
-                <router-link v-else to="/tools" class="w-full sm:w-auto px-5 py-2.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] rounded-full transition-all flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-wider">
-                    <span class="material-symbols-outlined text-sm">construction</span>
-                    Sử dụng Công Cụ
+                    Trang Quản Trị
                 </router-link>
 
                 <button @click="handleLogout" class="w-full sm:w-auto px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[10px] rounded-full transition-all flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-wider">

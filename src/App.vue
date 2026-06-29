@@ -133,15 +133,6 @@ onUnmounted(() => {
                 Trang quản trị (Admin)
               </router-link>
 
-              <router-link 
-                to="/tools" 
-                @click="closeDropdown"
-                class="px-4 py-2.5 hover:bg-primary/5 text-[#4a2c32]/85 font-bold text-xs flex items-center gap-2 transition-colors"
-              >
-                <span class="material-symbols-outlined text-base text-teal-600">construction</span>
-                Sử dụng công cụ
-              </router-link>
-
               <div class="h-px bg-primary/5 my-1"></div>
 
               <!-- Logout option -->
