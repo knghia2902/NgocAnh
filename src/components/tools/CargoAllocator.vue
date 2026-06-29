@@ -2878,7 +2878,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in flex-1 overflow-hidden">
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -2940,16 +2940,6 @@ async function compileAndDownload() {
                         @change="handleTicketImport" 
                         class="hidden"
                     >
-                    <!-- Input Số lệnh trước khi Import -->
-                    <div class="flex items-center gap-1.5 bg-white border border-gray-200 rounded-[8px] px-2 h-7 shadow-sm">
-                        <span class="text-[9px] font-black text-gray-400 uppercase select-none">Số lệnh:</span>
-                        <input 
-                            type="text" 
-                            v-model="importOrderNo" 
-                            placeholder="Nhập số lệnh..." 
-                            class="bg-transparent border-none text-[10px] font-bold focus:outline-none w-[95px] placeholder:text-gray-300"
-                        />
-                    </div>
                     <button 
                         @click="triggerTicketFileInput"
                         class="h-7 px-3 bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold rounded-[8px] hover:bg-primary/20 active:scale-[0.98] transition-all flex items-center gap-1.5"
@@ -3047,7 +3037,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Source Tickets -->
-            <div v-if="activeDataTab === 'source'" class="flex flex-col gap-3 flex-1 min-h-0">
+            <div v-if="activeDataTab === 'source'" class="flex flex-col gap-3">
                 <!-- Search & Info -->
                 <div class="flex items-center justify-between gap-4">
                     <div class="relative w-full max-w-[320px] flex items-center">
@@ -3157,7 +3147,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Generated Split Trips -->
-            <div v-if="activeDataTab === 'generated'" class="flex flex-col gap-3 flex-1 min-h-0">
+            <div v-if="activeDataTab === 'generated'" class="flex flex-col gap-3">
                 <!-- Search Filter Row -->
                 <div class="flex items-center justify-between gap-4">
                     <div class="relative w-full max-w-[320px] flex items-center">
@@ -3275,7 +3265,7 @@ async function compileAndDownload() {
             </div>
 
             <!-- Tab Content: Detail Template (Theo dõi) -->
-            <div v-if="activeDataTab === 'template'" class="flex flex-col gap-3 flex-1 min-h-0">
+            <div v-if="activeDataTab === 'template'" class="flex flex-col gap-3">
                 <!-- Search Filter Row -->
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
