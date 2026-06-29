@@ -2767,15 +2767,12 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Col 2: Số phiếu tự động (Phần 1) -->
-                <div class="flex flex-col gap-2 border-r border-gray-100/80 pr-2 lg:pl-1 last:border-r-0">
-                    <div class="flex items-center gap-2">
-                        <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
-                            <span class="material-symbols-outlined text-[13px]">tag</span>
-                            Số phiếu tự động
-                        </h4>
-                        <input type="checkbox" v-model="useAutoTicketNo" class="size-3.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer">
-                    </div>
-                    <div v-if="useAutoTicketNo" class="space-y-2 animate-fade-in">
+                <div class="flex flex-col gap-2 pr-2 lg:pl-1">
+                    <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
+                        <span class="material-symbols-outlined text-[13px]">tag</span>
+                        Số phiếu tự động
+                    </h4>
+                    <div class="space-y-2">
                         <div class="flex flex-col gap-0.5">
                             <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Tiền tố số phiếu</span>
                             <input 
@@ -2795,14 +2792,11 @@ async function compileAndDownload() {
                             >
                         </div>
                     </div>
-                    <div v-else class="h-full flex items-center justify-center border border-dashed border-gray-200 rounded-xl py-4 text-gray-400 text-[10px] font-bold select-none bg-gray-50/50">
-                        Nhập tay số phiếu
-                    </div>
                 </div>
 
                 <!-- Col 3: Số phiếu tự động (Phần 2) -->
                 <div class="flex flex-col justify-between h-full lg:pl-1">
-                    <div v-if="useAutoTicketNo" class="space-y-2 animate-fade-in text-left">
+                    <div class="space-y-2 text-left">
                         <h4 class="text-[10px] font-black text-transparent select-none hidden md:block">Cấu hình định dạng</h4>
                         <div class="flex flex-col gap-0.5">
                             <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Số chữ số (Padding)</span>
@@ -2828,7 +2822,6 @@ async function compileAndDownload() {
                             Xem trước: <span class="font-bold text-teal-600 font-mono">{{ previewTicketNo }}</span>
                         </div>
                     </div>
-                    <div v-else class="h-full hidden md:block"></div>
                 </div>
             </div>
 
