@@ -3183,7 +3183,7 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Preview Data Table -->
-                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                <div :class="['border border-gray-100 rounded-[16px] bg-white', existingTrips.length > 0 ? 'overflow-x-auto' : 'overflow-hidden']">
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
@@ -3325,7 +3325,7 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Preview Data Table -->
-                <div class="overflow-x-auto border border-gray-100 rounded-[16px] bg-white">
+                <div :class="['border border-gray-100 rounded-[16px] bg-white', generatedTrips.length > 0 ? 'overflow-x-auto' : 'overflow-hidden']">
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
