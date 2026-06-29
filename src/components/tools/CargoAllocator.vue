@@ -2727,8 +2727,8 @@ async function compileAndDownload() {
 
         <!-- Compact Settings & Capacities configs -->
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 shrink-0 text-left">
-            <!-- Thẻ trái: Quy tắc & Số phiếu (3/4 width) -->
-            <div class="lg:col-span-3 bg-white rounded-[20px] p-3.5 soft-shadow border border-primary/5 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <!-- Thẻ 1: Số phiếu tự động (2/4 width) -->
+            <div class="lg:col-span-2 bg-white rounded-[20px] p-3.5 soft-shadow border border-primary/5 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <!-- Col 1: Số phiếu tự động (Phần 1) -->
                 <div class="flex flex-col gap-2 pr-2 lg:pl-1">
                     <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
@@ -2762,7 +2762,7 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Col 2: Số phiếu tự động (Phần 2) -->
-                <div class="flex flex-col gap-2 h-full lg:pl-1 border-r border-gray-100/80 pr-2 last:border-r-0">
+                <div class="flex flex-col gap-2 h-full lg:pl-1">
                     <div class="space-y-2 text-left">
                         <h4 class="text-[10px] font-black text-transparent select-none hidden md:block">Cấu hình định dạng</h4>
                         <div class="flex flex-col gap-0.5">
@@ -2786,46 +2786,46 @@ async function compileAndDownload() {
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Col 3: Quy tắc phân bổ -->
-                <div class="flex flex-col gap-2 lg:pl-1">
-                    <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
-                        <span class="material-symbols-outlined text-[13px]">tune</span>
-                        Quy tắc phân bổ
-                    </h4>
-                    <div class="space-y-2">
-                        <div class="flex flex-col gap-0.5">
-                            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Chiến lược chia</span>
-                            <select v-model="distStrategy" class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
-                                <option value="random">Phân bổ ngẫu nhiên</option>
-                                <option value="even">Chia đều</option>
-                                <option value="max">Tối đa hóa công suất</option>
-                            </select>
-                        </div>
-                        <div class="flex flex-col gap-0.5">
-                            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Định thời gian</span>
-                            <select v-model="spacingStrategy" class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
-                                <option value="even">Phân đều chu kỳ</option>
-                                <option value="forward">Tịnh tiến (+ Phút)</option>
-                                <option value="backward">Lùi dần (- Phút)</option>
-                            </select>
-                        </div>
-                        <div v-if="spacingStrategy !== 'even'" class="flex items-center gap-1.5 bg-primary/5 p-1 rounded-lg border border-primary/10">
-                            <span class="text-[9px] font-bold text-gray-500 uppercase whitespace-nowrap">Giãn cách:</span>
-                            <input 
-                                type="number" 
-                                v-model.number="timeIntervalMinutes" 
-                                min="10" 
-                                max="720"
-                                class="w-12 px-1 py-0.5 bg-white border border-gray-200 rounded-[4px] text-[10px] font-bold focus:outline-none focus:border-primary transition-all font-mono text-center"
-                            >
-                            <span class="text-[9px] text-gray-400 font-bold">phút</span>
-                        </div>
+            <!-- Thẻ 2: Quy tắc phân bổ (1/4 width) -->
+            <div class="lg:col-span-1 bg-white rounded-[20px] p-3.5 soft-shadow border border-primary/5 flex flex-col gap-2">
+                <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
+                    <span class="material-symbols-outlined text-[13px]">tune</span>
+                    Quy tắc phân bổ
+                </h4>
+                <div class="space-y-2">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Chiến lược chia</span>
+                        <select v-model="distStrategy" class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
+                            <option value="random">Phân bổ ngẫu nhiên</option>
+                            <option value="even">Chia đều</option>
+                            <option value="max">Tối đa hóa công suất</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Định thời gian</span>
+                        <select v-model="spacingStrategy" class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all cursor-pointer">
+                            <option value="even">Phân đều chu kỳ</option>
+                            <option value="forward">Tịnh tiến (+ Phút)</option>
+                            <option value="backward">Lùi dần (- Phút)</option>
+                        </select>
+                    </div>
+                    <div v-if="spacingStrategy !== 'even'" class="flex items-center gap-1.5 bg-primary/5 p-1 rounded-lg border border-primary/10">
+                        <span class="text-[9px] font-bold text-gray-500 uppercase whitespace-nowrap">Giãn cách:</span>
+                        <input 
+                            type="number" 
+                            v-model.number="timeIntervalMinutes" 
+                            min="10" 
+                            max="720"
+                            class="w-12 px-1 py-0.5 bg-white border border-gray-200 rounded-[4px] text-[10px] font-bold focus:outline-none focus:border-primary transition-all font-mono text-center"
+                        >
+                        <span class="text-[9px] text-gray-400 font-bold">phút</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Thẻ phải: Hạn mức tải trọng (1/4 width) -->
+            <!-- Thẻ 3: Hạn mức tải trọng (1/4 width) -->
             <div class="lg:col-span-1 bg-white rounded-[20px] p-3.5 soft-shadow border border-primary/5 flex flex-col gap-2">
                 <h4 class="text-[10px] font-black text-primary flex items-center gap-1.5 select-none">
                     <span class="material-symbols-outlined text-[13px]">shield</span>
