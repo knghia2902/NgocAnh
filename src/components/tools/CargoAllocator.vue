@@ -2690,7 +2690,7 @@ async function compileAndDownload() {
 
                     <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-0 fade-in">
         <!-- Header Banner -->
-        <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
+        <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4 shrink-0">
             <div>
                 <div class="text-[9px] uppercase font-black tracking-widest text-primary mb-0.5">Công cụ thông minh</div>
                 <h1 class="text-base font-black text-[#4a2c32] flex items-center gap-1.5">
@@ -2706,7 +2706,7 @@ async function compileAndDownload() {
         <!-- Settings Section -->
 
         <!-- 3-Column Settings & Capacities configs -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0">
             <!-- Parameters configuration -->
             <div class="lg:col-span-2 bg-white rounded-[24px] p-4 soft-shadow border border-primary/5 flex flex-col gap-2.5">
                 <h4 class="text-xs font-black text-primary flex items-center gap-1.5">
@@ -2878,7 +2878,7 @@ async function compileAndDownload() {
         </div>
 
         <!-- Tabbed Data Panel -->
-        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in">
+        <div class="bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 flex flex-col gap-4 animate-fade-in shrink-0">
             <!-- Tabs Header -->
             <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3319,23 +3319,23 @@ async function compileAndDownload() {
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
-                                <th class="py-[14px] px-3 bg-gray-55 font-bold">Số phiếu</th>
-                                <th class="py-[14px] px-3 bg-gray-55 font-bold">Mã lệnh</th>
-                                <th class="py-[14px] px-3 bg-gray-50 font-bold">Số xe</th>
-                                <th class="py-[14px] px-3 bg-gray-55 font-bold">Khách hàng</th>
-                                <th class="py-[14px] px-3 text-right bg-gray-50 font-bold">KL cân lần 1</th>
-                                <th class="py-[14px] px-3 text-right bg-gray-55 font-bold">KL cân lần 2</th>
-                                <th class="py-[14px] px-3 text-right bg-gray-50 font-bold">KL hàng</th>
-                                <th class="py-[14px] px-3 text-center bg-gray-55 font-bold">Ngày cân 1</th>
-                                <th class="py-[14px] px-3 text-center bg-gray-50 font-bold">Giờ cân 1</th>
-                                <th class="py-[14px] px-3 bg-gray-55 font-bold">Ngày giờ 1</th>
-                                <th class="py-[14px] px-3 text-center bg-gray-50 font-bold">Ngày cân 2</th>
-                                <th class="py-[14px] px-3 text-center bg-gray-55 font-bold">Giờ cân 2</th>
-                                <th class="py-[14px] px-3 bg-gray-50 font-bold">Ngày giờ 2</th>
-                                <th class="py-[14px] px-3 text-center bg-gray-55 font-bold">X/N</th>
-                                <th class="py-[14px] px-3 bg-gray-50 font-bold">Loại hàng</th>
-                                <th class="py-[14px] px-3 bg-gray-55 font-bold">Loại Sà lan</th>
-                                <th class="py-[14px] px-3 text-center bg-gray-50 font-bold w-[80px]">Thao tác</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Số phiếu</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Mã lệnh</th>
+                                <th class="py-2 px-3 bg-gray-50 font-bold">Số xe</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Khách hàng</th>
+                                <th class="py-2 px-3 text-right bg-gray-50 font-bold">KL cân lần 1</th>
+                                <th class="py-2 px-3 text-right bg-gray-55 font-bold">KL cân lần 2</th>
+                                <th class="py-2 px-3 text-right bg-gray-50 font-bold">KL hàng</th>
+                                <th class="py-2 px-3 text-center bg-gray-55 font-bold">Ngày cân 1</th>
+                                <th class="py-2 px-3 text-center bg-gray-55 font-bold">Giờ cân 1</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Ngày giờ 1</th>
+                                <th class="py-2 px-3 text-center bg-gray-50 font-bold">Ngày cân 2</th>
+                                <th class="py-2 px-3 text-center bg-gray-55 font-bold">Giờ cân 2</th>
+                                <th class="py-2 px-3 bg-gray-50 font-bold">Ngày giờ 2</th>
+                                <th class="py-2 px-3 text-center bg-gray-55 font-bold">X/N</th>
+                                <th class="py-2 px-3 bg-gray-50 font-bold">Loại hàng</th>
+                                <th class="py-2 px-3 bg-gray-55 font-bold">Loại Sà lan</th>
+                                <th class="py-2 px-3 text-center bg-gray-50 font-bold w-[80px]">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -3344,27 +3344,27 @@ async function compileAndDownload() {
                                 :key="trip.stt"
                                 class="hover:bg-gray-50 transition-colors"
                             >
-                                <td class="py-[14px] px-3 font-bold text-gray-800">{{ trip.ticketNo }}</td>
-                                <td class="py-[14px] px-3 font-semibold text-teal-600 font-mono">{{ trip.orderNo || '-' }}</td>
-                                <td class="py-[14px] px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(trip.plateNumber) }}</td>
-                                <td class="py-[14px] px-3 max-w-[150px] truncate text-gray-500" :title="trip.customer">{{ trip.customer }}</td>
-                                <td class="py-[14px] px-3 text-right font-mono text-gray-600">{{ trip.weight1.toLocaleString() }}</td>
-                                <td class="py-[14px] px-3 text-right font-mono text-gray-600">{{ trip.weight2.toLocaleString() }}</td>
-                                <td class="py-[14px] px-3 text-right font-black text-primary font-mono">{{ trip.weightNet.toLocaleString() }}</td>
-                                <td class="py-[14px] px-3 text-center text-gray-500 font-mono">{{ formatExcelDate(trip.date1Obj) }}</td>
-                                <td class="py-[14px] px-3 text-center text-gray-500 font-mono">{{ formatExcelTime(trip.date1Obj) }}</td>
-                                <td class="py-[14px] px-3 text-gray-400 text-[10px] font-mono whitespace-nowrap">{{ formatExcelDateTimeCombined(trip.date1Obj) }}</td>
-                                <td class="py-[14px] px-3 text-center text-gray-500 font-mono">{{ formatExcelDate(trip.date2Obj) }}</td>
-                                <td class="py-[14px] px-3 text-center text-gray-500 font-mono">{{ formatExcelTime(trip.date2Obj) }}</td>
-                                <td class="py-[14px] px-3 text-gray-400 text-[10px] font-mono whitespace-nowrap">{{ formatExcelDateTimeCombined(trip.date2Obj) }}</td>
-                                <td class="py-[14px] px-3 text-center">
+                                <td class="py-2 px-3 font-bold text-gray-800">{{ trip.ticketNo }}</td>
+                                <td class="py-2 px-3 font-semibold text-teal-600 font-mono">{{ trip.orderNo || '-' }}</td>
+                                <td class="py-2 px-3 font-bold text-gray-900 whitespace-nowrap">{{ formatPlate(trip.plateNumber) }}</td>
+                                <td class="py-2 px-3 max-w-[150px] truncate text-gray-500" :title="trip.customer">{{ trip.customer }}</td>
+                                <td class="py-2 px-3 text-right font-mono text-gray-600">{{ trip.weight1.toLocaleString() }}</td>
+                                <td class="py-2 px-3 text-right font-mono text-gray-600">{{ trip.weight2.toLocaleString() }}</td>
+                                <td class="py-2 px-3 text-right font-black text-primary font-mono">{{ trip.weightNet.toLocaleString() }}</td>
+                                <td class="py-2 px-3 text-center text-gray-500 font-mono">{{ formatExcelDate(trip.date1Obj) }}</td>
+                                <td class="py-2 px-3 text-center text-gray-500 font-mono">{{ formatExcelTime(trip.date1Obj) }}</td>
+                                <td class="py-2 px-3 text-gray-400 text-[10px] font-mono whitespace-nowrap">{{ formatExcelDateTimeCombined(trip.date1Obj) }}</td>
+                                <td class="py-2 px-3 text-center text-gray-500 font-mono">{{ formatExcelDate(trip.date2Obj) }}</td>
+                                <td class="py-2 px-3 text-center text-gray-500 font-mono">{{ formatExcelTime(trip.date2Obj) }}</td>
+                                <td class="py-2 px-3 text-gray-400 text-[10px] font-mono whitespace-nowrap">{{ formatExcelDateTimeCombined(trip.date2Obj) }}</td>
+                                <td class="py-2 px-3 text-center">
                                     <span :class="['px-1.5 py-0.5 rounded text-[10px] font-black', trip.direction.toUpperCase().includes('XUẤT') || trip.direction.toUpperCase().includes('XUAT') ? 'bg-primary/10 text-primary' : 'bg-teal-50 text-teal-600']">
                                         {{ trip.direction.toUpperCase().includes('XUẤT') || trip.direction.toUpperCase().includes('XUAT') ? 'XUẤT' : 'NHẬP' }}
                                     </span>
                                 </td>
-                                <td class="py-[14px] px-3 truncate max-w-[150px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
-                                <td class="py-[14px] px-3 truncate max-w-[150px]" :title="trip.bargeName">{{ trip.bargeName }}</td>
-                                <td class="py-[14px] px-3 text-center">
+                                <td class="py-2 px-3 truncate max-w-[150px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
+                                <td class="py-2 px-3 truncate max-w-[150px]" :title="trip.bargeName">{{ trip.bargeName }}</td>
+                                <td class="py-2 px-3 text-center">
                                     <button 
                                         @click="deleteGeneratedTrip(trip)"
                                         class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center mx-auto"
