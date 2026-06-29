@@ -2791,11 +2791,15 @@ async function compileAndDownload() {
                                 class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
                             >
                         </div>
+                        <div class="text-[9px] text-gray-400 font-semibold italic flex items-center gap-1 pt-1 select-none text-left">
+                            <span class="material-symbols-outlined text-[11px]">visibility</span>
+                            Xem trước: <span class="font-bold text-teal-600 font-mono">{{ previewTicketNo }}</span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Col 3: Số phiếu tự động (Phần 2) -->
-                <div class="flex flex-col justify-between h-full lg:pl-1">
+                <div class="flex flex-col gap-2 h-full lg:pl-1">
                     <div class="space-y-2 text-left">
                         <h4 class="text-[10px] font-black text-transparent select-none hidden md:block">Cấu hình định dạng</h4>
                         <div class="flex flex-col gap-0.5">
@@ -2816,10 +2820,6 @@ async function compileAndDownload() {
                                 placeholder="Ví dụ: /26B"
                                 class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
                             >
-                        </div>
-                        <div class="text-[9px] text-gray-400 font-semibold italic flex items-center gap-1 mt-1 select-none">
-                            <span class="material-symbols-outlined text-[11px]">visibility</span>
-                            Xem trước: <span class="font-bold text-teal-600 font-mono">{{ previewTicketNo }}</span>
                         </div>
                     </div>
                 </div>
