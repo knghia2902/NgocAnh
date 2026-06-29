@@ -2686,9 +2686,9 @@ async function compileAndDownload() {
                 </div>
 
                 <!-- Chế độ 2: Giao diện Phân bổ tải trọng xếp hàng (Chạy toàn cục) -->
-                <div v-else class="flex-1 flex flex-col gap-4 w-full max-w-[1200px] mx-auto">
+                <div v-else class="flex flex-col gap-4 w-full max-w-[1200px] mx-auto">
 
-                    <div class="flex-1 flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-0 fade-in">
+                    <div class="flex flex-col gap-6 w-full max-w-[1200px] mx-auto pb-0 fade-in">
         <!-- Header Banner -->
         <div class="flex flex-wrap items-center justify-between bg-white rounded-[24px] p-5 soft-shadow border border-primary/5 gap-4">
             <div>
