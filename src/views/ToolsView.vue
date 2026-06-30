@@ -6,6 +6,7 @@ import PdfOcrTools from '../components/tools/PdfOcrTools.vue';
 import ExcelMerger from '../components/tools/ExcelMerger.vue';
 import WeighbridgePrinter from '../components/tools/WeighbridgePrinter.vue';
 import CargoAllocator from '../components/tools/CargoAllocator.vue';
+import BargeMinutes from '../components/tools/BargeMinutes.vue';
 import { authStore } from '../stores/auth';
 import { ContentService } from '../services/ContentService';
 
@@ -14,7 +15,7 @@ const route = useRoute();
 // Active tool and sub-views
 const activeToolId = ref<string | null>(null);
 const activeTab = ref<'allocator' | 'printer'>('allocator');
-const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', 'allocator', 'ocr']);
+const allowedStaffTools = ref<string[]>(['converter', 'merger', 'weighbridge', 'allocator', 'ocr', 'minutes']);
 
 
 
@@ -75,6 +76,14 @@ const allTools = [
     icon: 'document_scanner',
     bgIcon: 'bg-teal-500/10 text-teal-600',
     tags: ['PDF Quét', 'Image OCR', 'Browser Only']
+  },
+  {
+    id: 'minutes',
+    name: 'Biên Bản Sà Lan 🚢',
+    desc: 'Tự động tính toán số liệu xuất kho, xá thẳng và lập bộ 4 biên bản làm hàng sà lan từ file Weight List.',
+    icon: 'description',
+    bgIcon: 'bg-emerald-500/10 text-emerald-600',
+    tags: ['Biên bản sà lan', 'Excel', 'Offline']
   }
 ];
 
@@ -296,6 +305,7 @@ const handleSidebarSwitch = (id: string) => {
             <FormatConverter v-if="activeToolId === 'converter'" />
             <ExcelMerger v-else-if="activeToolId === 'merger'" />
             <PdfOcrTools v-else-if="activeToolId === 'ocr'" />
+            <BargeMinutes v-else-if="activeToolId === 'minutes'" />
             
             <!-- Weighbridge Unified App components -->
             <template v-else-if="activeToolId === 'weighbridge'">
