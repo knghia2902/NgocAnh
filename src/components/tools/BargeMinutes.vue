@@ -146,6 +146,29 @@ async function handleWlUpload(event: Event) {
         chuHang.value = extCustomer.value;
         tenHang.value = extCargo.value;
 
+        // Read BK SALAN to map barge names to ports
+        const bargePortMap = new Map<string, string>();
+        const bkSalanSheet = workbook.getWorksheet('BK SALAN');
+        if (bkSalanSheet) {
+            for (let r = 14; r <= bkSalanSheet.rowCount; r++) {
+                const row = bkSalanSheet.getRow(r);
+                if (!row) continue;
+                const bargeName = getCellValueString(row.getCell(3)).trim();
+                const port = getCellValueString(row.getCell(4)).trim();
+                if (bargeName) {
+                    // Mapped to uppercase for clean match
+                    bargePortMap.set(bargeName.toUpperCase().replace(/[^A-Z0-9]/g, ''), port);
+                }
+            }
+        }
+
+        const getBargePort = (voyageStr: string): string => {
+            const match = voyageStr.match(/([a-zA-ZđĐ]+-[a-zA-ZđĐ]+\s*\d+|[a-zA-ZđĐ]+\s*\d+)/);
+            const bargeName = match ? match[0].toUpperCase() : voyageStr.toUpperCase();
+            const key = bargeName.replace(/[^A-Z0-9]/g, '');
+            return bargePortMap.get(key) || '';
+        };
+
         // Group records by voyage
         const voyageMap = new Map<string, {
             xeCount: number;
@@ -191,7 +214,13 @@ async function handleWlUpload(event: Event) {
                 const voyage = getCellValueString(row.getCell(9));
                 const weight = parseFloat(getCellValueString(row.getCell(7))) || 0;
                 const dateVal = row.getCell(2).value;
-                if (voyage) addRecord(voyage, weight, dateVal, null, true);
+                if (voyage) {
+                    const port = getBargePort(voyage);
+                    if (port.toLowerCase() === 'nguyên ngọc' || port.toLowerCase() === 'nguyen ngoc') {
+                        continue;
+                    }
+                    addRecord(voyage, weight, dateVal, null, true);
+                }
             }
         }
 
@@ -204,7 +233,13 @@ async function handleWlUpload(event: Event) {
                 const voyage = getCellValueString(row.getCell(9));
                 const weight = parseFloat(getCellValueString(row.getCell(6))) || 0;
                 const dateVal = row.getCell(7).value;
-                if (voyage) addRecord(voyage, weight, dateVal, null, false);
+                if (voyage) {
+                    const port = getBargePort(voyage);
+                    if (port.toLowerCase() === 'nguyên ngọc' || port.toLowerCase() === 'nguyen ngoc') {
+                        continue;
+                    }
+                    addRecord(voyage, weight, dateVal, null, false);
+                }
             }
         }
 
@@ -218,7 +253,13 @@ async function handleWlUpload(event: Event) {
                 const weight = parseFloat(getCellValueString(row.getCell(7))) || 0;
                 const dateVal = row.getCell(2).value;
                 const timeVal = row.getCell(9).value;
-                if (voyage) addRecord(voyage, weight, dateVal, timeVal, true);
+                if (voyage) {
+                    const port = getBargePort(voyage);
+                    if (port.toLowerCase() !== 'nguyên ngọc' && port.toLowerCase() !== 'nguyen ngoc') {
+                        continue;
+                    }
+                    addRecord(voyage, weight, dateVal, timeVal, true);
+                }
             }
         }
 
@@ -232,7 +273,13 @@ async function handleWlUpload(event: Event) {
                 const weight = parseFloat(getCellValueString(row.getCell(7))) || 0;
                 const dateVal = row.getCell(2).value;
                 const timeVal = row.getCell(8).value;
-                if (voyage) addRecord(voyage, weight, dateVal, timeVal, false);
+                if (voyage) {
+                    const port = getBargePort(voyage);
+                    if (port.toLowerCase() !== 'nguyên ngọc' && port.toLowerCase() !== 'nguyen ngoc') {
+                        continue;
+                    }
+                    addRecord(voyage, weight, dateVal, timeVal, false);
+                }
             }
         }
 
