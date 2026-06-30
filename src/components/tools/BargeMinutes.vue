@@ -26,6 +26,7 @@ interface VoyageOption {
     weightXaThang: number;
     minDate: Date | null;
     maxDate: Date | null;
+    portOfLoading: string;
 }
 
 const detectedVoyages = ref<VoyageOption[]>([]);
@@ -306,7 +307,8 @@ async function handleWlUpload(event: Event) {
                 weightKho: data.weightKho,
                 weightXaThang: data.weightXaThang,
                 minDate,
-                maxDate
+                maxDate,
+                portOfLoading: getBargePort(rawName)
             });
         });
 
@@ -334,6 +336,20 @@ async function handleWlUpload(event: Event) {
 function applySelectedVoyage(voyage: VoyageOption) {
     tenSaLan.value = voyage.bargeName;
     soHam.value = '';
+
+    // Suggest port of loading
+    const port = voyage.portOfLoading;
+    if (port) {
+        if (port.toLowerCase() === 'nguyên ngọc' || port.toLowerCase() === 'nguyen ngoc') {
+            cangNhan.value = 'Cảng Nguyên Ngọc - TPHCM';
+        } else if (port.toLowerCase().startsWith('cảng') || port.toLowerCase().startsWith('cang')) {
+            cangNhan.value = port;
+        } else {
+            cangNhan.value = 'Cảng ' + port;
+        }
+    } else {
+        cangNhan.value = 'Cảng Nguyên Ngọc - TPHCM';
+    }
 
     // Auto calculate default dates
     if (voyage.minDate && voyage.maxDate) {
