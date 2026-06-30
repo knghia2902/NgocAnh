@@ -461,38 +461,87 @@ async function generateMinutes() {
             throw new Error('Không tìm thấy sheet "Thong so chung" trong biên bản mẫu!');
         }
 
+        // Dynamic row lookup to support auto-sums and offsets
+        let rowXe = 7;
+        let rowKg = 8;
+        let rowKho = 9;
+        let rowCont = 10;
+        let rowXaThang = 11;
+        let rowBarge = 12;
+        let rowNationality = 13;
+        let rowLoadingPort = 14;
+        let rowDischargingPort = 15;
+        let rowVessel = 16;
+        let rowTimeArrival = 18;
+        let rowTimeInspection = 19;
+        let rowTimeStart = 20;
+        let rowTimeEnd = 21;
+        let rowTimeDepart = 22;
+        let rowSeal = 24;
+        let rowHamIndex = 25;
+
+        for (let r = 1; r <= tsc.rowCount; r++) {
+            const label = String(tsc.getCell(`A${r}`).value || '').toLowerCase();
+            const unit = String(tsc.getCell(`B${r}`).value || '').toLowerCase().trim();
+            
+            if (label.includes('lượng hàng thực giao') && unit === 'xe') rowXe = r;
+            else if (label.includes('lượng hàng thực giao') && unit === 'kg') rowKg = r;
+            else if (label.includes('kho - sà lan')) rowKho = r;
+            else if (label.includes('cont - sà lan')) rowCont = r;
+            else if (label.includes('xá thẳng')) rowXaThang = r;
+            else if (label.includes('tên sà lan nhận hàng')) rowBarge = r;
+            else if (label.includes('quốc tịch')) rowNationality = r;
+            else if (label.includes('cảng nhận hàng')) rowLoadingPort = r;
+            else if (label.includes('cảng giao hàng')) rowDischargingPort = r;
+            else if (label.includes('tàu quốc tế')) rowVessel = r;
+            else if (label.includes('đến cảng nhận hàng')) rowTimeArrival = r;
+            else if (label.includes('kiểm tra hầm hàng')) rowTimeInspection = r;
+            else if (label.includes('bắt đầu làm hàng')) rowTimeStart = r;
+            else if (label.includes('kết thúc làm hàng')) rowTimeEnd = r;
+            else if (label.includes('tàu rời cảng')) rowTimeDepart = r;
+            else if (label.includes('số lượng seal')) rowSeal = r;
+            else if (label.includes('số hầm sà lan')) rowHamIndex = r;
+        }
+
         // Fill Thong so chung worksheet
         tsc.getCell('C3').value = soBienBan.value;
         tsc.getCell('C4').value = chuHang.value;
         tsc.getCell('C5').value = tenHang.value;
-        tsc.getCell('C7').value = voyage.totalXe;
-        tsc.getCell('C8').value = voyage.totalKg;
-        tsc.getCell('C9').value = voyage.weightKho;
-        tsc.getCell('C11').value = voyage.weightXaThang;
-        tsc.getCell('C12').value = tenSaLan.value;
-        tsc.getCell('C13').value = quocTich.value;
-        tsc.getCell('C14').value = cangNhan.value;
-        tsc.getCell('C15').value = cangGiao.value;
-        tsc.getCell('C16').value = tauQuocTe.value;
+        
+        tsc.getCell(`C${rowXe}`).value = voyage.totalXe;
+        // Total weight is SUM of Kho, Cont, XaThang
+        tsc.getCell(`C${rowKg}`).value = {
+            formula: `SUM(C${rowKho}:C${rowXaThang})`,
+            result: voyage.totalKg
+        };
+        tsc.getCell(`C${rowKho}`).value = voyage.weightKho;
+        tsc.getCell(`C${rowCont}`).value = 0;
+        tsc.getCell(`C${rowXaThang}`).value = voyage.weightXaThang;
+        
+        tsc.getCell(`C${rowBarge}`).value = tenSaLan.value;
+        tsc.getCell(`C${rowNationality}`).value = quocTich.value;
+        tsc.getCell(`C${rowLoadingPort}`).value = cangNhan.value;
+        tsc.getCell(`C${rowDischargingPort}`).value = cangGiao.value;
+        tsc.getCell(`C${rowVessel}`).value = tauQuocTe.value;
 
         // Times
-        tsc.getCell('B18').value = timeIn.value;
-        tsc.getCell('C18').value = formatExcelDateStr(dateIn.value);
+        tsc.getCell(`B${rowTimeArrival}`).value = timeIn.value;
+        tsc.getCell(`C${rowTimeArrival}`).value = formatExcelDateStr(dateIn.value);
 
-        tsc.getCell('B19').value = timeInspection.value;
-        tsc.getCell('C19').value = formatExcelDateStr(dateInspection.value);
+        tsc.getCell(`B${rowTimeInspection}`).value = timeInspection.value;
+        tsc.getCell(`C${rowTimeInspection}`).value = formatExcelDateStr(dateInspection.value);
 
-        tsc.getCell('B20').value = timeCommenced.value;
-        tsc.getCell('C20').value = formatExcelDateStr(dateCommenced.value);
+        tsc.getCell(`B${rowTimeStart}`).value = timeCommenced.value;
+        tsc.getCell(`C${rowTimeStart}`).value = formatExcelDateStr(dateCommenced.value);
 
-        tsc.getCell('B21').value = timeCompleted.value;
-        tsc.getCell('C21').value = formatExcelDateStr(dateCompleted.value);
+        tsc.getCell(`B${rowTimeEnd}`).value = timeCompleted.value;
+        tsc.getCell(`C${rowTimeEnd}`).value = formatExcelDateStr(dateCompleted.value);
 
-        tsc.getCell('B22').value = timeDepart.value;
-        tsc.getCell('C22').value = formatExcelDateStr(dateDepart.value);
+        tsc.getCell(`B${rowTimeDepart}`).value = timeDepart.value;
+        tsc.getCell(`C${rowTimeDepart}`).value = formatExcelDateStr(dateDepart.value);
 
-        tsc.getCell('C24').value = soSeal.value;
-        tsc.getCell('C25').value = soHam.value ? parseInt(soHam.value) || null : null;
+        tsc.getCell(`C${rowSeal}`).value = soSeal.value;
+        tsc.getCell(`C${rowHamIndex}`).value = soHam.value ? parseInt(soHam.value) || null : null;
 
         // Compile values for helper formula updater
         const compileValues = {
