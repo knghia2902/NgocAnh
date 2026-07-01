@@ -2132,7 +2132,18 @@ function regenerateAllocatedTrips() {
     const finalTrips: SplitTrip[] = tempTrips.map((t, idx) => {
         const { dateObj, durationMs, ...rest } = t;
         const tripDate2 = sortedDates[idx] || dateObj;
-        const tripDate1 = new Date(tripDate2.getTime() - durationMs);
+        
+        let finalDuration = durationMs;
+        if (finalDuration < 5 * 60 * 1000) {
+            // Generate a seeded random duration between 8 and 15 minutes
+            const seed = t.ticketNo || `${t.plateNumber}_${t.weightNet}_${idx}_dur`;
+            const rand = createSeededRandom(seed);
+            const mins = Math.floor(rand() * 8) + 8; // 8 to 15 minutes
+            const secs = Math.floor(rand() * 60);
+            finalDuration = (mins * 60 + secs) * 1000;
+        }
+        
+        const tripDate1 = new Date(tripDate2.getTime() - finalDuration);
         
         let finalTicketNo = t.ticketNo;
         if (useAutoTicketNo.value) {
