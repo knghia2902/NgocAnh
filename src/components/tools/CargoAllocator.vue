@@ -2029,19 +2029,15 @@ function regenerateAllocatedTrips() {
         for (let j = 0; j < numTrips; j++) {
             let tripTime = new Date();
             
-            if (spacingStrategy.value === 'even') {
-                if (numTrips === 1) {
-                    tripTime = dateOut;
-                } else {
-                    const fraction = (j + 1) / numTrips;
-                    tripTime = new Date(dateIn.getTime() + fraction * durationMs);
-                }
-            } else if (spacingStrategy.value === 'forward') {
+            if (spacingStrategy.value === 'forward') {
                 // Step forward from In time
                 tripTime = new Date(dateIn.getTime() + (j + 1) * timeIntervalMinutes.value * 60 * 1000);
-            } else {
+            } else if (spacingStrategy.value === 'backward') {
                 // Step backward from Out time
                 tripTime = new Date(dateOut.getTime() - (numTrips - 1 - j) * timeIntervalMinutes.value * 60 * 1000);
+            } else {
+                // even spacing placeholder (will be recalculated across shift)
+                tripTime = dateOut;
             }
             
             // Add a small deterministic seeded jitter (+/- 10 minutes) to tripTime to make it look more natural
@@ -2096,10 +2092,53 @@ function regenerateAllocatedTrips() {
     });
     
     // Sort all trips chronologically by dateObj
+    // If spacing strategy is 'even', distribute all trips evenly across the entire shift range
+    if (spacingStrategy.value === 'even' && tempTrips.length > 0) {
+        let shiftStart = new Date();
+        let shiftEnd = new Date();
+        let hasDates = false;
+        
+        filteredSourceTickets.value.forEach(r => {
+            if (r.dateOutStr && r.timeOutStr) {
+                const d = parseDateTime(r.dateOutStr, r.timeOutStr);
+                if (!hasDates) {
+                    shiftStart = d;
+                    shiftEnd = d;
+                    hasDates = true;
+                } else {
+                    if (d < shiftStart) shiftStart = d;
+                    if (d > shiftEnd) shiftEnd = d;
+                }
+            }
+        });
+        
+        if (hasDates) {
+            const N = tempTrips.length;
+            const shiftDuration = shiftEnd.getTime() - shiftStart.getTime();
+            tempTrips.forEach((t, idx) => {
+                let tripTime = new Date();
+                if (N === 1) {
+                    tripTime = shiftEnd;
+                } else {
+                    const fraction = idx / (N - 1);
+                    tripTime = new Date(shiftStart.getTime() + fraction * shiftDuration);
+                }
+                
+                // Add a small deterministic seeded jitter (+/- 10 minutes) to tripTime to make it look more natural
+                const seed = t.ticketNo || `${t.plateNumber}_${t.weightNet}_${idx}`;
+                const rand = createSeededRandom(seed);
+                const jitterMs = (rand() * 20 - 10) * 60 * 1000;
+                t.dateObj = new Date(tripTime.getTime() + jitterMs);
+            });
+        }
+    }
+
+    // Sort all trips chronologically by dateObj
     tempTrips.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
     
-    // Extract chronological time strings before interleaving to re-apply them in order later
-    const sortedTimeStrings = tempTrips.map(t => formatExcelDateTime(t.dateObj));
+    // Extract chronological Date objects and time strings before interleaving to re-apply them in order later
+    const sortedDates = tempTrips.map(t => t.dateObj);
+    const sortedTimeStrings = sortedDates.map(d => formatExcelDateTime(d));
     
     // Resolve consecutive duplicates of plate numbers using our multi-pass resolver
     const n = tempTrips.length;
@@ -2162,8 +2201,8 @@ function regenerateAllocatedTrips() {
     const startSTT = nextSTT.value;
     const finalTrips: SplitTrip[] = tempTrips.map((t, idx) => {
         const { dateObj, durationMs, ...rest } = t;
-        const tripDate2 = dateObj;
-        const tripDate1 = new Date(dateObj.getTime() - durationMs);
+        const tripDate2 = sortedDates[idx] || dateObj;
+        const tripDate1 = new Date(tripDate2.getTime() - durationMs);
         
         let finalTicketNo = t.ticketNo;
         if (useAutoTicketNo.value) {
