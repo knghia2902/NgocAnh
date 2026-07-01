@@ -640,8 +640,8 @@ function getHistoryDuplicates(records: CSVRecord[]): { dupRecords: CSVRecord[], 
             if (rec.ticketNo && et.ticketNo && rec.ticketNo === et.ticketNo) {
                 return true;
             }
-            // Check by plate + weight + date
-            if (rec.plateNumber) {
+            // Check by plate + weight + date only if ticket number is missing
+            if (!rec.ticketNo && rec.plateNumber) {
                 const recDate = parseDateTime(rec.dateInStr, rec.timeInStr);
                 const etDate = ensureDate(et.date1Obj);
                 return normalizePlate(rec.plateNumber) === normalizePlate(et.plateNumber) &&
@@ -863,7 +863,7 @@ function mergeTickets(newRecords: CSVRecord[]): { added: number; updated: number
             : -1;
         
         // Nếu không có số phiếu, tìm trùng theo biển số + khối lượng hàng + ngày vào
-        if (matchIdx === -1 && rec.plateNumber) {
+        if (matchIdx === -1 && !rec.ticketNo && rec.plateNumber) {
             matchIdx = currentList.findIndex(x => 
                 x.plateNumber === rec.plateNumber && 
                 x.weightNet === rec.weightNet &&
