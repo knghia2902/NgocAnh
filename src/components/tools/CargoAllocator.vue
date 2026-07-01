@@ -241,6 +241,21 @@ onUnmounted(() => {
 const loadingCSV = ref(false);
 const compiling = ref(false);
 
+// Date range filters for ticket allocation
+const useDateRangeFilter = ref(localStorage.getItem('allocator_use_date_filter') === 'true');
+const filterStartDateTime = ref(localStorage.getItem('allocator_start_date_filter') || '');
+const filterEndDateTime = ref(localStorage.getItem('allocator_end_date_filter') || '');
+
+watch(useDateRangeFilter, (newVal) => {
+    localStorage.setItem('allocator_use_date_filter', String(newVal));
+});
+watch(filterStartDateTime, (newVal) => {
+    localStorage.setItem('allocator_start_date_filter', newVal);
+});
+watch(filterEndDateTime, (newVal) => {
+    localStorage.setItem('allocator_end_date_filter', newVal);
+});
+
 // Capacity configuration standards
 const standardTTTPLimit = ref(10.0);
 const standardCurbMin = ref(1.5);
@@ -694,6 +709,28 @@ async function handleTicketImport(event: Event) {
             }
             
             const { added, updated, skipped } = mergeTickets(finalRecords);
+            
+            // Auto-fill date filters based on imported tickets
+            if (finalRecords.length > 0) {
+                let minDateObj: Date | null = null;
+                let maxDateObj: Date | null = null;
+                finalRecords.forEach(r => {
+                    if (r.dateOutStr && r.timeOutStr) {
+                        const d = parseDateTime(r.dateOutStr, r.timeOutStr);
+                        if (!minDateObj || d < minDateObj) minDateObj = d;
+                        if (!maxDateObj || d > maxDateObj) maxDateObj = d;
+                    }
+                });
+                if (minDateObj && maxDateObj) {
+                    const toIsoStringLocal = (date: Date) => {
+                        const pad = (num: number) => String(num).padStart(2, '0');
+                        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+                    };
+                    filterStartDateTime.value = toIsoStringLocal(minDateObj);
+                    filterEndDateTime.value = toIsoStringLocal(maxDateObj);
+                }
+            }
+            
             addToast(`Import CSV: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
             await saveTicketsToSupabase();
         } catch (error) {
@@ -838,6 +875,28 @@ async function handleTicketExcelUpload(file: File, manualOrderNo: string = '') {
         }
         
         const { added, updated, skipped } = mergeTickets(finalRecords);
+        
+        // Auto-fill date filters based on imported tickets
+        if (finalRecords.length > 0) {
+            let minDateObj: Date | null = null;
+            let maxDateObj: Date | null = null;
+            finalRecords.forEach(r => {
+                if (r.dateOutStr && r.timeOutStr) {
+                    const d = parseDateTime(r.dateOutStr, r.timeOutStr);
+                    if (!minDateObj || d < minDateObj) minDateObj = d;
+                    if (!maxDateObj || d > maxDateObj) maxDateObj = d;
+                }
+            });
+            if (minDateObj && maxDateObj) {
+                const toIsoStringLocal = (date: Date) => {
+                    const pad = (num: number) => String(num).padStart(2, '0');
+                    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+                };
+                filterStartDateTime.value = toIsoStringLocal(minDateObj);
+                filterEndDateTime.value = toIsoStringLocal(maxDateObj);
+            }
+        }
+
         addToast(`Import Excel: ${added} mới, ${updated} cập nhật, ${skipped} bỏ qua (trùng)`, 'success');
         await saveTicketsToSupabase();
         
@@ -1027,13 +1086,24 @@ const sourceCurrentPage = ref(1);
 const sourceSearchQuery = ref('');
 
 const filteredSourceTickets = computed(() => {
-    if (!sourceSearchQuery.value.trim()) return csvRecords.value;
-    const q = sourceSearchQuery.value.toLowerCase();
-    return csvRecords.value.filter(t => 
-        t.plateNumber.toLowerCase().includes(q) || 
-        t.ticketNo.toLowerCase().includes(q) || 
-        t.cargoType.toLowerCase().includes(q)
-    );
+    let list = csvRecords.value;
+    if (useDateRangeFilter.value && filterStartDateTime.value && filterEndDateTime.value) {
+        const start = new Date(filterStartDateTime.value);
+        const end = new Date(filterEndDateTime.value);
+        list = list.filter(t => {
+            const d = parseDateTime(t.dateOutStr, t.timeOutStr);
+            return d >= start && d <= end;
+        });
+    }
+    if (sourceSearchQuery.value.trim()) {
+        const q = sourceSearchQuery.value.toLowerCase();
+        list = list.filter(t => 
+            t.plateNumber.toLowerCase().includes(q) || 
+            t.ticketNo.toLowerCase().includes(q) || 
+            t.cargoType.toLowerCase().includes(q)
+        );
+    }
+    return list;
 });
 
 const pagedSourceTickets = computed(() => {
@@ -1887,7 +1957,7 @@ const totalCsvWeightTons = computed(() => {
 function regenerateAllocatedTrips() {
     if (isSavingToHistory.value || isInitLoading.value) return;
     
-    if (csvRecords.value.length === 0) {
+    if (filteredSourceTickets.value.length === 0) {
         generatedTrips.value = [];
         return;
     }
@@ -1915,7 +1985,7 @@ function regenerateAllocatedTrips() {
     
     const tempTrips: TempTrip[] = [];
     
-    csvRecords.value.forEach(record => {
+    filteredSourceTickets.value.forEach(record => {
         const capacity = getVehicleCapacity(record.plateNumber);
         const weightTons = record.weightNet / 1000;
         
@@ -2127,7 +2197,10 @@ watch(
         ticketStart, 
         ticketPadding, 
         ticketPrefix, 
-        ticketSuffix
+        ticketSuffix,
+        useDateRangeFilter,
+        filterStartDateTime,
+        filterEndDateTime
     ], 
     () => {
         regenerateAllocatedTrips();
@@ -2359,7 +2432,7 @@ const historyTotalWeightTons = computed(() => {
 
 // Export source tickets (Tab 1) as Excel
 async function exportSourceTickets() {
-    if (csvRecords.value.length === 0) {
+    if (filteredSourceTickets.value.length === 0) {
         addToast('Không có phiếu cân nào để xuất!', 'info');
         return;
     }
@@ -2375,7 +2448,7 @@ async function exportSourceTickets() {
         headerRow.font = { name: 'Arial', size: 10, bold: true };
         headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
         
-        csvRecords.value.forEach((r, idx) => {
+        filteredSourceTickets.value.forEach((r, idx) => {
             const row = sheet.getRow(idx + 2);
             row.getCell(1).value = idx + 1;
             row.getCell(2).value = r.ticketNo;
@@ -3096,6 +3169,39 @@ async function compileAndDownload() {
             
             <!-- Tab Content: Source Tickets -->
             <div v-if="activeDataTab === 'source'" class="flex-1 flex flex-col gap-3 min-h-0">
+
+                <!-- Date range filter toolbar -->
+                <div class="bg-white border border-gray-100 rounded-[16px] p-3 flex flex-wrap items-center gap-4 text-xs font-semibold shadow-sm">
+                    <label class="flex items-center gap-2 font-bold cursor-pointer text-gray-700 select-none">
+                        <input 
+                            type="checkbox" 
+                            v-model="useDateRangeFilter" 
+                            class="rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0 focus:outline-none w-4 h-4 cursor-pointer"
+                        >
+                        <span>Lọc theo thời gian Cân lần 2</span>
+                    </label>
+                    <div v-if="useDateRangeFilter" class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-400">Từ:</span>
+                            <input 
+                                type="datetime-local" 
+                                v-model="filterStartDateTime" 
+                                class="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-primary transition-all cursor-pointer"
+                            >
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-400">Đến:</span>
+                            <input 
+                                type="datetime-local" 
+                                v-model="filterEndDateTime" 
+                                class="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:outline-none focus:border-primary transition-all cursor-pointer"
+                            >
+                        </div>
+                        <div class="text-[10px] text-gray-400 font-medium">
+                            (Tìm thấy {{ filteredSourceTickets.length }} / {{ csvRecords.length }} phiếu)
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Source Tickets Table -->
                 <div :class="['border border-gray-100 rounded-[16px] bg-white flex-1 overflow-y-auto', filteredSourceTickets.length > 0 ? 'overflow-x-auto' : 'overflow-hidden']">
