@@ -1479,6 +1479,30 @@ const selectBarge = async (vesselId: number, bargeId: number) => {
     activeBargeId.value = bargeId;
 };
 
+const getNextOrderNo = (): string => {
+    let maxNum = 0;
+    for (const v of vessels.value) {
+        if (v.barges) {
+            for (const b of v.barges) {
+                const orderStr = b.config?.orderNo || '';
+                const match = orderStr.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1] || '', 10);
+                    if (num > maxNum) {
+                        maxNum = num;
+                    }
+                } else {
+                    const num = parseInt(orderStr, 10);
+                    if (!isNaN(num) && num > maxNum) {
+                        maxNum = num;
+                    }
+                }
+            }
+        }
+    }
+    return String(maxNum + 1);
+};
+
 const addBarge = async (vesselId: number) => {
     const name = await showPrompt('Nhập tên sà lan mới:');
     if (!name || !name.trim()) return;
@@ -1489,11 +1513,12 @@ const addBarge = async (vesselId: number) => {
         if (idx !== -1) {
             const v = vessels.value[idx];
             if (v) {
+                const nextOrderNo = getNextOrderNo();
                 const newBarge: Barge = {
                     id: Date.now(),
                     name: name.trim(),
                     vesselId,
-                    config: { locked: false, orderNo: '' }
+                    config: { locked: false, orderNo: nextOrderNo }
                 };
                 if (!v.barges) v.barges = [];
                 v.barges.push(newBarge);
@@ -1515,12 +1540,16 @@ const addBarge = async (vesselId: number) => {
 const renameBarge = async (id: number, currentName: string) => {
     const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
     if (barge?.config?.locked) {
-        addToast('Sà lan đang bị khóa! Vui lòng mở khóa để đổi tên.', 'error');
+        addToast('Sà lan đang bị khóa! Vui lòng mở khóa để chỉnh sửa sà lan.', 'error');
         return;
     }
 
     const name = await showPrompt('Đổi tên sà lan:', currentName);
-    if (!name || !name.trim() || name.trim() === currentName) return;
+    if (name === null) return;
+
+    const currentOrderNo = barge?.config?.orderNo || '';
+    const orderNo = await showPrompt('Nhập số lệnh cho sà lan:', currentOrderNo);
+    if (orderNo === null) return;
 
     loading.value = true;
     try {
@@ -1531,7 +1560,9 @@ const renameBarge = async (id: number, currentName: string) => {
                 if (bIdx !== -1) {
                     const b = v.barges[bIdx];
                     if (b) {
-                        b.name = name.trim();
+                        b.name = name.trim() || b.name;
+                        if (!b.config) b.config = { locked: false };
+                        b.config.orderNo = orderNo.trim();
                         found = true;
                         break;
                     }
@@ -1540,7 +1571,7 @@ const renameBarge = async (id: number, currentName: string) => {
         }
         if (found) {
             await dbContext.set('allocator_vessels', vessels.value);
-            addToast(`Đã đổi tên sà lan thành: ${name}`);
+            addToast('Đã cập nhật thông tin sà lan!');
             await loadVessels();
             if (activeBargeId.value === id && activeVesselId.value) {
                 await selectBarge(activeVesselId.value, id);
@@ -1549,7 +1580,7 @@ const renameBarge = async (id: number, currentName: string) => {
             addToast('Không tìm thấy sà lan!', 'error');
         }
     } catch (e) {
-        addToast('Lỗi khi đổi tên sà lan!', 'error');
+        addToast('Lỗi khi chỉnh sửa sà lan!', 'error');
     } finally {
         loading.value = false;
     }
@@ -1681,11 +1712,12 @@ const handleAddBargeConfirm = async () => {
         if (idx !== -1) {
             const v = vessels.value[idx];
             if (v) {
+                const nextOrderNo = getNextOrderNo();
                 const newBarge: Barge = {
                     id: Date.now(),
                     name: state.bargeName.trim(),
                     vesselId: vId,
-                    config: { locked: false, orderNo: '' }
+                    config: { locked: false, orderNo: nextOrderNo }
                 };
                 if (!v.barges) v.barges = [];
                 v.barges.push(newBarge);

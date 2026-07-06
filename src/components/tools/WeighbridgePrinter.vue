@@ -1950,27 +1950,55 @@ const addBarge = async (vesselId: number) => {
 const renameBarge = async (id: number, currentName: string) => {
     const barge = vessels.value.flatMap(v => v.barges || []).find(b => b.id === id);
     if (barge?.config?.locked) {
-        showToast('Sà lan đang bị khóa! Vui lòng mở khóa để đổi tên.', 'error');
+        showToast('Sà lan đang bị khóa! Vui lòng mở khóa để chỉnh sửa sà lan.', 'error');
         return;
     }
 
     const name = await showPrompt('Đổi tên sà lan:', currentName);
-    if (!name || !name.trim() || name.trim() === currentName) return;
+    if (name === null) return;
+
+    const currentOrderNo = barge?.config?.orderNo || '';
+    const orderNo = await showPrompt('Nhập số lệnh cho sà lan:', currentOrderNo);
+    if (orderNo === null) return;
 
     loading.value = true;
     try {
-        const success = await WeighbridgeService.updateBarge(id, name);
-        if (success) {
+        let nameUpdated = false;
+        let configUpdated = false;
+
+        if (name.trim() && name.trim() !== currentName) {
+            const success = await WeighbridgeService.updateBarge(id, name);
+            if (success) nameUpdated = true;
+        }
+
+        if (orderNo.trim() !== currentOrderNo) {
+            const updatedConfig: BargeConfig = {
+                goods: barge?.config?.goods || '',
+                goodsCode: barge?.config?.goodsCode || '',
+                owner: barge?.config?.owner || '',
+                operator: barge?.config?.operator || '',
+                xn: barge?.config?.xn || 'XUẤT KHẨU',
+                ticketPrefix: barge?.config?.ticketPrefix || 'PC-',
+                ticketSeed: barge?.config?.ticketSeed || 1,
+                chinhpham: barge?.config?.chinhpham || '------------',
+                phupham: barge?.config?.phupham || '------------',
+                ketluan: barge?.config?.ketluan || '[ ] Đạt\n[ ] Không đạt',
+                ...(barge?.config || {}),
+                orderNo: orderNo.trim()
+            };
+            const success = await WeighbridgeService.updateBargeConfig(id, updatedConfig);
+            if (success) configUpdated = true;
+        }
+
+        if (nameUpdated || configUpdated) {
             await loadVessels();
             if (activeBargeId.value === id && activeVesselId.value) {
                 await selectBarge(activeVesselId.value, id);
             }
-            showToast(`Đã đổi tên sà lan thành: ${name}`);
-        } else {
-            showToast('Không thể đổi tên sà lan!', 'error');
+            showToast('Đã cập nhật thông tin sà lan!');
         }
     } catch (e) {
-        showToast('Lỗi khi đổi tên sà lan!', 'error');
+        showToast('Lỗi khi chỉnh sửa sà lan!', 'error');
     } finally {
         loading.value = false;
     }

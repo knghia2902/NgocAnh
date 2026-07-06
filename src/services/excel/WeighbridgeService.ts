@@ -252,6 +252,31 @@ export const WeighbridgeService = {
      * Create a new barge
      */
     async createBarge(vesselId: number, name: string): Promise<Barge | null> {
+        const local = await getLocalVessels();
+
+        // Calculate next orderNo sequentially based on max orderNo across all barges
+        let maxNum = 0;
+        for (const vessel of local) {
+            if (vessel.barges) {
+                for (const barge of vessel.barges) {
+                    const orderStr = barge.config?.orderNo || '';
+                    const match = orderStr.match(/(\d+)$/);
+                    if (match) {
+                        const num = parseInt(match[1] || '', 10);
+                        if (num > maxNum) {
+                            maxNum = num;
+                        }
+                    } else {
+                        const num = parseInt(orderStr, 10);
+                        if (!isNaN(num) && num > maxNum) {
+                            maxNum = num;
+                        }
+                    }
+                }
+            }
+        }
+        const nextOrderNo = String(maxNum + 1);
+
         const defaultConfig: BargeConfig = {
             goods: '',
             goodsCode: '',
@@ -263,6 +288,7 @@ export const WeighbridgeService = {
             chinhpham: '------------',
             phupham: '------------',
             ketluan: '[ ] Đạt\n[ ] Không đạt',
+            orderNo: nextOrderNo,
             updatedAt: Date.now()
         };
         const newBarge: Barge = {
@@ -273,7 +299,6 @@ export const WeighbridgeService = {
             trucks: []
         };
 
-        const local = await getLocalVessels();
         const vessel = local.find(v => v.id === vesselId);
         if (vessel) {
             if (!vessel.barges) vessel.barges = [];
