@@ -247,6 +247,63 @@ const inputDialog = ref<InputDialogState>({
 
 const inputPromptRef = ref<HTMLInputElement | null>(null);
 
+// Unified Barge dialog state
+interface BargeDialogState {
+    show: boolean;
+    title: string;
+    bargeName: string;
+    orderNo: string;
+    resolve?: (result: { name: string; orderNo: string } | null) => void;
+}
+
+const bargeDialog = ref<BargeDialogState>({
+    show: false,
+    title: '',
+    bargeName: '',
+    orderNo: ''
+});
+
+const bargeNameInputRef = ref<HTMLInputElement | null>(null);
+
+function showBargeDialog(title: string, defaultName: string = '', defaultOrderNo: string = ''): Promise<{ name: string; orderNo: string } | null> {
+    return new Promise((resolve) => {
+        bargeDialog.value = {
+            show: true,
+            title,
+            bargeName: defaultName,
+            orderNo: defaultOrderNo,
+            resolve
+        };
+        nextTick(() => {
+            bargeNameInputRef.value?.focus();
+            if (bargeNameInputRef.value) {
+                bargeNameInputRef.value.select();
+            }
+        });
+    });
+}
+
+function handleBargeOk() {
+    if (!bargeDialog.value.bargeName.trim()) {
+        showToast('Vui lòng nhập tên sà lan!', 'error');
+        return;
+    }
+    if (bargeDialog.value.resolve) {
+        bargeDialog.value.resolve({
+            name: bargeDialog.value.bargeName.trim(),
+            orderNo: bargeDialog.value.orderNo.trim()
+        });
+    }
+    bargeDialog.value.show = false;
+}
+
+function handleBargeCancel() {
+    if (bargeDialog.value.resolve) {
+        bargeDialog.value.resolve(null);
+    }
+    bargeDialog.value.show = false;
+}
+
 function showPrompt(title: string, defaultValue: string = '', placeholder: string = ''): Promise<string | null> {
     return new Promise((resolve) => {
         inputDialog.value = {
@@ -1927,12 +1984,35 @@ const deleteVessel = async (id: number, name: string) => {
 
 // Barge CRUD
 const addBarge = async (vesselId: number) => {
-    const name = await showPrompt('Nhập tên sà lan mới:');
-    if (!name || !name.trim()) return;
+    // Pre-calculate the next sequential order number
+    let maxNum = 0;
+    for (const vessel of vessels.value) {
+        if (vessel.barges) {
+            for (const barge of vessel.barges) {
+                const orderStr = barge.config?.orderNo || '';
+                const match = orderStr.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1] || '', 10);
+                    if (num > maxNum) {
+                        maxNum = num;
+                    }
+                } else {
+                    const num = parseInt(orderStr, 10);
+                    if (!isNaN(num) && num > maxNum) {
+                        maxNum = num;
+                    }
+                }
+            }
+        }
+    }
+    const nextOrderNo = String(maxNum + 1);
+
+    const result = await showBargeDialog('Thêm sà lan phân bổ mới', '', nextOrderNo);
+    if (!result || !result.name.trim()) return;
 
     loading.value = true;
     try {
-        const data = await WeighbridgeService.createBarge(vesselId, name);
+        const data = await WeighbridgeService.createBarge(vesselId, result.name, result.orderNo);
         if (data) {
             await loadVessels();
             await selectBarge(vesselId, data.id);
@@ -1954,12 +2034,11 @@ const renameBarge = async (id: number, currentName: string) => {
         return;
     }
 
-    const name = await showPrompt('Đổi tên sà lan:', currentName);
-    if (name === null) return;
-
     const currentOrderNo = barge?.config?.orderNo || '';
-    const orderNo = await showPrompt('Nhập số lệnh cho sà lan:', currentOrderNo);
-    if (orderNo === null) return;
+    const result = await showBargeDialog('Chỉnh sửa thông tin sà lan', currentName, currentOrderNo);
+    if (!result) return;
+
+    const { name, orderNo } = result;
 
     loading.value = true;
     try {
@@ -4453,6 +4532,78 @@ onUnmounted(() => {
                         class="h-9 px-5 rounded-[12px] text-xs font-bold text-white bg-primary hover:bg-primary/95 active:scale-95 transition-all"
                     >
                         {{ inputDialog.okText }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Transition>
+    </Teleport>
+
+    <!-- Premium Custom Barge Modal (Name & Order Number) -->
+    <Teleport to="body">
+    <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+    >
+        <div 
+            v-if="bargeDialog.show" 
+            class="fixed inset-0 z-[999] flex items-center justify-center bg-[#4a2c32]/40 backdrop-blur-sm p-4 no-print"
+            @click.self="handleBargeCancel"
+        >
+            <div 
+                class="w-full max-w-[420px] bg-white rounded-[24px] border border-gray-100 shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100"
+            >
+                <!-- Header -->
+                <div class="flex items-center gap-3">
+                    <div class="size-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">layers</span>
+                    </div>
+                    <h3 class="text-sm font-black text-gray-900 leading-tight">
+                        {{ bargeDialog.title }}
+                    </h3>
+                </div>
+                
+                <!-- Fields -->
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tên sà lan *</label>
+                        <input 
+                            type="text" 
+                            v-model="bargeDialog.bargeName"
+                            placeholder="Ví dụ: HP 1022, SG 9988..."
+                            class="w-full px-4 py-2.5 bg-white border border-gray-200 focus:border-primary rounded-[14px] text-xs font-bold focus:outline-none transition-all uppercase"
+                            ref="bargeNameInputRef"
+                        />
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Mã lệnh (Số lệnh)</label>
+                        <input 
+                            type="text" 
+                            v-model="bargeDialog.orderNo"
+                            placeholder="Ví dụ: 11, L11..."
+                            @keyup.enter="handleBargeOk"
+                            class="w-full px-4 py-2.5 bg-white border border-gray-200 focus:border-primary rounded-[14px] text-xs font-bold focus:outline-none transition-all"
+                        />
+                    </div>
+                </div>
+                
+                <!-- Footer Buttons -->
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                    <button 
+                        @click="handleBargeCancel"
+                        class="h-9 px-4 rounded-[12px] text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                    >
+                        Hủy
+                    </button>
+                    <button 
+                        @click="handleBargeOk"
+                        class="h-9 px-5 rounded-[12px] text-xs font-bold text-white bg-primary hover:bg-primary/95 active:scale-95 transition-all"
+                    >
+                        Xác nhận
                     </button>
                 </div>
             </div>

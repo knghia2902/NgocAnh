@@ -251,31 +251,36 @@ export const WeighbridgeService = {
     /**
      * Create a new barge
      */
-    async createBarge(vesselId: number, name: string): Promise<Barge | null> {
+    async createBarge(vesselId: number, name: string, customOrderNo?: string): Promise<Barge | null> {
         const local = await getLocalVessels();
 
-        // Calculate next orderNo sequentially based on max orderNo across all barges
-        let maxNum = 0;
-        for (const vessel of local) {
-            if (vessel.barges) {
-                for (const barge of vessel.barges) {
-                    const orderStr = barge.config?.orderNo || '';
-                    const match = orderStr.match(/(\d+)$/);
-                    if (match) {
-                        const num = parseInt(match[1] || '', 10);
-                        if (num > maxNum) {
-                            maxNum = num;
-                        }
-                    } else {
-                        const num = parseInt(orderStr, 10);
-                        if (!isNaN(num) && num > maxNum) {
-                            maxNum = num;
+        let nextOrderNo = '';
+        if (customOrderNo !== undefined) {
+            nextOrderNo = customOrderNo;
+        } else {
+            // Calculate next orderNo sequentially based on max orderNo across all barges
+            let maxNum = 0;
+            for (const vessel of local) {
+                if (vessel.barges) {
+                    for (const barge of vessel.barges) {
+                        const orderStr = barge.config?.orderNo || '';
+                        const match = orderStr.match(/(\d+)$/);
+                        if (match) {
+                            const num = parseInt(match[1] || '', 10);
+                            if (num > maxNum) {
+                                maxNum = num;
+                            }
+                        } else {
+                            const num = parseInt(orderStr, 10);
+                            if (!isNaN(num) && num > maxNum) {
+                                maxNum = num;
+                            }
                         }
                     }
                 }
             }
+            nextOrderNo = String(maxNum + 1);
         }
-        const nextOrderNo = String(maxNum + 1);
 
         const defaultConfig: BargeConfig = {
             goods: '',
