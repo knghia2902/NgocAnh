@@ -1163,7 +1163,6 @@ const expandedVesselIds = ref<Record<number, boolean>>({});
 const loading = ref(false);
 const saving = ref(false);
 void saving;
-void loadTicketsFromSupabase;
 
 interface BargeSummary {
     id: number;
@@ -1820,11 +1819,14 @@ onMounted(async () => {
             csvRecords.value = savedTickets;
             existingTrips.value = savedHistory;
             generatedTrips.value = savedGenerated;
+
+            // Load latest data from Supabase in the background
+            await loadTicketsFromSupabase();
         } finally {
             isInitLoading.value = false;
         }
     } catch (e) {
-        console.error('Lỗi khi nạp cấu hình từ IndexedDB:', e);
+        console.error('Lỗi khi nạp cấu hình:', e);
     }
 });
 
