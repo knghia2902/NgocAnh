@@ -133,10 +133,6 @@ const importOrderNo = ref('');
 
 
 function triggerTicketFileInput() {
-    if (!importOrderNo.value.trim()) {
-        addToast('Vui lòng nhập Mã lệnh trước khi import!', 'error');
-        return;
-    }
     ticketFileInput.value?.click();
 }
 const csvRecords = ref<CSVRecord[]>([]);
