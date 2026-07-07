@@ -3765,17 +3765,17 @@ async function compileAndDownload() {
                                 <td class="py-1 px-3 truncate max-w-[150px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
                                 <td class="py-1 px-3 truncate max-w-[150px]" :title="trip.bargeName">{{ trip.bargeName }}</td>
                                 <td class="py-1 px-3 text-center">
-                                    <div class="flex flex-col items-center justify-center gap-1">
+                                    <div class="flex items-center justify-center gap-1.5">
                                         <button 
                                             @click="editGeneratedTripOrderNo(trip)"
-                                            class="size-6 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all mx-auto"
+                                            class="size-6 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all"
                                             title="Sửa Mã lệnh"
                                         >
                                             <span class="material-symbols-outlined text-[13px]">edit</span>
                                         </button>
                                         <button 
                                             @click="deleteGeneratedTrip(trip)"
-                                            class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all mx-auto"
+                                            class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all"
                                             title="Xóa chuyến xe này"
                                         >
                                             <span class="material-symbols-outlined text-[13px]">delete</span>
