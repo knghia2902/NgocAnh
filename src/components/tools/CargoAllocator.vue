@@ -2458,6 +2458,53 @@ async function deleteGeneratedTrip(trip: SplitTrip) {
     }
 }
 
+async function editHistoryTripOrderNo(trip: SplitTrip) {
+    const currentOrderNo = trip.orderNo || '';
+    const newOrderNo = prompt(`Nhập Mã lệnh mới cho xe "${trip.plateNumber}" rời bến lúc ${trip.timeStr || ''}:`, currentOrderNo);
+    if (newOrderNo === null) return; // Cancelled
+    
+    trip.orderNo = newOrderNo.trim();
+    
+    const idx = existingTrips.value.findIndex(t => t.stt === trip.stt || (t.ticketNo && t.ticketNo === trip.ticketNo));
+    if (idx !== -1) {
+        existingTrips.value[idx] = { ...trip };
+    }
+    
+    await saveTicketsToSupabase();
+    addToast('Cập nhật mã lệnh thành công!', 'success');
+}
+
+async function deleteHistoryTrip(trip: SplitTrip) {
+    const proceed = await showConfirm({
+        title: 'Xóa bản ghi lịch sử',
+        message: `Bạn có chắc chắn muốn xóa xe "${trip.plateNumber}" rời bến lúc ${trip.timeStr || ''} khỏi Sổ theo dõi?`,
+        type: 'danger',
+        okText: 'Xóa',
+        cancelText: 'Hủy'
+    });
+    if (!proceed) return;
+    
+    existingTrips.value = existingTrips.value.filter(t => t.stt !== trip.stt && (!t.ticketNo || t.ticketNo !== trip.ticketNo));
+    await saveTicketsToSupabase();
+    addToast('Đã xóa bản ghi khỏi Sổ theo dõi!', 'success');
+}
+
+async function editGeneratedTripOrderNo(trip: SplitTrip) {
+    const currentOrderNo = trip.orderNo || '';
+    const newOrderNo = prompt(`Nhập Mã lệnh mới cho xe "${trip.plateNumber}" rời bến lúc ${trip.timeStr || ''}:`, currentOrderNo);
+    if (newOrderNo === null) return; // Cancelled
+    
+    trip.orderNo = newOrderNo.trim();
+    
+    const idx = generatedTrips.value.findIndex(t => t.stt === trip.stt || (t.ticketNo && t.ticketNo === trip.ticketNo));
+    if (idx !== -1) {
+        generatedTrips.value[idx] = { ...trip };
+    }
+    
+    await saveTicketsToSupabase();
+    addToast('Cập nhật mã lệnh thành công!', 'success');
+}
+
 async function clearAllGeneratedTrips() {
     const confirmClear = await showConfirm({
         title: 'Xóa tất cả phân bổ',
@@ -3470,6 +3517,7 @@ async function compileAndDownload() {
                                     </div>
                                 </th>
                                 <th class="py-1 px-3 text-center w-16 bg-gray-55 font-bold select-none">Trạng thái</th>
+                                <th class="py-1 px-3 text-center w-20 bg-gray-55 font-bold select-none">Hành động</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -3507,9 +3555,27 @@ async function compileAndDownload() {
                                         <span class="material-symbols-outlined text-[13px] font-black">close</span>
                                     </span>
                                 </td>
+                                <td class="py-1 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <button 
+                                            @click="editHistoryTripOrderNo(trip)"
+                                            class="size-6 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all"
+                                            title="Sửa Mã lệnh"
+                                        >
+                                            <span class="material-symbols-outlined text-[13px]">edit</span>
+                                        </button>
+                                        <button 
+                                            @click="deleteHistoryTrip(trip)"
+                                            class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all"
+                                            title="Xóa"
+                                        >
+                                            <span class="material-symbols-outlined text-[13px]">delete</span>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                             <tr v-if="filteredHistoryTrips.length === 0">
-                                <td colspan="9" class="p-8 text-center text-gray-400 italic">
+                                <td colspan="11" class="p-8 text-center text-gray-400 italic">
                                     Không tìm thấy bản ghi nào khớp bộ lọc!
                                 </td>
                             </tr>
@@ -3699,13 +3765,22 @@ async function compileAndDownload() {
                                 <td class="py-1 px-3 truncate max-w-[150px]" :title="trip.cargoType">{{ trip.cargoType }}</td>
                                 <td class="py-1 px-3 truncate max-w-[150px]" :title="trip.bargeName">{{ trip.bargeName }}</td>
                                 <td class="py-1 px-3 text-center">
-                                    <button 
-                                        @click="deleteGeneratedTrip(trip)"
-                                        class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all mx-auto"
-                                        title="Xóa chuyến xe này"
-                                    >
-                                        <span class="material-symbols-outlined text-[13px]">delete</span>
-                                    </button>
+                                    <div class="flex flex-col items-center justify-center gap-1">
+                                        <button 
+                                            @click="editGeneratedTripOrderNo(trip)"
+                                            class="size-6 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all mx-auto"
+                                            title="Sửa Mã lệnh"
+                                        >
+                                            <span class="material-symbols-outlined text-[13px]">edit</span>
+                                        </button>
+                                        <button 
+                                            @click="deleteGeneratedTrip(trip)"
+                                            class="size-6 rounded-full bg-red-50 hover:bg-red-100 text-red-655 flex items-center justify-center transition-all mx-auto"
+                                            title="Xóa chuyến xe này"
+                                        >
+                                            <span class="material-symbols-outlined text-[13px]">delete</span>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             <tr v-if="filteredTrips.length === 0">
