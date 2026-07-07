@@ -133,6 +133,10 @@ const importOrderNo = ref('');
 
 
 function triggerTicketFileInput() {
+    if (!importOrderNo.value.trim()) {
+        addToast('Vui lòng nhập Mã lệnh trước khi import!', 'error');
+        return;
+    }
     ticketFileInput.value?.click();
 }
 const csvRecords = ref<CSVRecord[]>([]);
@@ -661,6 +665,13 @@ function getHistoryDuplicates(records: CSVRecord[]): { dupRecords: CSVRecord[], 
 
 // Handle Ticket Import (accepts CSV and Excel)
 async function handleTicketImport(event: Event) {
+    if (!importOrderNo.value.trim()) {
+        addToast('Vui lòng nhập Mã lệnh trước khi import!', 'error');
+        // Reset file input value so that change event triggers if they select again after fixing
+        const target = event.target as HTMLInputElement;
+        target.value = '';
+        return;
+    }
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
     if (!file) return;
@@ -1026,14 +1037,89 @@ const activeDataTab = ref<'source' | 'generated' | 'template'>('source');
 const sourceCurrentPage = ref(1);
 const sourceSearchQuery = ref('');
 
+// Sorting Helper Function
+function compareValues(a: any, b: any, key: string, desc: boolean): number {
+    let valA = a[key];
+    let valB = b[key];
+    
+    if (valA === undefined || valA === null) valA = '';
+    if (valB === undefined || valB === null) valB = '';
+    
+    // Date comparison
+    if (key === 'dateObj' || key === 'date1Obj' || key === 'date2Obj') {
+        const timeA = valA ? new Date(valA).getTime() : 0;
+        const timeB = valB ? new Date(valB).getTime() : 0;
+        return desc ? timeB - timeA : timeA - timeB;
+    }
+    
+    if (typeof valA === 'number' && typeof valB === 'number') {
+        return desc ? valB - valA : valA - valB;
+    }
+    
+    const strA = String(valA).trim().toLowerCase();
+    const strB = String(valB).trim().toLowerCase();
+    
+    if (strA < strB) return desc ? 1 : -1;
+    if (strA > strB) return desc ? -1 : 1;
+    return 0;
+}
+
+// Sorting states for Tab 1 (Source)
+const sourceSortKey = ref<string>('');
+const sourceSortDesc = ref<boolean>(false);
+
+function toggleSourceSort(key: string) {
+    if (sourceSortKey.value === key) {
+        sourceSortDesc.value = !sourceSortDesc.value;
+    } else {
+        sourceSortKey.value = key;
+        sourceSortDesc.value = false;
+    }
+    sourceCurrentPage.value = 1;
+}
+
+// Sorting states for Tab 2 (Generated/Template)
+const templateSortKey = ref<string>('');
+const templateSortDesc = ref<boolean>(false);
+
+function toggleTemplateSort(key: string) {
+    if (templateSortKey.value === key) {
+        templateSortDesc.value = !templateSortDesc.value;
+    } else {
+        templateSortKey.value = key;
+        templateSortDesc.value = false;
+    }
+    currentPage.value = 1;
+}
+
+// Sorting states for Tab 3 (History/Tracking)
+const historySortKey = ref<string>('');
+const historySortDesc = ref<boolean>(false);
+
+function toggleHistorySort(key: string) {
+    if (historySortKey.value === key) {
+        historySortDesc.value = !historySortDesc.value;
+    } else {
+        historySortKey.value = key;
+        historySortDesc.value = false;
+    }
+    historyCurrentPage.value = 1;
+}
+
 const filteredSourceTickets = computed(() => {
-    if (!sourceSearchQuery.value.trim()) return csvRecords.value;
-    const q = sourceSearchQuery.value.toLowerCase();
-    return csvRecords.value.filter(t => 
-        t.plateNumber.toLowerCase().includes(q) || 
-        t.ticketNo.toLowerCase().includes(q) || 
-        t.cargoType.toLowerCase().includes(q)
-    );
+    let list = csvRecords.value;
+    if (sourceSearchQuery.value.trim()) {
+        const q = sourceSearchQuery.value.toLowerCase();
+        list = list.filter(t => 
+            t.plateNumber.toLowerCase().includes(q) || 
+            t.ticketNo.toLowerCase().includes(q) || 
+            t.cargoType.toLowerCase().includes(q)
+        );
+    }
+    if (sourceSortKey.value) {
+        list = [...list].sort((a, b) => compareValues(a, b, sourceSortKey.value, sourceSortDesc.value));
+    }
+    return list;
 });
 
 const pagedSourceTickets = computed(() => {
@@ -2235,6 +2321,10 @@ const filteredTrips = computed(() => {
         );
     }
     
+    if (templateSortKey.value) {
+        list = [...list].sort((a, b) => compareValues(a, b, templateSortKey.value, templateSortDesc.value));
+    }
+    
     return list;
 });
 
@@ -2264,13 +2354,19 @@ const historySearchQuery = ref('');
 const historyCurrentPage = ref(1);
 
 const filteredHistoryTrips = computed(() => {
-    if (!historySearchQuery.value.trim()) return existingTrips.value;
-    const q = historySearchQuery.value.toLowerCase();
-    return existingTrips.value.filter(t => 
-        t.plateNumber.toLowerCase().includes(q) || 
-        t.ticketNo.toLowerCase().includes(q) || 
-        t.cargoType.toLowerCase().includes(q)
-    );
+    let list = existingTrips.value;
+    if (historySearchQuery.value.trim()) {
+        const q = historySearchQuery.value.toLowerCase();
+        list = list.filter(t => 
+            t.plateNumber.toLowerCase().includes(q) || 
+            t.ticketNo.toLowerCase().includes(q) || 
+            t.cargoType.toLowerCase().includes(q)
+        );
+    }
+    if (historySortKey.value) {
+        list = [...list].sort((a, b) => compareValues(a, b, historySortKey.value, historySortDesc.value));
+    }
+    return list;
 });
 
 const pagedHistoryTrips = computed(() => {
@@ -3046,6 +3142,15 @@ async function compileAndDownload() {
                 <div class="flex items-center gap-2 flex-wrap">
                     <!-- Tab 1 Actions -->
                     <template v-if="activeDataTab === 'source'">
+                        <div class="flex items-center gap-1.5 border border-amber-200 bg-amber-50/50 rounded-[8px] px-2 py-0.5">
+                            <span class="text-[9px] font-bold text-amber-800 uppercase tracking-wider">Mã lệnh *</span>
+                            <input 
+                                type="text" 
+                                v-model="importOrderNo" 
+                                placeholder="Bắt buộc nhập mã lệnh..."
+                                class="h-6 px-2 py-1 bg-white border border-amber-200 rounded-[6px] text-[10px] font-bold focus:outline-none focus:border-amber-500 transition-all w-40 placeholder:text-gray-300 placeholder:font-normal"
+                            >
+                        </div>
                         <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center font-bold text-[10px]">
                             KL: {{ totalCsvWeightTons.toFixed(2) }}t
                         </div>
@@ -3155,15 +3260,71 @@ async function compileAndDownload() {
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="py-1 px-3 w-12 text-center bg-gray-55 font-bold">STT</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Số phiếu</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Mã lệnh</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Số xe</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Loại hàng</th>
-                                <th class="py-1 px-3 text-right bg-gray-55 font-bold">Khối lượng (kg)</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Thời gian vào</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Thời gian ra</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Tài xế</th>
-                                <th class="py-1 px-3 text-center w-24 bg-gray-55 font-bold">Thao tác</th>
+                                <th @click="toggleSourceSort('ticketNo')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Số phiếu</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'ticketNo' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('orderNo')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Mã lệnh</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'orderNo' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('plateNumber')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Số xe</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'plateNumber' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('cargoType')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Loại hàng</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'cargoType' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('weightNet')" class="py-1 px-3 text-right bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>Khối lượng (kg)</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'weightNet' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('dateInStr')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Thời gian vào</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'dateInStr' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('dateOutStr')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Thời gian ra</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'dateOutStr' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleSourceSort('driverName')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Tài xế</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ sourceSortKey === 'driverName' ? (sourceSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th class="py-1 px-3 text-center w-24 bg-gray-55 font-bold select-none">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -3263,16 +3424,72 @@ async function compileAndDownload() {
                     <table class="w-full text-left border-collapse text-[11px] font-semibold min-w-[1200px]">
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
-                                <th class="py-1 px-3 w-12 text-center bg-gray-50 font-bold">STT</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Mã lệnh</th>
-                                <th class="py-1 px-3 bg-gray-50 font-bold">Thời gian rời bến (Giờ/Ngày)</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Số xe</th>
-                                <th class="py-1 px-3 text-center bg-gray-50 font-bold">TTTP (tấn)</th>
-                                <th class="py-1 px-3 text-center bg-gray-55 font-bold">Trọng lượng hàng CP (tấn)</th>
-                                <th class="py-1 px-3 bg-gray-50 font-bold">Số phiếu</th>
-                                <th class="py-1 px-3 text-center w-28 bg-gray-55 font-bold">Loại hàng</th>
-                                <th class="py-1 px-3 text-right bg-gray-50 font-bold">Khối lượng (tấn)</th>
-                                <th class="py-1 px-3 text-center w-16 bg-gray-55 font-bold">Trạng thái</th>
+                                <th class="py-1 px-3 w-12 text-center bg-gray-55 font-bold">STT</th>
+                                <th @click="toggleHistorySort('orderNo')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Mã lệnh</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'orderNo' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('dateObj')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Thời gian rời bến (Giờ/Ngày)</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'dateObj' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('plateNumber')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Số xe</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'plateNumber' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('tttp')" class="py-1 px-3 text-center bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>TTTP (tấn)</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'tttp' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('limit')" class="py-1 px-3 text-center bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>Trọng lượng hàng CP (tấn)</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'limit' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('ticketNo')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Số phiếu</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'ticketNo' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('cargoType')" class="py-1 px-3 text-center w-28 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>Loại hàng</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'cargoType' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleHistorySort('weightTons')" class="py-1 px-3 text-right bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>Khối lượng (tấn)</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ historySortKey === 'weightTons' ? (historySortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th class="py-1 px-3 text-center w-16 bg-gray-55 font-bold select-none">Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -3373,23 +3590,103 @@ async function compileAndDownload() {
                         <thead>
                             <tr class="bg-gray-55 text-gray-500 border-b border-gray-100 font-bold whitespace-nowrap">
                                 <th class="py-1 px-3 w-12 text-center bg-gray-50 font-bold">STT</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Số phiếu</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Mã lệnh</th>
-                                <th class="py-1 px-3 bg-gray-50 font-bold">Số xe</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Khách hàng</th>
-                                <th class="py-1 px-3 text-right bg-gray-50 font-bold">KL cân lần 1</th>
-                                <th class="py-1 px-3 text-right bg-gray-55 font-bold">KL cân lần 2</th>
-                                <th class="py-1 px-3 text-right bg-gray-50 font-bold">KL hàng</th>
-                                <th class="py-1 px-3 text-center bg-gray-55 font-bold">Ngày cân 1</th>
-                                <th class="py-1 px-3 text-center bg-gray-55 font-bold">Giờ cân 1</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Ngày giờ 1</th>
-                                <th class="py-1 px-3 text-center bg-gray-50 font-bold">Ngày cân 2</th>
-                                <th class="py-1 px-3 text-center bg-gray-55 font-bold">Giờ cân 2</th>
-                                <th class="py-1 px-3 bg-gray-50 font-bold">Ngày giờ 2</th>
-                                <th class="py-1 px-3 text-center bg-gray-55 font-bold">X/N</th>
-                                <th class="py-1 px-3 bg-gray-50 font-bold">Loại hàng</th>
-                                <th class="py-1 px-3 bg-gray-55 font-bold">Loại Sà lan</th>
-                                <th class="py-1 px-3 text-center bg-gray-50 font-bold w-[80px]">Thao tác</th>
+                                <th @click="toggleTemplateSort('ticketNo')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Số phiếu</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'ticketNo' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('orderNo')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Mã lệnh</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'orderNo' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('plateNumber')" class="py-1 px-3 bg-gray-50 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Số xe</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'plateNumber' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('customer')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Khách hàng</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'customer' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('weight1')" class="py-1 px-3 text-right bg-gray-50 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>KL cân lần 1</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'weight1' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('weight2')" class="py-1 px-3 text-right bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>KL cân lần 2</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'weight2' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('weightNet')" class="py-1 px-3 text-right bg-gray-50 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>KL hàng</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'weightNet' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('date1Obj')" class="py-1 px-3 text-center bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group" colspan="3">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>Thời gian vào</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'date1Obj' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('date2Obj')" class="py-1 px-3 text-center bg-gray-50 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group" colspan="3">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>Thời gian ra</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'date2Obj' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('direction')" class="py-1 px-3 text-center bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>X/N</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'direction' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('cargoType')" class="py-1 px-3 bg-gray-50 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Loại hàng</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'cargoType' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th @click="toggleTemplateSort('bargeName')" class="py-1 px-3 bg-gray-55 font-bold cursor-pointer hover:bg-gray-100 transition-colors select-none group">
+                                    <div class="flex items-center gap-1">
+                                        <span>Loại Sà lan</span>
+                                        <span class="material-symbols-outlined text-[12px] text-gray-400 group-hover:text-gray-600 transition-colors">
+                                            {{ templateSortKey === 'bargeName' ? (templateSortDesc ? 'arrow_downward' : 'arrow_upward') : 'unfold_more' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                <th class="py-1 px-3 text-center bg-gray-50 font-bold w-[80px] select-none">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
