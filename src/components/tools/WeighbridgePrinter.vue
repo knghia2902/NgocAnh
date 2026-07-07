@@ -25,9 +25,11 @@ syncChannel.onmessage = async (event) => {
             if (saved && Array.isArray(saved)) {
                 globalGoodsList.value = saved;
             }
+        } else if (event.data.type === 'generated') {
+            await autoSyncAllBarges();
         }
     } catch (e) {
-        console.error('Lỗi khi đồng bộ hàng hóa toàn cục:', e);
+        console.error('Lỗi khi đồng bộ qua in phiếu cân:', e);
     }
 };
 
@@ -2133,6 +2135,114 @@ function isBargeMatch(trip: any, barge: Barge): boolean {
     return false;
 }
 
+// Auto-sync allocator trips for all barges of loaded vessels
+async function autoSyncAllBarges() {
+    try {
+        const allocatorTrips = await dbContext.get<any[]>('allocator_generated_trips') || [];
+        if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) return;
+
+        let hasUpdates = false;
+        
+        for (const vessel of vessels.value) {
+            if (!vessel.barges) continue;
+            for (const barge of vessel.barges) {
+                if (barge.config?.locked) continue;
+                const bargeOrderNo = barge.config?.orderNo ? String(barge.config.orderNo).trim() : '';
+                if (!bargeOrderNo) continue;
+
+                // Filter trips for this barge
+                const matchedTrips = allocatorTrips.filter((t: any) => isBargeMatch(t, barge));
+                if (matchedTrips.length === 0) continue;
+
+                // Map to Truck type
+                const importedTrucks: Truck[] = matchedTrips.map((t: any, idx: number) => {
+                    let dIn = '';
+                    let dOut = '';
+                    try {
+                        if (t.date1Obj) {
+                            const date1 = new Date(t.date1Obj);
+                            if (!isNaN(date1.getTime())) {
+                                const offset = date1.getTimezoneOffset();
+                                const localDate = new Date(date1.getTime() - (offset * 60 * 1000));
+                                dIn = localDate.toISOString().slice(0, 16);
+                            }
+                        }
+                        if (t.date2Obj) {
+                            const date2 = new Date(t.date2Obj);
+                            if (!isNaN(date2.getTime())) {
+                                const offset = date2.getTimezoneOffset();
+                                const localDate = new Date(date2.getTime() - (offset * 60 * 1000));
+                                dOut = localDate.toISOString().slice(0, 16);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Error parsing date:', e);
+                    }
+
+                    if (!dIn) dIn = new Date().toISOString().slice(0, 16);
+                    if (!dOut) {
+                        const outDate = new Date();
+                        outDate.setMinutes(outDate.getMinutes() + 30);
+                        dOut = outDate.toISOString().slice(0, 16);
+                    }
+
+                    return {
+                        id: Date.now() + idx,
+                        barge_id: barge.id,
+                        ticketNo: t.ticketNo || '',
+                        plateNumber: t.plateNumber || '',
+                        driver: '',
+                        weight1: Number(t.weight1) || 0,
+                        weight2: Number(t.weight2) || 0,
+                        weightNet: Number(t.weightNet) || 0,
+                        dateIn: dIn,
+                        dateOut: dOut,
+                        note: t.notes || ''
+                    };
+                });
+
+                // Compare importedTrucks and currentTrucks to prevent redundant saves/toasts
+                const currentTrucks = await WeighbridgeService.getTrucks(barge.id);
+                let isIdentical = importedTrucks.length === currentTrucks.length;
+                if (isIdentical) {
+                    for (let i = 0; i < importedTrucks.length; i++) {
+                        const it = importedTrucks[i]!;
+                        const ct = currentTrucks[i]!;
+                        if (
+                            it.ticketNo !== ct.ticketNo ||
+                            it.plateNumber !== ct.plateNumber ||
+                            it.weight1 !== ct.weight1 ||
+                            it.weight2 !== ct.weight2 ||
+                            it.weightNet !== ct.weightNet ||
+                            it.note !== ct.note
+                        ) {
+                            isIdentical = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (isIdentical) continue;
+
+                // Auto-sync overwrites the trucks list with matchedTrips
+                const success = await WeighbridgeService.saveTrucks(barge.id, importedTrucks);
+                if (success) {
+                    hasUpdates = true;
+                    // If this is the currently active barge, reload trucks ref
+                    if (activeBargeId.value === barge.id) {
+                        trucks.value = importedTrucks;
+                    }
+                }
+            }
+        }
+        if (hasUpdates) {
+            showToast('Đã tự động đồng bộ danh sách xe từ Báo cáo phân bổ!', 'success');
+        }
+    } catch (e) {
+        console.error('Lỗi khi tự động đồng bộ từ phân bổ:', e);
+    }
+}
+
 // Sync allocator trips for a single active barge
 const syncFromAllocatorActiveBarge = async () => {
     const bargeId = activeBargeId.value;
@@ -2899,9 +3009,10 @@ const triggerPrint = (singleTruck?: Truck) => {
 };
 
 // Initialize
-onMounted(() => {
-    loadVessels();
+onMounted(async () => {
+    await loadVessels();
     loadGlobalGoods();
+    await autoSyncAllBarges();
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);

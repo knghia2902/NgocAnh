@@ -433,7 +433,7 @@ watch(itemsPerPage, () => {
 const searchQuery = ref('');
 
 // Parse CSV text safely
-function parseCSVText(text: string, manualOrderNo: string = ''): CSVRecord[] {
+function parseCSVText(text: string): CSVRecord[] {
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
     
@@ -502,7 +502,7 @@ function parseCSVText(text: string, manualOrderNo: string = ''): CSVRecord[] {
             bargeName: (idxBarge !== -1 ? parts[idxBarge] : '') || '',
             driverName: (idxDriver !== -1 ? parts[idxDriver] : '') || '',
             notes: (idxNotes !== -1 ? parts[idxNotes] : '') || '',
-            orderNo: manualOrderNo.trim() || ((idxOrderNo !== -1 ? parts[idxOrderNo] : '') || '')
+            orderNo: (idxOrderNo !== -1 ? parts[idxOrderNo] : '') || ''
         });
     }
     return records;
@@ -683,7 +683,7 @@ async function handleTicketImport(event: Event) {
         loadingCSV.value = true;
         try {
             const text = await file.text();
-            const newRecords = parseCSVText(text, importOrderNo.value);
+            const newRecords = parseCSVText(text);
             
             let finalRecords = newRecords;
             const { dupRecords, description } = getHistoryDuplicates(newRecords);
