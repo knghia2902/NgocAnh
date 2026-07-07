@@ -665,13 +665,6 @@ function getHistoryDuplicates(records: CSVRecord[]): { dupRecords: CSVRecord[], 
 
 // Handle Ticket Import (accepts CSV and Excel)
 async function handleTicketImport(event: Event) {
-    if (!importOrderNo.value.trim()) {
-        addToast('Vui lòng nhập Mã lệnh trước khi import!', 'error');
-        // Reset file input value so that change event triggers if they select again after fixing
-        const target = event.target as HTMLInputElement;
-        target.value = '';
-        return;
-    }
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
     if (!file) return;
