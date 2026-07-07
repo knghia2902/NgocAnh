@@ -3142,15 +3142,6 @@ async function compileAndDownload() {
                 <div class="flex items-center gap-2 flex-wrap">
                     <!-- Tab 1 Actions -->
                     <template v-if="activeDataTab === 'source'">
-                        <div class="flex items-center gap-1.5 border border-amber-200 bg-amber-50/50 rounded-[8px] px-2 py-0.5">
-                            <span class="text-[9px] font-bold text-amber-800 uppercase tracking-wider">Mã lệnh *</span>
-                            <input 
-                                type="text" 
-                                v-model="importOrderNo" 
-                                placeholder="Bắt buộc nhập mã lệnh..."
-                                class="h-6 px-2 py-1 bg-white border border-amber-200 rounded-[6px] text-[10px] font-bold focus:outline-none focus:border-amber-500 transition-all w-40 placeholder:text-gray-300 placeholder:font-normal"
-                            >
-                        </div>
                         <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center font-bold text-[10px]">
                             KL: {{ totalCsvWeightTons.toFixed(2) }}t
                         </div>
