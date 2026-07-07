@@ -2459,6 +2459,10 @@ async function deleteGeneratedTrip(trip: SplitTrip) {
 }
 
 async function editHistoryTripOrderNo(trip: SplitTrip) {
+    if (authStore.role !== 'admin') {
+        addToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     const currentOrderNo = trip.orderNo || '';
     const newOrderNo = prompt(`Nhập Mã lệnh mới cho xe "${trip.plateNumber}" rời bến lúc ${trip.timeStr || ''}:`, currentOrderNo);
     if (newOrderNo === null) return; // Cancelled
@@ -2475,6 +2479,10 @@ async function editHistoryTripOrderNo(trip: SplitTrip) {
 }
 
 async function deleteHistoryTrip(trip: SplitTrip) {
+    if (authStore.role !== 'admin') {
+        addToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     const proceed = await showConfirm({
         title: 'Xóa bản ghi lịch sử',
         message: `Bạn có chắc chắn muốn xóa xe "${trip.plateNumber}" rời bến lúc ${trip.timeStr || ''} khỏi Sổ theo dõi?`,
@@ -2522,6 +2530,10 @@ async function clearAllGeneratedTrips() {
 
 // Clear all history
 async function clearHistory() {
+    if (authStore.role !== 'admin') {
+        addToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     const confirmClearHistory = await showConfirm({
         title: 'Xóa sạch Sổ Theo Dõi',
         message: 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong Sổ Theo Dõi không? Hành động này không thể hoàn tác!',
@@ -3517,7 +3529,7 @@ async function compileAndDownload() {
                                     </div>
                                 </th>
                                 <th class="py-1 px-3 text-center w-16 bg-gray-55 font-bold select-none">Trạng thái</th>
-                                <th class="py-1 px-3 text-center w-20 bg-gray-55 font-bold select-none">Hành động</th>
+                                <th v-if="authStore.role === 'admin'" class="py-1 px-3 text-center w-20 bg-gray-55 font-bold select-none">Hành động</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-[#4a2c32]/90">
@@ -3555,7 +3567,7 @@ async function compileAndDownload() {
                                         <span class="material-symbols-outlined text-[13px] font-black">close</span>
                                     </span>
                                 </td>
-                                <td class="py-1 px-3 text-center">
+                                <td v-if="authStore.role === 'admin'" class="py-1 px-3 text-center">
                                     <div class="flex items-center justify-center gap-1.5">
                                         <button 
                                             @click="editHistoryTripOrderNo(trip)"
@@ -3575,7 +3587,7 @@ async function compileAndDownload() {
                                 </td>
                             </tr>
                             <tr v-if="filteredHistoryTrips.length === 0">
-                                <td colspan="11" class="p-8 text-center text-gray-400 italic">
+                                <td :colspan="authStore.role === 'admin' ? 11 : 10" class="p-8 text-center text-gray-400 italic">
                                     Không tìm thấy bản ghi nào khớp bộ lọc!
                                 </td>
                             </tr>

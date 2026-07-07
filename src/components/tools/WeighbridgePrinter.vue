@@ -2245,6 +2245,10 @@ async function autoSyncAllBarges() {
 
 // Sync allocator trips for a single active barge
 const syncFromAllocatorActiveBarge = async () => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     const bargeId = activeBargeId.value;
     if (!bargeId || !activeBarge.value) {
         showToast('Vui lòng chọn một sà lan trước!', 'error');
@@ -2376,6 +2380,10 @@ const syncFromAllocatorActiveBarge = async () => {
 
 // Excel Upload and Analysis
 const handleExcelFile = async (file: File) => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (!activeBargeId.value) {
         showToast('Vui lòng chọn một sà lan trước!', 'error');
         return;
@@ -2718,6 +2726,10 @@ const downloadSampleExcel = () => {
 
 // Truck CRUD Dialog Functions
 const openAddTruckDialog = () => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể thêm xe.', 'error');
         return;
@@ -2741,6 +2753,10 @@ const openAddTruckDialog = () => {
 };
 
 const openEditTruckDialog = (truck: Truck) => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể sửa thông tin.', 'error');
         return;
@@ -2764,6 +2780,10 @@ const onWeightInput = () => {
 };
 
 const saveTruck = async () => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể lưu dữ liệu.', 'error');
         return;
@@ -2825,6 +2845,10 @@ const saveTruck = async () => {
 };
 
 const deleteTruck = async (id: number, plate: string) => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     if (cfgForm.locked) {
         showToast('Sà lan đang bị khóa! Không thể xóa xe.', 'error');
         return;
@@ -2858,6 +2882,10 @@ const deleteTruck = async (id: number, plate: string) => {
 };
 
 const clearTrucks = async () => {
+    if (authStore.role !== 'admin') {
+        showToast('Bạn không có quyền thực hiện thao tác này!', 'error');
+        return;
+    }
     const bargeId = activeBargeId.value;
     if (!bargeId) return;
     if (cfgForm.locked) {
@@ -3582,8 +3610,8 @@ onUnmounted(() => {
                         <div v-if="activeTab === 'data'" class="flex-1 flex flex-col gap-4 min-h-0 animate-fade-in">
                             <!-- Stats & Excel Upload Side-by-Side -->
                             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                                <!-- Stats Grid (6 cols) -->
-                                <div class="lg:col-span-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <!-- Stats Grid (6 cols / 12 cols depending on role) -->
+                                <div :class="authStore.role === 'admin' ? 'lg:col-span-6' : 'lg:col-span-12'" class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div class="bg-white rounded-2xl p-3 soft-shadow border border-primary/5 flex items-center gap-3">
                                         <div class="size-9 bg-primary/10 text-primary rounded-[12px] flex items-center justify-center flex-shrink-0">
                                             <span class="material-symbols-outlined text-lg">local_shipping</span>
@@ -3614,7 +3642,7 @@ onUnmounted(() => {
                                 </div>
 
                                 <!-- Compact Excel Upload (3 cols) -->
-                                <div 
+                                <div v-if="authStore.role === 'admin'"
                                     @dragover.prevent
                                     @drop="cfgForm.locked ? null : handleExcelDrop($event)"
                                     :class="['lg:col-span-3 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50', cfgForm.locked ? 'opacity-50 pointer-events-none' : '']"
@@ -3649,7 +3677,7 @@ onUnmounted(() => {
                                 </div>
 
                                 <!-- Direct Sync Card (3 cols) -->
-                                <div 
+                                <div v-if="authStore.role === 'admin'"
                                     :class="['lg:col-span-3 bg-white rounded-2xl p-3 soft-shadow border border-primary/5 hover:border-primary/20 transition-all flex items-center justify-between gap-3 bg-gray-50/50', cfgForm.locked ? 'opacity-50 pointer-events-none' : '']"
                                 >
                                     <div class="flex items-center gap-2 min-w-0 cursor-pointer" @click="cfgForm.locked ? null : syncFromAllocatorActiveBarge()">
@@ -3680,7 +3708,7 @@ onUnmounted(() => {
                                     </h3>
                                     
                                     <div class="flex items-center gap-1.5 flex-wrap">
-                                        <button 
+                                        <button v-if="authStore.role === 'admin'"
                                             @click="openAddTruckDialog"
                                             :disabled="cfgForm.locked"
                                             class="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all"
@@ -3688,7 +3716,7 @@ onUnmounted(() => {
                                             <span class="material-symbols-outlined text-xs">add</span>
                                             Thêm xe
                                         </button>
-                                        <button 
+                                        <button v-if="authStore.role === 'admin'"
                                             @click="clearTrucks"
                                             :disabled="cfgForm.locked"
                                             class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-[8px] text-[10px] flex items-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
@@ -3791,10 +3819,10 @@ onUnmounted(() => {
                                                         <button @click="triggerPrint(truck)" class="size-7 rounded-full bg-teal-50 hover:bg-teal-100 text-teal-600 flex items-center justify-center transition-all" title="In phiếu này">
                                                             <span class="material-symbols-outlined text-sm">print</span>
                                                         </button>
-                                                        <button @click="openEditTruckDialog(truck)" :disabled="cfgForm.locked" class="size-7 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none" title="Sửa">
+                                                        <button v-if="authStore.role === 'admin'" @click="openEditTruckDialog(truck)" :disabled="cfgForm.locked" class="size-7 rounded-full bg-primary/5 hover:bg-primary/10 text-primary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none" title="Sửa">
                                                             <span class="material-symbols-outlined text-sm">edit</span>
                                                         </button>
-                                                        <button @click="deleteTruck(truck.id, truck.plateNumber)" :disabled="cfgForm.locked" class="size-7 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none" title="Xóa">
+                                                        <button v-if="authStore.role === 'admin'" @click="deleteTruck(truck.id, truck.plateNumber)" :disabled="cfgForm.locked" class="size-7 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none" title="Xóa">
                                                             <span class="material-symbols-outlined text-sm">delete</span>
                                                         </button>
                                                     </div>
