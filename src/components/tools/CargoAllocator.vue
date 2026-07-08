@@ -326,14 +326,27 @@ function splitWeightRandomly(weightTons: number, numTrips: number, tripLimit: nu
 const timeIntervalMinutes = ref(90);
 
 const ticketPrefix = ref('');
-const ticketSuffix = ref('/26B');
+const ticketSuffix = ref('/mmyy');
 const ticketStart = ref(1);
 const ticketPadding = ref(6);
 const useAutoTicketNo = ref(true);
 
 const previewTicketNo = computed(() => {
     const num = String(ticketStart.value).padStart(ticketPadding.value, '0');
-    return ticketPrefix.value + num + ticketSuffix.value;
+    const dateObj = new Date();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const yy = String(dateObj.getFullYear()).slice(-2);
+    
+    let suffixPattern = ticketSuffix.value || '';
+    if (suffixPattern.toLowerCase().includes('mmyy')) {
+        suffixPattern = suffixPattern.replace(/mmyy/i, `${mm}${yy}`);
+    } else {
+        suffixPattern = suffixPattern
+            .replace(/mm/g, mm)
+            .replace(/yy/g, yy);
+    }
+    
+    return ticketPrefix.value + num + suffixPattern;
 });
 
 watch(ticketPrefix, async (newVal) => {
@@ -2227,7 +2240,20 @@ function regenerateAllocatedTrips() {
         if (useAutoTicketNo.value) {
             const ticketNumVal = ticketStart.value + idx;
             const paddedNum = String(ticketNumVal).padStart(ticketPadding.value, '0');
-            finalTicketNo = ticketPrefix.value + paddedNum + ticketSuffix.value;
+            const dateObj = tripDate2 || new Date();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const yy = String(dateObj.getFullYear()).slice(-2);
+            
+            let suffixPattern = ticketSuffix.value || '';
+            if (suffixPattern.toLowerCase().includes('mmyy')) {
+                suffixPattern = suffixPattern.replace(/mmyy/i, `${mm}${yy}`);
+            } else {
+                suffixPattern = suffixPattern
+                    .replace(/mm/g, mm)
+                    .replace(/yy/g, yy);
+            }
+            
+            finalTicketNo = ticketPrefix.value + paddedNum + suffixPattern;
         }
         
         return {
@@ -2992,7 +3018,7 @@ async function compileAndDownload() {
                             <input 
                                 type="text" 
                                 v-model="ticketSuffix" 
-                                placeholder="Ví dụ: /26B"
+                                placeholder="Ví dụ: /mmyy"
                                 class="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-[8px] text-[11px] font-semibold focus:outline-none focus:border-primary transition-all font-mono"
                             >
                         </div>
