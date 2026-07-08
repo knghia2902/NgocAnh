@@ -222,6 +222,8 @@ syncChannel.onmessage = async (event) => {
                     vehiclesList.value = savedVehicles;
                 }
             }
+        } else if (event.data.type === 'sync_response') {
+            addToast(event.data.message, event.data.status);
         }
     } catch (e) {
         console.error('Lỗi khi đồng bộ giữa các tab:', e);

@@ -2140,7 +2140,11 @@ async function autoSyncAllBarges(isManual = false) {
     try {
         const allocatorTrips = await dbContext.get<any[]>('allocator_generated_trips') || [];
         if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) {
-            if (isManual) showToast('Không tìm thấy chuyến xe nào trong Báo cáo phân bổ để đồng bộ!');
+            if (isManual) {
+                const emptyMsg = 'Không tìm thấy chuyến xe nào trong Báo cáo phân bổ để đồng bộ!';
+                showToast(emptyMsg);
+                syncChannel.postMessage({ type: 'sync_response', message: emptyMsg, status: 'success' });
+            }
             return;
         }
 
@@ -2158,7 +2162,9 @@ async function autoSyncAllBarges(isManual = false) {
         }
 
         if (lockedBarges.length > 0) {
-            showToast(`Đồng bộ thất bại! Sà lan đang khóa: ${lockedBarges.join(', ')}. Vui lòng mở khóa trước.`, 'error');
+            const errorMsg = `Đồng bộ thất bại! Sà lan đang khóa: ${lockedBarges.join(', ')}. Vui lòng mở khóa trước.`;
+            showToast(errorMsg, 'error');
+            syncChannel.postMessage({ type: 'sync_response', message: errorMsg, status: 'error' });
             return;
         }
 
@@ -2260,12 +2266,18 @@ async function autoSyncAllBarges(isManual = false) {
             }
         }
         if (hasUpdates) {
-            showToast('Đã đồng bộ danh sách xe qua Phần mềm in phiếu cân thành công! 🚢', 'success');
+            const successMsg = 'Đã đồng bộ danh sách xe qua Phần mềm in phiếu cân thành công! 🚢';
+            showToast(successMsg, 'success');
+            syncChannel.postMessage({ type: 'sync_response', message: successMsg, status: 'success' });
         } else if (isManual) {
             if (matchedBargeCount === 0) {
-                showToast('Không tìm thấy sà lan nào trùng khớp mã lệnh để đồng bộ!');
+                const noBargeMsg = 'Không tìm thấy sà lan nào trùng khớp mã lệnh để đồng bộ!';
+                showToast(noBargeMsg);
+                syncChannel.postMessage({ type: 'sync_response', message: noBargeMsg, status: 'success' });
             } else {
-                showToast('Dữ liệu xe của các sà lan đã trùng khớp, không cần đồng bộ thêm!');
+                const upToDateMsg = 'Dữ liệu xe của các sà lan đã trùng khớp, không cần đồng bộ thêm!';
+                showToast(upToDateMsg);
+                syncChannel.postMessage({ type: 'sync_response', message: upToDateMsg, status: 'success' });
             }
         }
     } catch (e) {
