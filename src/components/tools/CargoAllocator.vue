@@ -2349,6 +2349,23 @@ const totalSplitWeightTons = computed(() => {
     return generatedTrips.value.reduce((acc, t) => acc + t.weightTons, 0);
 });
 
+// Computed: Check if current generated trips are already saved to history
+const isAlreadySaved = computed(() => {
+    if (generatedTrips.value.length === 0) return false;
+    return generatedTrips.value.every(gt => {
+        return existingTrips.value.some(et => {
+            if (gt.ticketNo && et.ticketNo && gt.ticketNo === et.ticketNo) {
+                return true;
+            }
+            const gtDateStr = formatExcelDateTimeCombined(gt.date1Obj);
+            const etDateStr = formatExcelDateTimeCombined(et.date1Obj);
+            return normalizePlate(gt.plateNumber) === normalizePlate(et.plateNumber) &&
+                   gt.weightNet === et.weightNet &&
+                   gtDateStr === etDateStr;
+        });
+    });
+});
+
 // Paged trips
 const pagedTrips = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage.value;
@@ -3289,11 +3306,11 @@ async function compileAndDownload() {
                         </button>
                         <button 
                             @click="saveToHistory"
-                            :disabled="generatedTrips.length === 0"
+                            :disabled="generatedTrips.length === 0 || isAlreadySaved"
                             class="h-7 px-3 bg-primary text-white border border-primary text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <span class="material-symbols-outlined text-[14px]">save</span>
-                            Lưu
+                            {{ isAlreadySaved ? 'Đã lưu' : 'Lưu' }}
                         </button>
                         <button 
                             @click="clearAllGeneratedTrips"
