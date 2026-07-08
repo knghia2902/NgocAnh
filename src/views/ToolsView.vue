@@ -25,6 +25,10 @@ onMounted(async () => {
     const toolParam = route.query.tool;
     if (typeof toolParam === 'string' && toolParam) {
         openTool(toolParam);
+    } else if (authStore.role === 'staff') {
+        // If staff, go directly to "Phần mềm in phiếu cân xe"
+        activeToolId.value = 'weighbridge';
+        activeTab.value = 'printer';
     }
 });
 

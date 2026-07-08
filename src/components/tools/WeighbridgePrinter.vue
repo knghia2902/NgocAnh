@@ -2141,6 +2141,24 @@ async function autoSyncAllBarges() {
         const allocatorTrips = await dbContext.get<any[]>('allocator_generated_trips') || [];
         if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) return;
 
+        // Check if any matched barge for allocatorTrips is locked
+        const lockedBarges: string[] = [];
+        for (const vessel of vessels.value) {
+            if (vessel.barges) {
+                for (const barge of vessel.barges) {
+                    const hasMatch = allocatorTrips.some((t: any) => isBargeMatch(t, barge));
+                    if (hasMatch && barge.config?.locked) {
+                        lockedBarges.push(`"${barge.name}" (${barge.config.orderNo || ''})`);
+                    }
+                }
+            }
+        }
+
+        if (lockedBarges.length > 0) {
+            showToast(`Đồng bộ thất bại! Sà lan đang khóa: ${lockedBarges.join(', ')}. Vui lòng mở khóa trước.`, 'error');
+            return;
+        }
+
         let hasUpdates = false;
         
         for (const vessel of vessels.value) {
@@ -2278,6 +2296,24 @@ const syncFromAllocatorActiveBarge = async () => {
         const allocatorTrips = data?.settings?.allocator_generated_trips || [];
         if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) {
             showToast('Không tìm thấy chuyến xe nào trong Báo cáo phân bổ. Hãy thực hiện phân bổ tải trọng trước!', 'error');
+            return;
+        }
+
+        // Check if any matched barge for allocatorTrips is locked
+        const lockedBarges: string[] = [];
+        for (const vessel of vessels.value) {
+            if (vessel.barges) {
+                for (const barge of vessel.barges) {
+                    const hasMatch = allocatorTrips.some((t: any) => isBargeMatch(t, barge));
+                    if (hasMatch && barge.config?.locked) {
+                        lockedBarges.push(`"${barge.name}" (${barge.config.orderNo || ''})`);
+                    }
+                }
+            }
+        }
+
+        if (lockedBarges.length > 0) {
+            showToast(`Đồng bộ thất bại! Sà lan đang khóa: ${lockedBarges.join(', ')}. Vui lòng mở khóa trước.`, 'error');
             return;
         }
 
