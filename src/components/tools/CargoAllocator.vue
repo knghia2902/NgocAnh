@@ -1932,7 +1932,6 @@ watch(generatedTrips, async (newVal) => {
     if (isSyncingFromChannel || isInitLoading.value) return;
     try {
         await dbContext.set('allocator_generated_trips', newVal);
-        syncChannel.postMessage({ type: 'generated' });
     } catch (e) {
         console.error('Lỗi khi lưu danh sách phân bổ vào IndexedDB:', e);
     }
@@ -2370,6 +2369,21 @@ const historyTotalPages = computed(() => {
 watch(historySearchQuery, () => {
     historyCurrentPage.value = 1;
 });
+
+async function triggerManualSyncToPrinter() {
+    if (generatedTrips.value.length === 0) {
+        addToast('Không có dữ liệu phân bổ để đồng bộ!', 'info');
+        return;
+    }
+    try {
+        await dbContext.set('allocator_generated_trips', generatedTrips.value);
+    } catch (e) {
+        console.error('Lỗi lưu IndexedDB trước đồng bộ:', e);
+    }
+    await saveTicketsToSupabase();
+    syncChannel.postMessage({ type: 'manual_sync_request' });
+    addToast('Đang tiến hành đồng bộ theo mã lệnh qua In phiếu cân...', 'info');
+}
 
 // Save generated temporary trips into history
 async function saveToHistory() {
@@ -3237,6 +3251,14 @@ async function compileAndDownload() {
                         <div class="h-7 px-2.5 bg-teal-50 rounded-[8px] border border-teal-200 text-teal-700 flex items-center font-bold text-[10px]">
                             KL: {{ totalSplitWeightTons.toFixed(2) }}t
                         </div>
+                        <button 
+                            @click="triggerManualSyncToPrinter"
+                            :disabled="generatedTrips.length === 0 || compiling"
+                            class="h-7 px-3 bg-teal-600 text-white border border-teal-600 text-[10px] font-bold rounded-[8px] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed animate-fade-in"
+                        >
+                            <span class="material-symbols-outlined text-[14px]">sync</span>
+                            Đồng bộ qua In phiếu
+                        </button>
                         <button 
                             @click="saveToHistory"
                             :disabled="generatedTrips.length === 0"

@@ -320,7 +320,7 @@ const handleSidebarSwitch = (id: string) => {
               
               <!-- Weighbridge Printer Tab -->
               <WeighbridgePrinter 
-                v-if="activeTab === 'printer'" 
+                v-show="activeTab === 'printer'" 
                 :hide-card="true"
               />
               

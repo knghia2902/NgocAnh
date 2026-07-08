@@ -25,8 +25,8 @@ syncChannel.onmessage = async (event) => {
             if (saved && Array.isArray(saved)) {
                 globalGoodsList.value = saved;
             }
-        } else if (event.data.type === 'generated') {
-            await autoSyncAllBarges();
+        } else if (event.data.type === 'manual_sync_request') {
+            await autoSyncAllBarges(true);
         }
     } catch (e) {
         console.error('Lỗi khi đồng bộ qua in phiếu cân:', e);
@@ -2136,10 +2136,13 @@ function isBargeMatch(trip: any, barge: Barge): boolean {
 }
 
 // Auto-sync allocator trips for all barges of loaded vessels
-async function autoSyncAllBarges() {
+async function autoSyncAllBarges(isManual = false) {
     try {
         const allocatorTrips = await dbContext.get<any[]>('allocator_generated_trips') || [];
-        if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) return;
+        if (!Array.isArray(allocatorTrips) || allocatorTrips.length === 0) {
+            if (isManual) showToast('Không tìm thấy chuyến xe nào trong Báo cáo phân bổ để đồng bộ!');
+            return;
+        }
 
         // Check if any matched barge for allocatorTrips is locked
         const lockedBarges: string[] = [];
@@ -2160,6 +2163,7 @@ async function autoSyncAllBarges() {
         }
 
         let hasUpdates = false;
+        let matchedBargeCount = 0;
         
         for (const vessel of vessels.value) {
             if (!vessel.barges) continue;
@@ -2171,6 +2175,8 @@ async function autoSyncAllBarges() {
                 // Filter trips for this barge
                 const matchedTrips = allocatorTrips.filter((t: any) => isBargeMatch(t, barge));
                 if (matchedTrips.length === 0) continue;
+
+                matchedBargeCount++;
 
                 // Map to Truck type
                 const importedTrucks: Truck[] = matchedTrips.map((t: any, idx: number) => {
@@ -2254,7 +2260,13 @@ async function autoSyncAllBarges() {
             }
         }
         if (hasUpdates) {
-            showToast('Đã tự động đồng bộ danh sách xe từ Báo cáo phân bổ!', 'success');
+            showToast('Đã đồng bộ danh sách xe qua Phần mềm in phiếu cân thành công! 🚢', 'success');
+        } else if (isManual) {
+            if (matchedBargeCount === 0) {
+                showToast('Không tìm thấy sà lan nào trùng khớp mã lệnh để đồng bộ!');
+            } else {
+                showToast('Dữ liệu xe của các sà lan đã trùng khớp, không cần đồng bộ thêm!');
+            }
         }
     } catch (e) {
         console.error('Lỗi khi tự động đồng bộ từ phân bổ:', e);
@@ -3076,7 +3088,6 @@ const triggerPrint = (singleTruck?: Truck) => {
 onMounted(async () => {
     await loadVessels();
     loadGlobalGoods();
-    await autoSyncAllBarges();
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
