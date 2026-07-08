@@ -1863,6 +1863,78 @@ watch(activeBargeId, async (newBargeId) => {
     }
 });
 
+function getNextTicketNumber(dateStr: string, existingTrucks: Truck[], currentSeed: string | number, excludeId?: number): string {
+    let date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+        date = new Date();
+    }
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yy = String(date.getFullYear()).slice(-2);
+    const suffix = `${mm}${yy}`;
+    
+    let maxSerial = 0;
+    let found = false;
+    for (const t of existingTrucks) {
+        if (excludeId && t.id === excludeId) continue;
+        const parts = (t.ticketNo || '').split('/');
+        if (parts.length === 2 && parts[1] === suffix) {
+            found = true;
+            const serialNum = parseInt(parts[0] || '0', 10);
+            if (!isNaN(serialNum) && serialNum > maxSerial) {
+                maxSerial = serialNum;
+            }
+        }
+    }
+    
+    let nextSerial = 1;
+    if (found) {
+        nextSerial = maxSerial + 1;
+    } else {
+        const parsedSeed = parseInt(String(currentSeed), 10);
+        if (!isNaN(parsedSeed) && parsedSeed > 0) {
+            nextSerial = parsedSeed;
+        }
+    }
+    
+    const serialStr = String(nextSerial).padStart(6, '0');
+    return `${serialStr}/${suffix}`;
+}
+
+function regenerateAllTicketNumbers(trucksList: Truck[], startingSeed: string | number): Truck[] {
+    const sorted = [...trucksList].sort((a, b) => {
+        const timeA = new Date(a.dateOut || a.dateIn || 0).getTime();
+        const timeB = new Date(b.dateOut || b.dateIn || 0).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        return a.id - b.id;
+    });
+
+    const parsedSeed = parseInt(String(startingSeed), 10);
+    const defaultStart = !isNaN(parsedSeed) && parsedSeed > 0 ? parsedSeed : 1;
+
+    const serialCounters: Record<string, number> = {};
+
+    return sorted.map(truck => {
+        let date = new Date(truck.dateOut || truck.dateIn || '');
+        if (isNaN(date.getTime())) {
+            date = new Date();
+        }
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yy = String(date.getFullYear()).slice(-2);
+        const suffix = `${mm}${yy}`;
+
+        if (serialCounters[suffix] === undefined) {
+            serialCounters[suffix] = defaultStart - 1;
+        }
+        serialCounters[suffix]++;
+        const serialStr = String(serialCounters[suffix]).padStart(6, '0');
+        
+        return {
+            ...truck,
+            ticketNo: `${serialStr}/${suffix}`
+        };
+    });
+}
+
 // Handle ticket prefix or seed change from UI to regenerate ticket numbers
 const handleTicketConfigChange = async () => {
     const bargeId = activeBargeId.value;
@@ -1888,16 +1960,8 @@ const handleTicketConfigChange = async () => {
     if (trucks.value.length === 0) return;
     
     // Regenerate ticket numbers
-    const prefix = cfgForm.ticketPrefix || 'PC-';
-    const seedStr = String(cfgForm.ticketSeed || '1');
-    let seed = parseInt(seedStr) || 1;
-    const padLength = seedStr.length;
-
-    trucks.value.forEach(truck => {
-        const padNum = String(seed).padStart(padLength, '0');
-        truck.ticketNo = `${prefix}${padNum}`;
-        seed++;
-    });
+    const updatedTrucks = regenerateAllTicketNumbers(trucks.value, cfgForm.ticketSeed);
+    trucks.value = updatedTrucks;
 
     // Save updated list to Supabase
     saving.value = true;
@@ -2231,8 +2295,17 @@ async function autoSyncAllBarges(isManual = false) {
                     };
                 });
 
-                // Compare importedTrucks and currentTrucks to prevent redundant saves/toasts
                 const currentTrucks = await WeighbridgeService.getTrucks(barge.id);
+                let currentSeed = barge.config?.ticketSeed || '1';
+                for (const tr of importedTrucks) {
+                    if (!tr.ticketNo) {
+                        tr.ticketNo = getNextTicketNumber(tr.dateOut || tr.dateIn, [...currentTrucks, ...importedTrucks], currentSeed, tr.id);
+                        const serialPart = tr.ticketNo.split('/')[0];
+                        currentSeed = (parseInt(serialPart || '0', 10) || 1) + 1;
+                    }
+                }
+
+                // Compare importedTrucks and currentTrucks to prevent redundant saves/toasts
                 let isIdentical = importedTrucks.length === currentTrucks.length;
                 if (isIdentical) {
                     for (let i = 0; i < importedTrucks.length; i++) {
@@ -2258,9 +2331,13 @@ async function autoSyncAllBarges(isManual = false) {
                 const success = await WeighbridgeService.saveTrucks(barge.id, importedTrucks);
                 if (success) {
                     hasUpdates = true;
+                    barge.config.ticketSeed = String(currentSeed).padStart(6, '0');
+                    await WeighbridgeService.updateBargeConfig(barge.id, barge.config);
+                    
                     // If this is the currently active barge, reload trucks ref
                     if (activeBargeId.value === barge.id) {
                         trucks.value = importedTrucks;
+                        cfgForm.ticketSeed = barge.config.ticketSeed;
                     }
                 }
             }
@@ -2413,6 +2490,16 @@ const syncFromAllocatorActiveBarge = async () => {
             };
         });
 
+        let currentSeed = cfgForm.ticketSeed || '1';
+        for (const tr of importedTrucks) {
+            if (!tr.ticketNo) {
+                const tempAll = (action === 'overwrite') ? importedTrucks : [...currentTrucks, ...importedTrucks];
+                tr.ticketNo = getNextTicketNumber(tr.dateOut || tr.dateIn, tempAll, currentSeed, tr.id);
+                const serialPart = tr.ticketNo.split('/')[0];
+                currentSeed = (parseInt(serialPart || '0', 10) || 1) + 1;
+            }
+        }
+
         let allTrucks = [];
         if (action === 'overwrite') {
             allTrucks = importedTrucks;
@@ -2422,6 +2509,8 @@ const syncFromAllocatorActiveBarge = async () => {
 
         const success = await WeighbridgeService.saveTrucks(bargeId, allTrucks);
         if (success) {
+            cfgForm.ticketSeed = String(currentSeed).padStart(6, '0');
+            await WeighbridgeService.updateBargeConfig(bargeId, { ...cfgForm });
             showToast(`Đồng bộ thành công ${importedTrucks.length} xe từ Phân rã chuyến!`);
             trucks.value = await WeighbridgeService.getTrucks(bargeId);
         } else {
@@ -2662,10 +2751,7 @@ const confirmExcelMapping = async () => {
         const startRow = pendingExcelData.value.headerIndex + 1;
         const importedTrucks: Truck[] = [];
         
-        const prefix = cfgForm.ticketPrefix || 'PC-';
-        const seedStr = String(cfgForm.ticketSeed || '1');
-        let seed = parseInt(seedStr) || 1;
-        const padLength = seedStr.length;
+        let currentSeed = cfgForm.ticketSeed || '1';
 
         for (let r = startRow; r < pendingExcelData.value.rawRows.length; r++) {
             const row = pendingExcelData.value.rawRows[r];
@@ -2713,9 +2799,10 @@ const confirmExcelMapping = async () => {
                 ticketNo = String(row[ticketNoCol]).trim();
             }
             if (!ticketNo) {
-                const padNum = String(seed).padStart(padLength, '0');
-                ticketNo = `${prefix}${padNum}`;
-                seed++;
+                const tempAllTrucks = [...trucks.value, ...importedTrucks];
+                ticketNo = getNextTicketNumber(dOut || dIn, tempAllTrucks, currentSeed);
+                const serialPart = ticketNo.split('/')[0];
+                currentSeed = (parseInt(serialPart || '0', 10) || 1) + 1;
             }
 
             importedTrucks.push({
@@ -2739,7 +2826,7 @@ const confirmExcelMapping = async () => {
 
         if (success) {
             // Update seed in configuration
-            cfgForm.ticketSeed = String(seed).padStart(padLength, '0');
+            cfgForm.ticketSeed = String(currentSeed).padStart(6, '0');
             await WeighbridgeService.updateBargeConfig(bargeId, { ...cfgForm });
             
             // Reload list
@@ -2861,17 +2948,13 @@ const saveTruck = async () => {
         
         // Generate new ticket no if adding new
         if (dialogTruck.id === 0) {
-            const prefix = cfgForm.ticketPrefix || 'PC-';
-            const seedStr = String(cfgForm.ticketSeed || '1');
-            let seed = parseInt(seedStr) || 1;
-            const padLength = seedStr.length;
-
-            const padNum = String(seed).padStart(padLength, '0');
-            ticketNo = `${prefix}${padNum}`;
-            seed++;
-
-            // Update configuration seed
-            cfgForm.ticketSeed = String(seed).padStart(padLength, '0');
+            ticketNo = getNextTicketNumber(dialogTruck.dateOut || dialogTruck.dateIn, trucks.value, cfgForm.ticketSeed);
+            
+            // Extract the next serial and pad it
+            const serialPart = ticketNo.split('/')[0];
+            const nextSerial = (parseInt(serialPart || '0', 10) || 1) + 1;
+            cfgForm.ticketSeed = String(nextSerial).padStart(6, '0');
+            
             await WeighbridgeService.updateBargeConfig(bargeId, { ...cfgForm });
         }
 
