@@ -437,7 +437,7 @@ const activeVessel = computed(() => vessels.value.find(v => v.id === activeVesse
 const activeBarge = computed<Barge | null>(() => activeVessel.value?.barges?.find(b => b.id === activeBargeId.value) || null);
 
 const allBarges = computed(() => {
-    const list: Array<{ id: number; name: string; vesselId: number; vesselName: string; created_at?: string; locked: boolean }> = [];
+    const list: Array<{ id: number; name: string; vesselId: number; vesselName: string; created_at?: string; locked: boolean; orderNo: string }> = [];
     vessels.value.forEach(v => {
         if (v.barges) {
             v.barges.forEach(b => {
@@ -447,15 +447,23 @@ const allBarges = computed(() => {
                     vesselId: v.id,
                     vesselName: v.name,
                     created_at: b.created_at,
-                    locked: b.config?.locked || false
+                    locked: b.config?.locked || false,
+                    orderNo: b.config?.orderNo ? String(b.config.orderNo).trim() : ''
                 });
             });
         }
     });
     return list.sort((a, b) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA; // Show latest first
+        const orderA = a.orderNo;
+        const orderB = b.orderNo;
+        
+        if (!orderA && orderB) return 1;
+        if (orderA && !orderB) return -1;
+        if (!orderA && !orderB) {
+            return a.name.localeCompare(b.name);
+        }
+        
+        return orderA.localeCompare(orderB, undefined, { numeric: true, sensitivity: 'base' });
     });
 });
 
@@ -3493,6 +3501,7 @@ onUnmounted(() => {
                                         <tr class="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold">
                                             <th class="px-3 py-2 w-12 text-center bg-gray-50">STT</th>
                                             <th class="px-3 py-2 bg-gray-50">Tên sà lan</th>
+                                            <th class="px-3 py-2 bg-gray-50">Mã lệnh</th>
                                             <th class="px-3 py-2 bg-gray-50">Thuộc Tàu</th>
                                             <th class="px-3 py-2 bg-gray-50">Thời gian bắt đầu</th>
                                             <th class="px-3 py-2 bg-gray-50">Thời gian kết thúc</th>
@@ -3504,6 +3513,12 @@ onUnmounted(() => {
                                         <tr v-for="(b, idx) in filteredAllBarges" :key="b.id" class="hover:bg-gray-50 transition-colors">
                                             <td class="px-3 py-2 text-center text-gray-400 font-bold">{{ idx + 1 }}</td>
                                             <td class="px-3 py-2 font-bold text-gray-900">{{ b.name }}</td>
+                                            <td class="px-3 py-2">
+                                                <span v-if="b.orderNo" class="px-2 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full text-[10px] font-black whitespace-nowrap">
+                                                    {{ b.orderNo }}
+                                                </span>
+                                                <span v-else class="text-gray-400 italic text-[10px]">-</span>
+                                            </td>
                                             <td class="px-3 py-2">
                                                 <span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-black whitespace-nowrap">
                                                     {{ b.vesselName }}
